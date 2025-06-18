@@ -8,6 +8,8 @@ import authRoutes from './routes/auth.js';
 import stateRoutes from './routes/states.js';
 import userRoutes from './routes/users.js';
 import permissionRoutes from './routes/permissions.js';
+import hospitalRoutes from './routes/hospitals.js'; // New hospital routes
+import dashboardRoutes from './routes/dashboard.js'; // New dashboard routes
 
 dotenv.config();
 
@@ -49,9 +51,12 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/dashboard', dashboardRoutes); // New dashboard routes
+
 app.use('/api/states', stateRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/permissions', permissionRoutes);
+app.use('/api/hospitals', hospitalRoutes); // New hospital routes
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

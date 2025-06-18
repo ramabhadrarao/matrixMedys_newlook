@@ -9,6 +9,8 @@ import {
   logout,
   forgotPassword,
   resetPassword,
+    changePassword, // Add this line
+
   getProfile,
 } from '../controllers/authController.js';
 
@@ -34,7 +36,14 @@ const resetPasswordValidation = [
   body('token').notEmpty().withMessage('Token is required'),
   body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
 ];
+// Add this validation rule
+const changePasswordValidation = [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+];
 
+// Add this route
+router.post('/change-password', authenticate, changePasswordValidation, validate, changePassword);
 // Routes
 router.post('/register', registerValidation, validate, register);
 router.post('/login', loginValidation, validate, login);

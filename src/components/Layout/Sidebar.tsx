@@ -4,6 +4,7 @@ import {
   Home, 
   MapPin, 
   Users, 
+  Building2,
   Settings, 
   LogOut,
   ChevronRight
@@ -26,11 +27,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       icon: Home,
       permission: null, // Always visible for authenticated users
     },
+    
     {
-      path: '/states',
-      name: 'States',
-      icon: MapPin,
-      permission: { resource: 'states', action: 'view' },
+      path: '/hospitals',
+      name: 'Hospitals',
+      icon: Building2,
+      permission: { resource: 'hospitals', action: 'view' },
     },
     {
       path: '/users',

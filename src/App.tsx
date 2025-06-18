@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -19,6 +20,15 @@ import StateForm from './components/States/StateForm';
 import UsersList from './components/Users/UsersList';
 import UserForm from './components/Users/UserForm';
 import PermissionsManagement from './components/Users/PermissionsManagement';
+
+// Hospital Components
+import HospitalsList from './components/Hospitals/HospitalsList';
+import HospitalForm from './components/Hospitals/HospitalForm';
+import HospitalDetails from './components/Hospitals/HospitalDetails';
+
+// Settings Components
+import Settings from './components/Settings/Settings';
+import ChangePassword from './components/Settings/ChangePassword';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -119,7 +129,13 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             
-            {/* States Routes */}
+            {/* Hospital Routes */}
+            <Route path="hospitals" element={<HospitalsList />} />
+            <Route path="hospitals/new" element={<HospitalForm />} />
+            <Route path="hospitals/:id" element={<HospitalDetails />} />
+            <Route path="hospitals/:id/edit" element={<HospitalForm />} />
+            
+            {/* States Routes - Moved to Settings/Masters */}
             <Route path="states" element={<StatesList />} />
             <Route path="states/new" element={<StateForm />} />
             <Route path="states/:id" element={<StatesList />} />
@@ -130,6 +146,15 @@ function App() {
             <Route path="users/new" element={<UserForm />} />
             <Route path="users/:id/edit" element={<UserForm />} />
             <Route path="users/:id/permissions" element={<PermissionsManagement />} />
+
+            {/* Settings Routes */}
+            <Route path="settings" element={<Settings />} />
+            <Route path="settings/change-password" element={<ChangePassword />} />
+            <Route path="settings/profile" element={<div className="p-6 text-center text-gray-500">Profile settings coming soon...</div>} />
+            <Route path="settings/notifications" element={<div className="p-6 text-center text-gray-500">Notification settings coming soon...</div>} />
+            <Route path="settings/permissions" element={<div className="p-6 text-center text-gray-500">Permission management coming soon...</div>} />
+            <Route path="settings/appearance" element={<div className="p-6 text-center text-gray-500">Appearance settings coming soon...</div>} />
+            <Route path="settings/language" element={<div className="p-6 text-center text-gray-500">Language settings coming soon...</div>} />
           </Route>
 
           {/* Fallback route */}
