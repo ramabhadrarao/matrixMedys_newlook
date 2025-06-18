@@ -1,4 +1,4 @@
-// src/components/Hospitals/HospitalsList.tsx
+// src/components/Hospitals/HospitalsList.tsx - Updated to handle new file structure
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -15,7 +15,11 @@ import {
   MapPin,
   FileText,
   CreditCard,
-  Users
+  Users,
+  Download,
+  ExternalLink,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -119,6 +123,40 @@ const HospitalsList: React.FC = () => {
     return new Date(date).toLocaleDateString();
   };
 
+  // Format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Get file icon based on mime type
+  const getFileIcon = (mimetype: string) => {
+    if (mimetype?.includes('pdf')) return <FileText className="w-4 h-4 text-red-600" />;
+    if (mimetype?.includes('word') || mimetype?.includes('document')) return <FileText className="w-4 h-4 text-blue-600" />;
+    if (mimetype?.includes('image')) return <FileText className="w-4 h-4 text-green-600" />;
+    return <FileText className="w-4 h-4 text-gray-600" />;
+  };
+
+  // Handle file download
+  const handleDownloadFile = (filename: string, originalName: string) => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const link = document.createElement('a');
+    link.href = `${API_BASE_URL}/files/download/${filename}`;
+    link.download = originalName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Handle file view
+  const handleViewFile = (filename: string) => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    window.open(`${API_BASE_URL}/files/view/${filename}`, '_blank');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -216,6 +254,9 @@ const HospitalsList: React.FC = () => {
                       Location
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Agreement
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -279,6 +320,39 @@ const HospitalsList: React.FC = () => {
                             {hospital.state.name} - {hospital.pincode}
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {hospital.agreementFile?.filename ? (
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center text-sm text-gray-900">
+                              {getFileIcon(hospital.agreementFile.mimetype)}
+                              <span className="ml-1 text-xs text-gray-600">
+                                {formatFileSize(hospital.agreementFile.size)}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <button
+                                onClick={() => handleViewFile(hospital.agreementFile!.filename)}
+                                className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                                title="View File"
+                              >
+                                <Eye className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDownloadFile(hospital.agreementFile!.filename, hospital.agreementFile!.originalName)}
+                                className="text-green-600 hover:text-green-800 p-1 rounded"
+                                title="Download"
+                              >
+                                <Download className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 flex items-center">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            No file
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -363,6 +437,32 @@ const HospitalsList: React.FC = () => {
                           <div className="flex items-center text-sm text-gray-600">
                             <FileText className="w-4 h-4 mr-2" />
                             GST: {hospital.gstNumber}
+                          </div>
+                          
+                          {/* Agreement File for Mobile */}
+                          <div className="flex items-center text-sm text-gray-600">
+                            <FileText className="w-4 h-4 mr-2" />
+                            Agreement: {hospital.agreementFile?.filename ? (
+                              <div className="flex items-center space-x-2 ml-1">
+                                <span className="text-green-600">Available</span>
+                                <button
+                                  onClick={() => handleViewFile(hospital.agreementFile!.filename)}
+                                  className="text-blue-600 hover:text-blue-800"
+                                  title="View File"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadFile(hospital.agreementFile!.filename, hospital.agreementFile!.originalName)}
+                                  className="text-green-600 hover:text-green-800"
+                                  title="Download"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 ml-1">Not uploaded</span>
+                            )}
                           </div>
                         </div>
                         
@@ -459,7 +559,7 @@ const HospitalsList: React.FC = () => {
           >
             <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Hospital</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <strong>"{hospitalToDelete.name}"</strong>? This action cannot be undone and will also delete all associated contacts.
+              Are you sure you want to delete <strong>"{hospitalToDelete.name}"</strong>? This action cannot be undone and will also delete all associated contacts and files.
             </p>
             <div className="flex justify-end space-x-4">
               <button

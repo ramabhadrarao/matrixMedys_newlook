@@ -1,15 +1,17 @@
-// server/routes/hospitals.js
+// server/routes/hospitals.js - Updated with file upload
 import express from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
+import upload from '../middleware/upload.js';
 import {
   getHospitals,
   getHospital,
   createHospital,
   updateHospital,
   deleteHospital,
+  deleteHospitalFile,
   getHospitalContacts,
   createHospitalContact,
   updateHospitalContact,
@@ -45,9 +47,31 @@ const contactValidation = [
 // Hospital routes
 router.get('/', authenticate, checkPermission('hospitals', 'view'), getHospitals);
 router.get('/:id', authenticate, checkPermission('hospitals', 'view'), getHospital);
-router.post('/', authenticate, checkPermission('hospitals', 'create'), hospitalValidation, validate, createHospital);
-router.put('/:id', authenticate, checkPermission('hospitals', 'update'), hospitalValidation, validate, updateHospital);
+
+// Create hospital with optional file upload
+router.post('/', 
+  authenticate, 
+  checkPermission('hospitals', 'create'),
+  upload.single('agreementFile'), // Add file upload middleware
+  hospitalValidation, 
+  validate, 
+  createHospital
+);
+
+// Update hospital with optional file upload
+router.put('/:id', 
+  authenticate, 
+  checkPermission('hospitals', 'update'),
+  upload.single('agreementFile'), // Add file upload middleware
+  hospitalValidation, 
+  validate, 
+  updateHospital
+);
+
 router.delete('/:id', authenticate, checkPermission('hospitals', 'delete'), deleteHospital);
+
+// Delete hospital file specifically
+router.delete('/:id/file', authenticate, checkPermission('hospitals', 'update'), deleteHospitalFile);
 
 // Hospital contacts routes
 router.get('/:hospitalId/contacts', authenticate, checkPermission('hospitals', 'view'), getHospitalContacts);

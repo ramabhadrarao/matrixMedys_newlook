@@ -1,6 +1,12 @@
-// server/controllers/hospitalController.js
+// server/controllers/hospitalController.js - Updated with file upload
 import Hospital from '../models/Hospital.js';
 import HospitalContact from '../models/HospitalContact.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const getHospitals = async (req, res) => {
   try {
@@ -48,7 +54,8 @@ export const getHospital = async (req, res) => {
     const hospital = await Hospital.findById(id)
       .populate('state', 'name code')
       .populate('createdBy', 'name email')
-      .populate('updatedBy', 'name email');
+      .populate('updatedBy', 'name email')
+      .populate('agreementFile.uploadedBy', 'name email');
     
     if (!hospital) {
       return res.status(404).json({ message: 'Hospital not found' });
@@ -78,7 +85,6 @@ export const createHospital = async (req, res) => {
       phone,
       gstNumber,
       panNumber,
-      agreementFile,
       gstAddress,
       city,
       state,
@@ -97,20 +103,32 @@ export const createHospital = async (req, res) => {
       return res.status(400).json({ message: 'Hospital with this PAN number already exists' });
     }
     
-    const hospital = new Hospital({
+    const hospitalData = {
       name,
       email,
       phone,
       gstNumber,
       panNumber,
-      agreementFile,
       gstAddress,
       city,
       state,
       pincode,
       createdBy: req.user._id,
-    });
+    };
     
+    // Handle file upload if present
+    if (req.file) {
+      hospitalData.agreementFile = {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        uploadedAt: new Date(),
+        uploadedBy: req.user._id
+      };
+    }
+    
+    const hospital = new Hospital(hospitalData);
     await hospital.save();
     await hospital.populate('state', 'name code');
     await hospital.populate('createdBy', 'name email');
@@ -121,6 +139,14 @@ export const createHospital = async (req, res) => {
     });
   } catch (error) {
     console.error('Create hospital error:', error);
+    // Clean up uploaded file if hospital creation fails
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting uploaded file:', unlinkError);
+      }
+    }
     res.status(500).json({ message: 'Failed to create hospital' });
   }
 };
@@ -134,7 +160,6 @@ export const updateHospital = async (req, res) => {
       phone,
       gstNumber,
       panNumber,
-      agreementFile,
       gstAddress,
       city,
       state,
@@ -163,19 +188,46 @@ export const updateHospital = async (req, res) => {
       }
     }
     
+    // Store old file info for cleanup if needed
+    const oldFile = hospital.agreementFile?.filename;
+    
     // Update fields
     hospital.name = name;
     hospital.email = email;
     hospital.phone = phone;
     hospital.gstNumber = gstNumber;
     hospital.panNumber = panNumber;
-    hospital.agreementFile = agreementFile;
     hospital.gstAddress = gstAddress;
     hospital.city = city;
     hospital.state = state;
     hospital.pincode = pincode;
     hospital.isActive = isActive;
     hospital.updatedBy = req.user._id;
+    
+    // Handle new file upload
+    if (req.file) {
+      // Delete old file if it exists
+      if (oldFile) {
+        const oldFilePath = path.join(__dirname, '../uploads/hospital-documents', oldFile);
+        try {
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+          }
+        } catch (deleteError) {
+          console.error('Error deleting old file:', deleteError);
+        }
+      }
+      
+      // Set new file info
+      hospital.agreementFile = {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        uploadedAt: new Date(),
+        uploadedBy: req.user._id
+      };
+    }
     
     await hospital.save();
     await hospital.populate('state', 'name code');
@@ -188,6 +240,14 @@ export const updateHospital = async (req, res) => {
     });
   } catch (error) {
     console.error('Update hospital error:', error);
+    // Clean up uploaded file if update fails
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting uploaded file:', unlinkError);
+      }
+    }
     res.status(500).json({ message: 'Failed to update hospital' });
   }
 };
@@ -209,6 +269,19 @@ export const deleteHospital = async (req, res) => {
       });
     }
     
+    // Delete associated file if it exists
+    if (hospital.agreementFile?.filename) {
+      const filePath = path.join(__dirname, '../uploads/hospital-documents', hospital.agreementFile.filename);
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (deleteError) {
+        console.error('Error deleting hospital file:', deleteError);
+        // Don't fail the deletion if file cleanup fails
+      }
+    }
+    
     await Hospital.findByIdAndDelete(id);
     
     res.json({ message: 'Hospital deleted successfully' });
@@ -218,7 +291,51 @@ export const deleteHospital = async (req, res) => {
   }
 };
 
-// Hospital Contacts CRUD
+// New endpoint to delete hospital agreement file
+export const deleteHospitalFile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const hospital = await Hospital.findById(id);
+    if (!hospital) {
+      return res.status(404).json({ message: 'Hospital not found' });
+    }
+    
+    if (!hospital.agreementFile?.filename) {
+      return res.status(404).json({ message: 'No file found for this hospital' });
+    }
+    
+    // Delete the physical file
+    const filePath = path.join(__dirname, '../uploads/hospital-documents', hospital.agreementFile.filename);
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (deleteError) {
+      console.error('Error deleting file:', deleteError);
+      return res.status(500).json({ message: 'Failed to delete file from storage' });
+    }
+    
+    // Remove file info from database
+    hospital.agreementFile = {
+      filename: null,
+      originalName: null,
+      mimetype: null,
+      size: null,
+      uploadedAt: null,
+      uploadedBy: null
+    };
+    hospital.updatedBy = req.user._id;
+    await hospital.save();
+    
+    res.json({ message: 'Hospital file deleted successfully' });
+  } catch (error) {
+    console.error('Delete hospital file error:', error);
+    res.status(500).json({ message: 'Failed to delete hospital file' });
+  }
+};
+
+// Hospital Contacts CRUD (unchanged)
 export const getHospitalContacts = async (req, res) => {
   try {
     const { hospitalId } = req.params;

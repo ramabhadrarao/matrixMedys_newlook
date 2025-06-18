@@ -1,4 +1,4 @@
-// src/components/Hospitals/HospitalDetails.tsx
+// src/components/Hospitals/HospitalDetails.tsx - Updated with file viewing
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -15,7 +15,10 @@ import {
   CreditCard,
   User,
   Save,
-  X
+  X,
+  Download,
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -169,6 +172,34 @@ const HospitalDetails: React.FC = () => {
     return new Date(date).toLocaleDateString();
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (mimetype: string) => {
+    if (mimetype?.includes('pdf')) return <FileText className="w-5 h-5 text-red-600" />;
+    if (mimetype?.includes('word') || mimetype?.includes('document')) return <FileText className="w-5 h-5 text-blue-600" />;
+    if (mimetype?.includes('image')) return <FileText className="w-5 h-5 text-green-600" />;
+    return <FileText className="w-5 h-5 text-gray-600" />;
+  };
+
+  const handleViewFile = (filename: string) => {
+    window.open(`/api/files/view/${filename}`, '_blank');
+  };
+
+  const handleDownloadFile = (filename: string, originalName: string) => {
+    const link = document.createElement('a');
+    link.href = `/api/files/download/${filename}`;
+    link.download = originalName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -265,6 +296,57 @@ const HospitalDetails: React.FC = () => {
           <p className="text-sm text-gray-900">{hospital.gstAddress}</p>
         </div>
 
+        {/* Agreement File Section */}
+        {hospital.agreementFile?.filename && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Agreement Document</h3>
+            <div className="bg-gray-50 rounded-lg p-4 border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  {getFileIcon(hospital.agreementFile.mimetype)}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {hospital.agreementFile.originalName}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatFileSize(hospital.agreementFile.size)} • 
+                      Uploaded {formatDate(hospital.agreementFile.uploadedAt)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleViewFile(hospital.agreementFile!.filename)}
+                    className="inline-flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    title="View File"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View
+                  </button>
+                  <button
+                    onClick={() => handleDownloadFile(hospital.agreementFile!.filename, hospital.agreementFile!.originalName)}
+                    className="inline-flex items-center px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                    title="Download File"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Download
+                  </button>
+                  <a
+                    href={`/api/files/view/${hospital.agreementFile.filename}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    title="Open in New Tab"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    Open
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -274,11 +356,6 @@ const HospitalDetails: React.FC = () => {
             }`}>
               {hospital.isActive ? 'Active' : 'Inactive'}
             </span>
-            {hospital.agreementFile && (
-              <span className="text-xs text-gray-500">
-                Agreement: {hospital.agreementFile}
-              </span>
-            )}
           </div>
           <div className="text-xs text-gray-500">
             Created: {formatDate(hospital.createdAt)} by {hospital.createdBy.name}

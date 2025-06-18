@@ -1,15 +1,22 @@
+// server/server.js - Updated with file routes
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import connectDB from './config/database.js';
 import authRoutes from './routes/auth.js';
 import stateRoutes from './routes/states.js';
 import userRoutes from './routes/users.js';
 import permissionRoutes from './routes/permissions.js';
-import hospitalRoutes from './routes/hospitals.js'; // New hospital routes
-import dashboardRoutes from './routes/dashboard.js'; // New dashboard routes
+import hospitalRoutes from './routes/hospitals.js';
+import dashboardRoutes from './routes/dashboard.js';
+import fileRoutes from './routes/files.js'; // New file routes
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -47,16 +54,19 @@ const authLimiter = rateLimit({
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/dashboard', dashboardRoutes); // New dashboard routes
-
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/files', fileRoutes); // File management routes
 app.use('/api/states', stateRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/permissions', permissionRoutes);
-app.use('/api/hospitals', hospitalRoutes); // New hospital routes
+app.use('/api/hospitals', hospitalRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -66,6 +76,20 @@ app.get('/api/health', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
+  
+  // Handle multer errors
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ message: 'File too large. Maximum size is 10MB.' });
+  }
+  
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({ message: 'Unexpected file field.' });
+  }
+  
+  if (err.message && err.message.includes('Invalid file type')) {
+    return res.status(400).json({ message: err.message });
+  }
+  
   res.status(500).json({ 
     message: 'Something went wrong!',
     ...(process.env.NODE_ENV === 'development' && { error: err.message }),
@@ -81,4 +105,6 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Auth rate limit: ${process.env.NODE_ENV === 'production' ? '5' : '50'} requests per 15 minutes`);
+  console.log(`File uploads directory: ${path.join(__dirname, 'uploads')}`);
 });
+

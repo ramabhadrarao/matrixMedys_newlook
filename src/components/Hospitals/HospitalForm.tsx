@@ -1,12 +1,13 @@
-// src/components/Hospitals/HospitalForm.tsx
-import React, { useState, useEffect } from 'react';
+// src/components/Hospitals/HospitalForm.tsx - Fixed version with working API
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft, Save, Loader2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Upload, X, Download, Eye, FileText, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { hospitalAPI, HospitalFormData } from '../../services/hospitalAPI';
 import { statesAPI, handleApiError } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 
 interface State {
   _id: string;
@@ -14,29 +15,42 @@ interface State {
   code: string;
 }
 
+interface FileInfo {
+  filename: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
 const HospitalForm: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { accessToken } = useAuthStore();
   const isEdit = !!id;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEdit);
   const [states, setStates] = useState<State[]>([]);
   const [statesLoading, setStatesLoading] = useState(true);
-  const [agreementFile, setAgreementFile] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [existingFile, setExistingFile] = useState<FileInfo | null>(null);
+  const [filePreview, setFilePreview] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [deleteFileLoading, setDeleteFileLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<HospitalFormData>({
     defaultValues: {
       isActive: true,
     },
   });
-
-  const watchedState = watch('state');
 
   useEffect(() => {
     fetchStates();
@@ -75,9 +89,9 @@ const HospitalForm: React.FC = () => {
       setValue('pincode', hospital.pincode);
       setValue('isActive', hospital.isActive);
       
-      if (hospital.agreementFile) {
-        setAgreementFile(hospital.agreementFile);
-        setValue('agreementFile', hospital.agreementFile);
+      // Handle existing file
+      if (hospital.agreementFile?.filename) {
+        setExistingFile(hospital.agreementFile);
       }
     } catch (error) {
       handleApiError(error);
@@ -87,43 +101,165 @@ const HospitalForm: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // In a real application, you would upload the file to a server
-      // For now, we'll just store the file name
-      const fileName = file.name;
-      setAgreementFile(fileName);
-      setValue('agreementFile', fileName);
+      // Validate file type
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'image/jpeg',
+        'image/png',
+        'image/jpg'
+      ];
+      
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Invalid file type. Only PDF, DOC, DOCX, JPG, JPEG, and PNG files are allowed.');
+        return;
+      }
+      
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File too large. Maximum size is 10MB.');
+        return;
+      }
+      
+      setSelectedFile(file);
+      
+      // Create preview for images
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setFilePreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setFilePreview('');
+      }
+      
       toast.success('File selected successfully');
     }
   };
 
-  const removeFile = () => {
-    setAgreementFile('');
-    setValue('agreementFile', '');
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
+    setFilePreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteExistingFile = async () => {
+    if (!existingFile || !id) return;
+    
+    try {
+      setDeleteFileLoading(true);
+      
+      // Call API to delete the file using fetch
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/hospitals/${id}/file`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete file');
+      }
+      
+      setExistingFile(null);
+      toast.success('File deleted successfully');
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      toast.error('Failed to delete file');
+    } finally {
+      setDeleteFileLoading(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (mimetype: string) => {
+    if (mimetype.includes('pdf')) return <FileText className="w-5 h-5 text-red-600" />;
+    if (mimetype.includes('word') || mimetype.includes('document')) return <FileText className="w-5 h-5 text-blue-600" />;
+    if (mimetype.includes('image')) return <FileText className="w-5 h-5 text-green-600" />;
+    return <FileText className="w-5 h-5 text-gray-600" />;
   };
 
   const onSubmit = async (data: HospitalFormData) => {
     setLoading(true);
+    setUploadProgress(0);
+    
     try {
-      const submitData = {
-        ...data,
-        agreementFile: agreementFile || undefined,
-      };
-
-      if (isEdit && id) {
-        await hospitalAPI.updateHospital(id, submitData);
-        toast.success('Hospital updated successfully');
-      } else {
-        await hospitalAPI.createHospital(submitData);
-        toast.success('Hospital created successfully');
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Append form fields
+      Object.keys(data).forEach(key => {
+        const value = data[key as keyof HospitalFormData];
+        if (value !== undefined && value !== null) {
+          formData.append(key, value.toString());
+        }
+      });
+      
+      // Append file if selected
+      if (selectedFile) {
+        formData.append('agreementFile', selectedFile);
       }
+      
+      // Use fetch with progress tracking
+      const response = await new Promise<Response>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(progress);
+          }
+        };
+        
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(new Response(xhr.responseText, { status: xhr.status }));
+          } else {
+            reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+          }
+        };
+        
+        xhr.onerror = () => {
+          reject(new Error('Network error occurred'));
+        };
+        
+        xhr.open(isEdit ? 'PUT' : 'POST', `${API_BASE_URL}/hospitals${isEdit ? `/${id}` : ''}`, true);
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        xhr.send(formData);
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Operation failed');
+      }
+
+      const result = await response.json();
+      toast.success(isEdit ? 'Hospital updated successfully' : 'Hospital created successfully');
       navigate('/hospitals');
-    } catch (error) {
-      handleApiError(error);
+      
+    } catch (error: any) {
+      console.error('Submit error:', error);
+      toast.error(error.message || 'Operation failed');
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -232,40 +368,130 @@ const HospitalForm: React.FC = () => {
                 )}
               </div>
 
+              {/* File Upload Section */}
               <div>
-                <label htmlFor="agreementFile" className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Agreement Document
                 </label>
-                <div className="space-y-2">
-                  {agreementFile ? (
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-900">{agreementFile}</span>
+                
+                {/* Existing File Display */}
+                {existingFile && !selectedFile && (
+                  <div className="mb-3 p-3 bg-gray-50 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        {getFileIcon(existingFile.mimetype)}
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{existingFile.originalName}</p>
+                          <p className="text-xs text-gray-500">
+                            {formatFileSize(existingFile.size)} • Uploaded {new Date(existingFile.uploadedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <a
+                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/files/view/${existingFile.filename}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                          title="View File"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </a>
+                        <a
+                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/files/download/${existingFile.filename}`}
+                          download
+                          className="text-green-600 hover:text-green-800 p-1 rounded"
+                          title="Download File"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={handleDeleteExistingFile}
+                          disabled={deleteFileLoading}
+                          className="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                          title="Delete File"
+                        >
+                          {deleteFileLoading ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected File Preview */}
+                {selectedFile && (
+                  <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        {getFileIcon(selectedFile.type)}
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        onClick={removeFile}
-                        className="text-red-600 hover:text-red-800"
+                        onClick={removeSelectedFile}
+                        className="text-red-600 hover:text-red-800 p-1 rounded"
+                        title="Remove File"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <span className="text-blue-600 hover:text-blue-500">Upload a file</span>
-                        <span className="text-gray-500"> or drag and drop</span>
-                      </label>
-                      <input
-                        id="file-upload"
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.doc,.docx"
-                        onChange={handleFileUpload}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX up to 10MB</p>
+                  </div>
+                )}
+
+                {/* File Upload Area */}
+                {!selectedFile && (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <span className="text-blue-600 hover:text-blue-500 font-medium">Upload a file</span>
+                      <span className="text-gray-500"> or drag and drop</span>
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      id="file-upload"
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={handleFileSelect}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, JPEG, PNG up to 10MB</p>
+                  </div>
+                )}
+
+                {/* Upload Progress */}
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Uploading...</span>
+                      <span className="text-gray-600">{uploadProgress}%</span>
                     </div>
-                  )}
-                </div>
+                    <div className="mt-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Preview */}
+                {filePreview && (
+                  <div className="mt-3">
+                    <img
+                      src={filePreview}
+                      alt="File preview"
+                      className="max-w-full h-32 object-contain rounded-lg border"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -471,7 +697,7 @@ const HospitalForm: React.FC = () => {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  {isEdit ? 'Updating...' : 'Creating...'}
+                  {uploadProgress > 0 ? `Uploading... ${uploadProgress}%` : (isEdit ? 'Updating...' : 'Creating...')}
                 </>
               ) : (
                 <>
