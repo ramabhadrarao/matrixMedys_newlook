@@ -16,6 +16,9 @@ import ForgotPassword from './components/Auth/ForgotPassword';
 import Dashboard from './components/Dashboard/Dashboard';
 import StatesList from './components/States/StatesList';
 import StateForm from './components/States/StateForm';
+import UsersList from './components/Users/UsersList';
+import UserForm from './components/Users/UserForm';
+import PermissionsManagement from './components/Users/PermissionsManagement';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -70,7 +73,12 @@ function App() {
   }, [isAuthenticated, setUser, setPermissions, setLoading]);
 
   return (
-    <Router>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <div className="App">
         <Routes>
           {/* Public Routes */}
@@ -116,6 +124,12 @@ function App() {
             <Route path="states/new" element={<StateForm />} />
             <Route path="states/:id" element={<StatesList />} />
             <Route path="states/:id/edit" element={<StateForm />} />
+            
+            {/* Users Routes */}
+            <Route path="users" element={<UsersList />} />
+            <Route path="users/new" element={<UserForm />} />
+            <Route path="users/:id/edit" element={<UserForm />} />
+            <Route path="users/:id/permissions" element={<PermissionsManagement />} />
           </Route>
 
           {/* Fallback route */}

@@ -92,16 +92,16 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Welcome back, {user?.name}!</h1>
-            <p className="mt-2 opacity-90">
+            <div className="mt-2 opacity-90">
               Here's what's happening with your application today.
-            </p>
+            </div>
           </div>
           <div className="hidden sm:flex items-center space-x-4">
             <div className="text-right">
-              <p className="text-sm opacity-75">Today</p>
-              <p className="text-lg font-semibold">
+              <div className="text-sm opacity-75">Today</div>
+              <div className="text-lg font-semibold">
                 {new Date().toLocaleDateString()}
-              </p>
+              </div>
             </div>
             <Calendar className="w-8 h-8 opacity-75" />
           </div>
@@ -122,14 +122,14 @@ const Dashboard: React.FC = () => {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">{card.title}</p>
-                  <p className={`text-2xl font-bold ${card.textColor} mt-2`}>
+                  <div className="text-sm font-medium text-gray-600">{card.title}</div>
+                  <div className={`text-2xl font-bold ${card.textColor} mt-2`}>
                     {loading ? (
                       <div className="animate-pulse bg-gray-200 h-6 w-12 rounded"></div>
                     ) : (
                       card.value
                     )}
-                  </p>
+                  </div>
                 </div>
                 <div className={`${card.color} p-3 rounded-lg`}>
                   <Icon className="w-6 h-6 text-white" />
@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Permissions</h3>
           <div className="space-y-3">
             {permissions.length === 0 ? (
-              <p className="text-gray-500 text-sm">No permissions assigned</p>
+              <div className="text-gray-500 text-sm">No permissions assigned</div>
             ) : (
               permissions.slice(0, 6).map((permission) => (
                 <div
@@ -160,19 +160,19 @@ const Dashboard: React.FC = () => {
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{permission.name}</p>
-                    <p className="text-xs text-gray-500">
+                    <div className="text-sm font-medium text-gray-900">{permission.name}</div>
+                    <div className="text-xs text-gray-500">
                       {permission.resource} • {permission.action}
-                    </p>
+                    </div>
                   </div>
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                 </div>
               ))
             )}
             {permissions.length > 6 && (
-              <p className="text-xs text-gray-500 text-center">
+              <div className="text-xs text-gray-500 text-center">
                 +{permissions.length - 6} more permissions
-              </p>
+              </div>
             )}
           </div>
         </motion.div>
@@ -191,10 +191,10 @@ const Dashboard: React.FC = () => {
                 <Clock className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Last login</p>
-                <p className="text-xs text-gray-500">
+                <div className="text-sm font-medium text-gray-900">Last login</div>
+                <div className="text-xs text-gray-500">
                   {new Date().toLocaleString()}
-                </p>
+                </div>
               </div>
             </div>
             
@@ -203,8 +203,8 @@ const Dashboard: React.FC = () => {
                 <Activity className="w-4 h-4 text-green-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Account Status</p>
-                <p className="text-xs text-green-600">Active</p>
+                <div className="text-sm font-medium text-gray-900">Account Status</div>
+                <div className="text-xs text-green-600">Active</div>
               </div>
             </div>
             
@@ -213,8 +213,8 @@ const Dashboard: React.FC = () => {
                 <Users className="w-4 h-4 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">User Role</p>
-                <p className="text-xs text-purple-600">Administrator</p>
+                <div className="text-sm font-medium text-gray-900">User Role</div>
+                <div className="text-xs text-purple-600">Administrator</div>
               </div>
             </div>
           </div>
@@ -232,18 +232,18 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-2">Company</h4>
-            <p className="text-gray-900">Matryx Medizys</p>
-            <p className="text-sm text-gray-500">Technology Solutions Provider</p>
+            <div className="text-gray-900">Matryx Medizys</div>
+            <div className="text-sm text-gray-500">Technology Solutions Provider</div>
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-2">Contact</h4>
-            <p className="text-gray-900">+1 (555) 123-4567</p>
-            <p className="text-sm text-gray-500">contact@techcorp.com</p>
+            <div className="text-gray-900">+1 (555) 123-4567</div>
+            <div className="text-sm text-gray-500">contact@techcorp.com</div>
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-2">Address</h4>
-            <p className="text-gray-900">123 Business Ave</p>
-            <p className="text-sm text-gray-500">Tech City, TC 12345</p>
+            <div className="text-gray-900">123 Business Ave</div>
+            <div className="text-sm text-gray-500">Tech City, TC 12345</div>
           </div>
         </div>
       </motion.div>

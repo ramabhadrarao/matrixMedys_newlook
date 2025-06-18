@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -8,7 +8,9 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal
+  MapPin,
+  Users,
+  Square
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -34,62 +36,120 @@ interface State {
 const StatesList: React.FC = () => {
   const [states, setStates] = useState<State[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalStates, setTotalStates] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [stateToDelete, setStateToDelete] = useState<State | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   
+  const navigate = useNavigate();
   const { hasPermission } = useAuthStore();
+  
   const canCreate = hasPermission('states', 'create');
   const canUpdate = hasPermission('states', 'update');
   const canDelete = hasPermission('states', 'delete');
 
-  useEffect(() => {
-    fetchStates();
-  }, [currentPage, search]);
-
+  // Fetch states data
   const fetchStates = async () => {
     try {
       setLoading(true);
-      const response = await statesAPI.getStates({
+      const params = {
         page: currentPage,
         limit: 10,
-        search,
-      });
+        ...(searchTerm && { search: searchTerm.trim() })
+      };
       
-      setStates(response.data.states);
-      setTotalPages(response.data.pagination.pages);
+      const response = await statesAPI.getStates(params);
+      
+      if (response.data) {
+        setStates(response.data.states || []);
+        if (response.data.pagination) {
+          setTotalPages(response.data.pagination.pages || 1);
+          setTotalStates(response.data.pagination.total || 0);
+        }
+      }
     } catch (error) {
+      console.error('Error fetching states:', error);
       handleApiError(error);
+      setStates([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Initial load
+  useEffect(() => {
+    fetchStates();
+  }, [currentPage]);
+
+  // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset to first page when searching
     fetchStates();
   };
 
-  const handleDelete = async (state: State) => {
+  // Handle search input change with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm !== '') {
+        setCurrentPage(1);
+        fetchStates();
+      } else if (searchTerm === '') {
+        // If search is cleared, fetch all states
+        setCurrentPage(1);
+        fetchStates();
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Handle delete
+  const handleDelete = async () => {
+    if (!stateToDelete) return;
+    
     try {
-      await statesAPI.deleteState(state._id);
+      setDeleteLoading(true);
+      await statesAPI.deleteState(stateToDelete._id);
       toast.success('State deleted successfully');
-      fetchStates();
       setShowDeleteModal(false);
       setStateToDelete(null);
+      
+      // Refresh the list
+      fetchStates();
     } catch (error) {
       handleApiError(error);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
+  // View state details
+  const handleViewState = (state: State) => {
+    // For now, we'll show an alert with state details
+    // You can create a proper modal or detail page later
+    const details = `
+State: ${state.name} (${state.code})
+Capital: ${state.capital || 'N/A'}
+Population: ${state.population?.toLocaleString() || 'N/A'}
+Area: ${state.area?.toLocaleString() || 'N/A'} km²
+Status: ${state.isActive ? 'Active' : 'Inactive'}
+Created: ${new Date(state.createdAt).toLocaleDateString()}
+Created by: ${state.createdBy?.name || 'Unknown'}
+    `;
+    alert(details);
+  };
+
+  // Format numbers
   const formatNumber = (num?: number) => {
     if (!num) return 'N/A';
     return num.toLocaleString();
   };
 
+  // Format date
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString();
   };
@@ -100,7 +160,10 @@ const StatesList: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">States Management</h1>
-          <p className="text-gray-600 mt-1">Manage geographical states and regions</p>
+          <p className="text-gray-600 mt-1">
+            Manage geographical states and regions
+            {totalStates > 0 && ` • ${totalStates} total states`}
+          </p>
         </div>
         
         {canCreate && (
@@ -123,18 +186,31 @@ const StatesList: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search states by name, code, or country..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
           <button
             type="submit"
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+            disabled={loading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50"
           >
-            Search
+            {loading ? 'Searching...' : 'Search'}
           </button>
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+            >
+              Clear
+            </button>
+          )}
         </form>
       </div>
 
@@ -147,7 +223,13 @@ const StatesList: React.FC = () => {
           </div>
         ) : states.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-500">No states found</p>
+            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 text-lg">No states found</p>
+            {searchTerm && (
+              <p className="text-gray-400 text-sm mt-2">
+                Try adjusting your search terms or clear the search to see all states
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -180,11 +262,12 @@ const StatesList: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {states.map((state) => (
+                  {states.map((state, index) => (
                     <motion.tr
                       key={state._id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
                       className="hover:bg-gray-50"
                     >
                       <td className="px-6 py-4">
@@ -197,8 +280,18 @@ const StatesList: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{state.country}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{formatNumber(state.population)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{formatNumber(state.area)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="flex items-center">
+                          <Users className="w-4 h-4 text-gray-400 mr-1" />
+                          {formatNumber(state.population)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="flex items-center">
+                          <Square className="w-4 h-4 text-gray-400 mr-1" />
+                          {formatNumber(state.area)}
+                        </div>
+                      </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           state.isActive 
@@ -213,18 +306,18 @@ const StatesList: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            to={`/states/${state._id}`}
-                            className="text-blue-600 hover:text-blue-900 p-1"
-                            title="View"
+                          <button
+                            onClick={() => handleViewState(state)}
+                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                            title="View Details"
                           >
                             <Eye className="w-4 h-4" />
-                          </Link>
+                          </button>
                           
                           {canUpdate && (
                             <Link
                               to={`/states/${state._id}/edit`}
-                              className="text-green-600 hover:text-green-900 p-1"
+                              className="text-green-600 hover:text-green-900 p-1 rounded"
                               title="Edit"
                             >
                               <Edit className="w-4 h-4" />
@@ -237,7 +330,7 @@ const StatesList: React.FC = () => {
                                 setStateToDelete(state);
                                 setShowDeleteModal(true);
                               }}
-                              className="text-red-600 hover:text-red-900 p-1"
+                              className="text-red-600 hover:text-red-900 p-1 rounded"
                               title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -253,11 +346,12 @@ const StatesList: React.FC = () => {
 
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-gray-200">
-              {states.map((state) => (
+              {states.map((state, index) => (
                 <motion.div
                   key={state._id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
                   className="p-6"
                 >
                   <div className="flex items-start justify-between">
@@ -269,12 +363,14 @@ const StatesList: React.FC = () => {
                       )}
                       
                       <div className="mt-2 space-y-1">
-                        <p className="text-sm text-gray-600">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Users className="w-4 h-4 mr-2" />
                           Population: {formatNumber(state.population)}
-                        </p>
-                        <p className="text-sm text-gray-600">
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Square className="w-4 h-4 mr-2" />
                           Area: {formatNumber(state.area)} km²
-                        </p>
+                        </div>
                         <p className="text-sm text-gray-600">
                           Created: {formatDate(state.createdAt)}
                         </p>
@@ -291,18 +387,18 @@ const StatesList: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                      <Link
-                        to={`/states/${state._id}`}
-                        className="text-blue-600 hover:text-blue-900 p-2"
+                    <div className="flex items-center space-x-2 ml-4">
+                      <button
+                        onClick={() => handleViewState(state)}
+                        className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50"
                       >
                         <Eye className="w-4 h-4" />
-                      </Link>
+                      </button>
                       
                       {canUpdate && (
                         <Link
                           to={`/states/${state._id}/edit`}
-                          className="text-green-600 hover:text-green-900 p-2"
+                          className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50"
                         >
                           <Edit className="w-4 h-4" />
                         </Link>
@@ -314,7 +410,7 @@ const StatesList: React.FC = () => {
                             setStateToDelete(state);
                             setShowDeleteModal(true);
                           }}
-                          className="text-red-600 hover:text-red-900 p-2"
+                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -329,7 +425,7 @@ const StatesList: React.FC = () => {
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-sm text-gray-700">
-                  Page {currentPage} of {totalPages}
+                  Page {currentPage} of {totalPages} • {totalStates} total states
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -339,6 +435,11 @@ const StatesList: React.FC = () => {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
+                  
+                  <span className="px-3 py-1 text-sm font-medium">
+                    {currentPage}
+                  </span>
+                  
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
@@ -363,7 +464,7 @@ const StatesList: React.FC = () => {
           >
             <h3 className="text-lg font-medium text-gray-900 mb-4">Delete State</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete "{stateToDelete.name}"? This action cannot be undone.
+              Are you sure you want to delete <strong>"{stateToDelete.name}"</strong>? This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-4">
               <button
@@ -371,15 +472,24 @@ const StatesList: React.FC = () => {
                   setShowDeleteModal(false);
                   setStateToDelete(null);
                 }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+                disabled={deleteLoading}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleDelete(stateToDelete)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 disabled:opacity-50 flex items-center"
               >
-                Delete
+                {deleteLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </button>
             </div>
           </motion.div>

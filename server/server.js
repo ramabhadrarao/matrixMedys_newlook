@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import authRoutes from './routes/auth.js';
 import stateRoutes from './routes/states.js';
+import userRoutes from './routes/users.js';
+import permissionRoutes from './routes/permissions.js';
 
 dotenv.config();
 
@@ -22,19 +24,23 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
+// Rate limiting - More relaxed for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // 1000 for dev, 100 for production
   message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use(limiter);
 
-// Stricter rate limiting for auth routes
+// More relaxed rate limiting for auth routes in development
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 5 : 50, // 50 for dev, 5 for production
   message: 'Too many authentication attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Body parsing middleware
@@ -44,6 +50,8 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/states', stateRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/permissions', permissionRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -66,4 +74,6 @@ app.use('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Auth rate limit: ${process.env.NODE_ENV === 'production' ? '5' : '50'} requests per 15 minutes`);
 });
