@@ -338,17 +338,7 @@ const HospitalDetails: React.FC = () => {
                     <Download className="w-4 h-4 mr-1" />
                     Download
                   </button>
-                  <button
-                    onClick={() => {
-                      const url = hospitalAPI.getFileUrl(hospital.agreementFile!.filename, 'view');
-                      window.open(url, '_blank');
-                    }}
-                    className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                    title="Open in New Tab"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-1" />
-                    Open
-                  </button>
+                  
                 </div>
               </div>
             </div>
