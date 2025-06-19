@@ -1,4 +1,4 @@
-// server/controllers/hospitalController.js - Updated with multiple file support
+// server/controllers/hospitalController.js - Fixed file handling
 import Hospital from '../models/Hospital.js';
 import HospitalContact from '../models/HospitalContact.js';
 import fs from 'fs';
@@ -119,27 +119,45 @@ export const createHospital = async (req, res) => {
       documents: []
     };
     
-    // Handle multiple file uploads
-    if (req.files && req.files.length > 0) {
-      hospitalData.documents = req.files.map((file, index) => ({
+    // Handle file uploads from multer
+    console.log('Files received:', req.files);
+    console.log('File fields:', req.file);
+    console.log('Body:', req.body);
+    
+    // Handle multiple documents
+    if (req.files && req.files.documents) {
+      const documentsFiles = Array.isArray(req.files.documents) 
+        ? req.files.documents 
+        : [req.files.documents];
+      
+      const fileTypes = req.body.fileTypes ? 
+        (Array.isArray(req.body.fileTypes) ? req.body.fileTypes : [req.body.fileTypes]) : 
+        [];
+      
+      const descriptions = req.body.descriptions ? 
+        (Array.isArray(req.body.descriptions) ? req.body.descriptions : [req.body.descriptions]) : 
+        [];
+      
+      hospitalData.documents = documentsFiles.map((file, index) => ({
         filename: file.filename,
         originalName: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
-        fileType: req.body.fileTypes ? req.body.fileTypes[index] : 'other',
-        description: req.body.descriptions ? req.body.descriptions[index] : '',
+        fileType: fileTypes[index] || 'other',
+        description: descriptions[index] || '',
         uploadedAt: new Date(),
         uploadedBy: req.user._id
       }));
     }
     
-    // Handle single file upload (backward compatibility)
-    if (req.file) {
+    // Handle single agreement file (legacy support)
+    if (req.files && req.files.agreementFile && req.files.agreementFile[0]) {
+      const file = req.files.agreementFile[0];
       hospitalData.agreementFile = {
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
+        filename: file.filename,
+        originalName: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
         uploadedAt: new Date(),
         uploadedBy: req.user._id
       };
@@ -157,23 +175,31 @@ export const createHospital = async (req, res) => {
     });
   } catch (error) {
     console.error('Create hospital error:', error);
+    
     // Clean up uploaded files if hospital creation fails
     if (req.files) {
-      req.files.forEach(file => {
+      // Clean up documents
+      if (req.files.documents) {
+        const files = Array.isArray(req.files.documents) ? req.files.documents : [req.files.documents];
+        files.forEach(file => {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (unlinkError) {
+            console.error('Error deleting uploaded file:', unlinkError);
+          }
+        });
+      }
+      
+      // Clean up agreement file
+      if (req.files.agreementFile && req.files.agreementFile[0]) {
         try {
-          fs.unlinkSync(file.path);
+          fs.unlinkSync(req.files.agreementFile[0].path);
         } catch (unlinkError) {
           console.error('Error deleting uploaded file:', unlinkError);
         }
-      });
-    }
-    if (req.file) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error deleting uploaded file:', unlinkError);
       }
     }
+    
     res.status(500).json({ message: 'Failed to create hospital' });
   }
 };
@@ -229,14 +255,30 @@ export const updateHospital = async (req, res) => {
     hospital.updatedBy = req.user._id;
     
     // Handle new file uploads
-    if (req.files && req.files.length > 0) {
-      const newDocuments = req.files.map((file, index) => ({
+    console.log('Update - Files received:', req.files);
+    console.log('Update - Body:', req.body);
+    
+    // Handle multiple documents
+    if (req.files && req.files.documents) {
+      const documentsFiles = Array.isArray(req.files.documents) 
+        ? req.files.documents 
+        : [req.files.documents];
+      
+      const fileTypes = req.body.fileTypes ? 
+        (Array.isArray(req.body.fileTypes) ? req.body.fileTypes : [req.body.fileTypes]) : 
+        [];
+      
+      const descriptions = req.body.descriptions ? 
+        (Array.isArray(req.body.descriptions) ? req.body.descriptions : [req.body.descriptions]) : 
+        [];
+      
+      const newDocuments = documentsFiles.map((file, index) => ({
         filename: file.filename,
         originalName: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
-        fileType: req.body.fileTypes ? req.body.fileTypes[index] : 'other',
-        description: req.body.descriptions ? req.body.descriptions[index] : '',
+        fileType: fileTypes[index] || 'other',
+        description: descriptions[index] || '',
         uploadedAt: new Date(),
         uploadedBy: req.user._id
       }));
@@ -244,8 +286,9 @@ export const updateHospital = async (req, res) => {
       hospital.documents.push(...newDocuments);
     }
     
-    // Handle single file upload (backward compatibility)
-    if (req.file) {
+    // Handle single agreement file (legacy support)
+    if (req.files && req.files.agreementFile && req.files.agreementFile[0]) {
+      const file = req.files.agreementFile[0];
       const oldFile = hospital.agreementFile?.filename;
       
       // Delete old file if it exists
@@ -262,10 +305,10 @@ export const updateHospital = async (req, res) => {
       
       // Set new file info
       hospital.agreementFile = {
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
+        filename: file.filename,
+        originalName: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
         uploadedAt: new Date(),
         uploadedBy: req.user._id
       };
@@ -283,23 +326,31 @@ export const updateHospital = async (req, res) => {
     });
   } catch (error) {
     console.error('Update hospital error:', error);
+    
     // Clean up uploaded files if update fails
     if (req.files) {
-      req.files.forEach(file => {
+      // Clean up documents
+      if (req.files.documents) {
+        const files = Array.isArray(req.files.documents) ? req.files.documents : [req.files.documents];
+        files.forEach(file => {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (unlinkError) {
+            console.error('Error deleting uploaded file:', unlinkError);
+          }
+        });
+      }
+      
+      // Clean up agreement file
+      if (req.files.agreementFile && req.files.agreementFile[0]) {
         try {
-          fs.unlinkSync(file.path);
+          fs.unlinkSync(req.files.agreementFile[0].path);
         } catch (unlinkError) {
           console.error('Error deleting uploaded file:', unlinkError);
         }
-      });
-    }
-    if (req.file) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error deleting uploaded file:', unlinkError);
       }
     }
+    
     res.status(500).json({ message: 'Failed to update hospital' });
   }
 };
@@ -514,7 +565,7 @@ export const deleteHospitalFile = async (req, res) => {
   }
 };
 
-// Hospital Contacts CRUD (unchanged)
+// Hospital Contacts CRUD
 export const getHospitalContacts = async (req, res) => {
   try {
     const { hospitalId } = req.params;

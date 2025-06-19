@@ -1,4 +1,4 @@
-// server/routes/hospitals.js - Updated with multiple file support
+// server/routes/hospitals.js - Fixed with proper multiple file support
 import express from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
@@ -7,6 +7,7 @@ import { checkPermission } from '../middleware/permissions.js';
 import { 
   uploadSingleFile, 
   uploadMultipleFiles, 
+  uploadMixedFiles,
   uploadDocument, 
   handleUploadError 
 } from '../middleware/upload.js';
@@ -62,26 +63,26 @@ const documentValidation = [
 router.get('/', authenticate, checkPermission('hospitals', 'view'), getHospitals);
 router.get('/:id', authenticate, checkPermission('hospitals', 'view'), getHospital);
 
-// Create hospital with multiple file upload support
+// Create hospital with mixed file upload support (both single and multiple)
 router.post('/', 
   authenticate, 
   checkPermission('hospitals', 'create'),
-  uploadMultipleFiles, // Support multiple files
+  uploadMixedFiles, // Support both single and multiple files
+  handleUploadError,
   hospitalValidation, 
   validate, 
-  createHospital,
-  handleUploadError
+  createHospital
 );
 
-// Update hospital with multiple file upload support
+// Update hospital with mixed file upload support
 router.put('/:id', 
   authenticate, 
   checkPermission('hospitals', 'update'),
-  uploadMultipleFiles, // Support multiple files
+  uploadMixedFiles, // Support both single and multiple files
+  handleUploadError,
   hospitalValidation, 
   validate, 
-  updateHospital,
-  handleUploadError
+  updateHospital
 );
 
 router.delete('/:id', authenticate, checkPermission('hospitals', 'delete'), deleteHospital);
@@ -94,10 +95,10 @@ router.post('/:id/documents',
   authenticate, 
   checkPermission('hospitals', 'update'),
   uploadDocument,
+  handleUploadError,
   documentValidation,
   validate,
-  addHospitalDocument,
-  handleUploadError
+  addHospitalDocument
 );
 
 router.put('/:id/documents/:documentId', 
