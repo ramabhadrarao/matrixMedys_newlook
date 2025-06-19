@@ -1,4 +1,4 @@
-// src/components/Hospitals/HospitalsList.tsx - Updated with working file operations
+// src/components/Hospitals/HospitalsList.tsx - Updated with multiple file support
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -19,7 +19,9 @@ import {
   Download,
   ExternalLink,
   CheckCircle,
-  XCircle
+  XCircle,
+  FolderOpen,
+  Files
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -136,11 +138,22 @@ const HospitalsList: React.FC = () => {
   const getFileIcon = (mimetype: string) => {
     if (mimetype?.includes('pdf')) return <FileText className="w-4 h-4 text-red-600" />;
     if (mimetype?.includes('word') || mimetype?.includes('document')) return <FileText className="w-4 h-4 text-blue-600" />;
-    if (mimetype?.includes('image')) return <FileText className="w-4 h-4 text-green-600" />;
+    if (mimetype?.includes('sheet') || mimetype?.includes('excel')) return <FileText className="w-4 h-4 text-green-600" />;
+    if (mimetype?.includes('image')) return <FileText className="w-4 h-4 text-purple-600" />;
     return <FileText className="w-4 h-4 text-gray-600" />;
   };
 
-  // Handle file download - Updated with proper error handling
+  // Get file type color
+  const getFileTypeColor = (fileType: string) => {
+    switch (fileType) {
+      case 'agreement': return 'bg-blue-100 text-blue-800';
+      case 'license': return 'bg-green-100 text-green-800';
+      case 'certificate': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Handle file download
   const handleDownloadFile = async (filename: string, originalName: string) => {
     try {
       await hospitalAPI.downloadFile(filename, originalName);
@@ -151,7 +164,7 @@ const HospitalsList: React.FC = () => {
     }
   };
 
-  // Handle file view - Updated with proper error handling
+  // Handle file view
   const handleViewFile = (filename: string) => {
     try {
       hospitalAPI.viewFile(filename);
@@ -159,6 +172,18 @@ const HospitalsList: React.FC = () => {
       console.error('View error:', error);
       toast.error('Failed to view file');
     }
+  };
+
+  // Get total documents count for a hospital
+  const getTotalDocuments = (hospital: Hospital) => {
+    let count = 0;
+    if (hospital.documents && hospital.documents.length > 0) {
+      count += hospital.documents.length;
+    }
+    if (hospital.agreementFile?.filename) {
+      count += 1;
+    }
+    return count;
   };
 
   return (
@@ -258,7 +283,7 @@ const HospitalsList: React.FC = () => {
                       Location
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Agreement
+                      Documents
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -269,208 +294,139 @@ const HospitalsList: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {hospitals.map((hospital, index) => (
-                    <motion.tr
-                      key={hospital._id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-                            <Building2 className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{hospital.name}</div>
-                            <div className="text-sm text-gray-500">
-                              Created: {formatDate(hospital.createdAt)}
+                  {hospitals.map((hospital, index) => {
+                    const totalDocs = getTotalDocuments(hospital);
+                    
+                    return (
+                      <motion.tr
+                        key={hospital._id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="hover:bg-gray-50"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                              <Building2 className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{hospital.name}</div>
+                              <div className="text-sm text-gray-500">
+                                Created: {formatDate(hospital.createdAt)}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Mail className="w-3 h-3 mr-1 text-gray-400" />
-                            {hospital.email}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Mail className="w-3 h-3 mr-1 text-gray-400" />
+                              {hospital.email}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Phone className="w-3 h-3 mr-1 text-gray-400" />
+                              {hospital.phone}
+                            </div>
                           </div>
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Phone className="w-3 h-3 mr-1 text-gray-400" />
-                            {hospital.phone}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center text-sm text-gray-900">
+                              <FileText className="w-3 h-3 mr-1 text-gray-400" />
+                              GST: {hospital.gstNumber}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-900">
+                              <CreditCard className="w-3 h-3 mr-1 text-gray-400" />
+                              PAN: {hospital.panNumber}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <FileText className="w-3 h-3 mr-1 text-gray-400" />
-                            GST: {hospital.gstNumber}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center text-sm text-gray-900">
+                              <MapPin className="w-3 h-3 mr-1 text-gray-400" />
+                              {hospital.city}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {hospital.state.name} - {hospital.pincode}
+                            </div>
                           </div>
-                          <div className="flex items-center text-sm text-gray-900">
-                            <CreditCard className="w-3 h-3 mr-1 text-gray-400" />
-                            PAN: {hospital.panNumber}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                            {hospital.city}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {hospital.state.name} - {hospital.pincode}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {hospital.agreementFile?.filename ? (
+                        </td>
+                        <td className="px-6 py-4">
                           <div className="flex items-center space-x-2">
                             <div className="flex items-center text-sm text-gray-900">
-                              {getFileIcon(hospital.agreementFile.mimetype)}
-                              <span className="ml-1 text-xs text-gray-600">
-                                {formatFileSize(hospital.agreementFile.size)}
+                              <Files className="w-4 h-4 mr-1 text-gray-400" />
+                              <span className="font-medium">{totalDocs}</span>
+                              <span className="text-gray-500 ml-1">
+                                {totalDocs === 1 ? 'document' : 'documents'}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <button
-                                onClick={() => handleViewFile(hospital.agreementFile!.filename)}
-                                className="text-blue-600 hover:text-blue-800 p-1 rounded"
-                                title="View File"
-                              >
-                                <Eye className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => handleDownloadFile(hospital.agreementFile!.filename, hospital.agreementFile!.originalName)}
-                                className="text-green-600 hover:text-green-800 p-1 rounded"
-                                title="Download"
-                              >
-                                <Download className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400 flex items-center">
-                            <XCircle className="w-3 h-3 mr-1" />
-                            No file
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          hospital.isActive 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {hospital.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            to={`/hospitals/${hospital._id}`}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                            title="View Details & Contacts"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          
-                          {canUpdate && (
-                            <Link
-                              to={`/hospitals/${hospital._id}/edit`}
-                              className="text-green-600 hover:text-green-900 p-1 rounded"
-                              title="Edit"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Link>
-                          )}
-                          
-                          {canDelete && (
-                            <button
-                              onClick={() => {
-                                setHospitalToDelete(hospital);
-                                setShowDeleteModal(true);
-                              }}
-                              className="text-red-600 hover:text-red-900 p-1 rounded"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Cards */}
-            <div className="lg:hidden divide-y divide-gray-200">
-              {hospitals.map((hospital, index) => (
-                <motion.div
-                  key={hospital._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  className="p-6"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
-                      <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-medium text-gray-900">{hospital.name}</h3>
-                        
-                        <div className="mt-2 space-y-2">
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Mail className="w-4 h-4 mr-2" />
-                            {hospital.email}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Phone className="w-4 h-4 mr-2" />
-                            {hospital.phone}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <MapPin className="w-4 h-4 mr-2" />
-                            {hospital.city}, {hospital.state.name}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <FileText className="w-4 h-4 mr-2" />
-                            GST: {hospital.gstNumber}
-                          </div>
-                          
-                          {/* Agreement File for Mobile */}
-                          <div className="flex items-center text-sm text-gray-600">
-                            <FileText className="w-4 h-4 mr-2" />
-                            Agreement: {hospital.agreementFile?.filename ? (
-                              <div className="flex items-center space-x-2 ml-1">
-                                <span className="text-green-600">Available</span>
+                            
+                            {/* Show recent documents */}
+                            {hospital.documents && hospital.documents.length > 0 && (
+                              <div className="flex items-center space-x-1">
+                                {hospital.documents.slice(0, 3).map((doc) => (
+                                  <div
+                                    key={doc._id}
+                                    className="flex items-center space-x-1"
+                                  >
+                                    <button
+                                      onClick={() => handleViewFile(doc.filename)}
+                                      className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                                      title={`View ${doc.originalName}`}
+                                    >
+                                      <Eye className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDownloadFile(doc.filename, doc.originalName)}
+                                      className="text-green-600 hover:text-green-800 p-1 rounded"
+                                      title={`Download ${doc.originalName}`}
+                                    >
+                                      <Download className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                                {hospital.documents.length > 3 && (
+                                  <span className="text-xs text-gray-400">
+                                    +{hospital.documents.length - 3} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Legacy agreement file */}
+                            {hospital.agreementFile?.filename && (
+                              <div className="flex items-center space-x-1">
+                                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                  Legacy
+                                </span>
                                 <button
                                   onClick={() => handleViewFile(hospital.agreementFile!.filename)}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="View File"
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                                  title="View Legacy Agreement"
                                 >
                                   <Eye className="w-3 h-3" />
                                 </button>
                                 <button
                                   onClick={() => handleDownloadFile(hospital.agreementFile!.filename, hospital.agreementFile!.originalName)}
-                                  className="text-green-600 hover:text-green-800"
-                                  title="Download"
+                                  className="text-green-600 hover:text-green-800 p-1 rounded"
+                                  title="Download Legacy Agreement"
                                 >
                                   <Download className="w-3 h-3" />
                                 </button>
                               </div>
-                            ) : (
-                              <span className="text-gray-400 ml-1">Not uploaded</span>
+                            )}
+                            
+                            {totalDocs === 0 && (
+                              <span className="text-xs text-gray-400 flex items-center">
+                                <XCircle className="w-3 h-3 mr-1" />
+                                No documents
+                              </span>
                             )}
                           </div>
-                        </div>
-                        
-                        <div className="mt-3 flex items-center space-x-4">
+                        </td>
+                        <td className="px-6 py-4">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             hospital.isActive 
                               ? 'bg-green-100 text-green-800' 
@@ -478,49 +434,195 @@ const HospitalsList: React.FC = () => {
                           }`}>
                             {hospital.isActive ? 'Active' : 'Inactive'}
                           </span>
-                          <span className="text-xs text-gray-500">
-                            Created: {formatDate(hospital.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 ml-4">
-                      <Link
-                        to={`/hospitals/${hospital._id}`}
-                        className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50"
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Link>
-                      
-                      {canUpdate && (
-                        <Link
-                          to={`/hospitals/${hospital._id}/edit`}
-                          className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                      )}
-                      
-                      {canDelete && (
-                        <button
-                          onClick={() => {
-                            setHospitalToDelete(hospital);
-                            setShowDeleteModal(true);
-                          }}
-                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <Link
+                              to={`/hospitals/${hospital._id}`}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                              title="View Details & Contacts"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                            
+                            {canUpdate && (
+                              <Link
+                                to={`/hospitals/${hospital._id}/edit`}
+                                className="text-green-600 hover:text-green-900 p-1 rounded"
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Link>
+                            )}
+                            
+                            {canDelete && (
+                              <button
+                                onClick={() => {
+                                  setHospitalToDelete(hospital);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="text-red-600 hover:text-red-900 p-1 rounded"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-           {/* Pagination */}
+            {/* Mobile Cards */}
+            <div className="lg:hidden divide-y divide-gray-200">
+              {hospitals.map((hospital, index) => {
+                const totalDocs = getTotalDocuments(hospital);
+                
+                return (
+                  <motion.div
+                    key={hospital._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    className="p-6"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-3 flex-1">
+                        <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                          <Building2 className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-medium text-gray-900">{hospital.name}</h3>
+                          
+                          <div className="mt-2 space-y-2">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Mail className="w-4 h-4 mr-2" />
+                              {hospital.email}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Phone className="w-4 h-4 mr-2" />
+                              {hospital.phone}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <MapPin className="w-4 h-4 mr-2" />
+                              {hospital.city}, {hospital.state.name}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <FileText className="w-4 h-4 mr-2" />
+                              GST: {hospital.gstNumber}
+                            </div>
+                            
+                            {/* Documents for Mobile */}
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Files className="w-4 h-4 mr-2" />
+                              Documents: {totalDocs > 0 ? (
+                                <div className="flex items-center space-x-2 ml-1">
+                                  <span className="text-green-600 font-medium">{totalDocs}</span>
+                                  {hospital.documents && hospital.documents.length > 0 && (
+                                    <div className="flex items-center space-x-1">
+                                      {hospital.documents.slice(0, 2).map((doc) => (
+                                        <div key={doc._id} className="flex items-center space-x-1">
+                                          <button
+                                            onClick={() => handleViewFile(doc.filename)}
+                                            className="text-blue-600 hover:text-blue-800"
+                                            title={`View ${doc.originalName}`}
+                                          >
+                                            <Eye className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDownloadFile(doc.filename, doc.originalName)}
+                                            className="text-green-600 hover:text-green-800"
+                                            title={`Download ${doc.originalName}`}
+                                          >
+                                            <Download className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {hospital.agreementFile?.filename && (
+                                    <div className="flex items-center space-x-1">
+                                      <span className="text-xs bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded">
+                                        Legacy
+                                      </span>
+                                      <button
+                                        onClick={() => handleViewFile(hospital.agreementFile!.filename)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                        title="View Legacy Agreement"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDownloadFile(hospital.agreementFile!.filename, hospital.agreementFile!.originalName)}
+                                        className="text-green-600 hover:text-green-800"
+                                        title="Download Legacy Agreement"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 ml-1">None</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 flex items-center space-x-4">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              hospital.isActive 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {hospital.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Created: {formatDate(hospital.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 ml-4">
+                        <Link
+                          to={`/hospitals/${hospital._id}`}
+                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                        
+                        {canUpdate && (
+                          <Link
+                            to={`/hospitals/${hospital._id}/edit`}
+                            className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Link>
+                        )}
+                        
+                        {canDelete && (
+                          <button
+                            onClick={() => {
+                              setHospitalToDelete(hospital);
+                              setShowDeleteModal(true);
+                            }}
+                            className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-sm text-gray-700">

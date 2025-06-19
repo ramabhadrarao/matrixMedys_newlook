@@ -1,5 +1,42 @@
-// server/models/Hospital.js - Updated version
+// server/models/Hospital.js - Updated to support multiple files
 import mongoose from 'mongoose';
+
+const fileSchema = new mongoose.Schema({
+  filename: {
+    type: String,
+    required: true,
+  },
+  originalName: {
+    type: String,
+    required: true,
+  },
+  mimetype: {
+    type: String,
+    required: true,
+  },
+  size: {
+    type: Number,
+    required: true,
+  },
+  fileType: {
+    type: String,
+    enum: ['agreement', 'license', 'certificate', 'other'],
+    default: 'other',
+  },
+  description: {
+    type: String,
+    trim: true,
+  },
+  uploadedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  uploadedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  }
+}, { _id: true });
 
 const hospitalSchema = new mongoose.Schema({
   name: {
@@ -32,7 +69,9 @@ const hospitalSchema = new mongoose.Schema({
     uppercase: true,
     trim: true,
   },
-  // Updated agreement file structure to store more file information
+  // Updated to support multiple files
+  documents: [fileSchema],
+  // Keep the old agreementFile for backward compatibility
   agreementFile: {
     filename: {
       type: String,
@@ -100,7 +139,22 @@ const hospitalSchema = new mongoose.Schema({
 // Index for search performance
 hospitalSchema.index({ name: 'text', email: 'text', gstNumber: 'text' });
 
-// Virtual to get file download URL
+// Virtual to get total documents count
+hospitalSchema.virtual('documentsCount').get(function() {
+  return this.documents ? this.documents.length : 0;
+});
+
+// Virtual to get file download URLs
+hospitalSchema.virtual('documentUrls').get(function() {
+  if (!this.documents || this.documents.length === 0) return [];
+  return this.documents.map(doc => ({
+    ...doc.toObject(),
+    downloadUrl: `/api/files/download/${doc.filename}`,
+    viewUrl: `/api/files/view/${doc.filename}`
+  }));
+});
+
+// Virtual to get legacy agreement file URL
 hospitalSchema.virtual('agreementFileUrl').get(function() {
   if (this.agreementFile && this.agreementFile.filename) {
     return `/api/files/download/${this.agreementFile.filename}`;
@@ -108,7 +162,7 @@ hospitalSchema.virtual('agreementFileUrl').get(function() {
   return null;
 });
 
-// Virtual to get file view URL
+// Virtual to get legacy agreement file view URL
 hospitalSchema.virtual('agreementFileViewUrl').get(function() {
   if (this.agreementFile && this.agreementFile.filename) {
     return `/api/files/view/${this.agreementFile.filename}`;
@@ -119,5 +173,27 @@ hospitalSchema.virtual('agreementFileViewUrl').get(function() {
 // Ensure virtual fields are serialized
 hospitalSchema.set('toJSON', { virtuals: true });
 hospitalSchema.set('toObject', { virtuals: true });
+
+// Method to add a document
+hospitalSchema.methods.addDocument = function(fileData) {
+  this.documents.push(fileData);
+  return this.save();
+};
+
+// Method to remove a document
+hospitalSchema.methods.removeDocument = function(documentId) {
+  this.documents.id(documentId).remove();
+  return this.save();
+};
+
+// Method to update a document
+hospitalSchema.methods.updateDocument = function(documentId, updateData) {
+  const document = this.documents.id(documentId);
+  if (document) {
+    Object.assign(document, updateData);
+    return this.save();
+  }
+  throw new Error('Document not found');
+};
 
 export default mongoose.model('Hospital', hospitalSchema);

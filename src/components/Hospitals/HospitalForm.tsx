@@ -1,11 +1,23 @@
-// src/components/Hospitals/HospitalForm.tsx - Updated with proper file handling
+// src/components/Hospitals/HospitalForm.tsx - Updated with multiple file support
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft, Save, Loader2, Upload, X, Download, Eye, FileText, Trash2 } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Save, 
+  Loader2, 
+  Upload, 
+  X, 
+  Download, 
+  Eye, 
+  FileText, 
+  Trash2,
+  Plus,
+  Edit
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { hospitalAPI, HospitalFormData } from '../../services/hospitalAPI';
+import { hospitalAPI, HospitalFormData, HospitalDocument } from '../../services/hospitalAPI';
 import { statesAPI, handleApiError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 
@@ -13,6 +25,13 @@ interface State {
   _id: string;
   name: string;
   code: string;
+}
+
+interface FileWithMetadata {
+  file: File;
+  fileType: string;
+  description: string;
+  id: string;
 }
 
 const HospitalForm: React.FC = () => {
@@ -25,11 +44,22 @@ const HospitalForm: React.FC = () => {
   const [initialLoading, setInitialLoading] = useState(isEdit);
   const [states, setStates] = useState<State[]>([]);
   const [statesLoading, setStatesLoading] = useState(true);
+  
+  // Multiple file states
+  const [selectedFiles, setSelectedFiles] = useState<FileWithMetadata[]>([]);
+  const [existingDocuments, setExistingDocuments] = useState<HospitalDocument[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [deleteFileLoading, setDeleteFileLoading] = useState<string>('');
+  const [showAddDocument, setShowAddDocument] = useState(false);
+  const [newDocument, setNewDocument] = useState({
+    fileType: 'other',
+    description: ''
+  });
+
+  // Legacy single file states (for backward compatibility)
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingFile, setExistingFile] = useState<any>(null);
   const [filePreview, setFilePreview] = useState<string>('');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [deleteFileLoading, setDeleteFileLoading] = useState(false);
 
   const {
     register,
@@ -79,7 +109,12 @@ const HospitalForm: React.FC = () => {
       setValue('pincode', hospital.pincode);
       setValue('isActive', hospital.isActive);
       
-      // Handle existing file
+      // Handle existing documents
+      if (hospital.documents && hospital.documents.length > 0) {
+        setExistingDocuments(hospital.documents);
+      }
+      
+      // Handle legacy file
       if (hospital.agreementFile?.filename) {
         setExistingFile(hospital.agreementFile);
       }
@@ -92,6 +127,58 @@ const HospitalForm: React.FC = () => {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const newFiles: FileWithMetadata[] = [];
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        const allowedTypes = [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'image/jpeg',
+          'image/png',
+          'image/jpg',
+          'text/plain'
+        ];
+        
+        if (!allowedTypes.includes(file.type)) {
+          toast.error(`Invalid file type for ${file.name}. Only PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG, and TXT files are allowed.`);
+          continue;
+        }
+        
+        // Validate file size (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error(`File ${file.name} is too large. Maximum size is 10MB.`);
+          continue;
+        }
+        
+        newFiles.push({
+          file,
+          fileType: 'other',
+          description: '',
+          id: `${Date.now()}-${i}`
+        });
+      }
+      
+      if (newFiles.length > 0) {
+        setSelectedFiles(prev => [...prev, ...newFiles]);
+        toast.success(`${newFiles.length} file(s) selected successfully`);
+      }
+    }
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSingleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       // Validate file type
@@ -132,7 +219,17 @@ const HospitalForm: React.FC = () => {
     }
   };
 
-  const removeSelectedFile = () => {
+  const removeSelectedFile = (fileId: string) => {
+    setSelectedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  const updateFileMetadata = (fileId: string, field: 'fileType' | 'description', value: string) => {
+    setSelectedFiles(prev => prev.map(f => 
+      f.id === fileId ? { ...f, [field]: value } : f
+    ));
+  };
+
+  const removeSingleFile = () => {
     setSelectedFile(null);
     setFilePreview('');
     if (fileInputRef.current) {
@@ -140,11 +237,27 @@ const HospitalForm: React.FC = () => {
     }
   };
 
+  const handleDeleteExistingDocument = async (documentId: string) => {
+    if (!id) return;
+    
+    try {
+      setDeleteFileLoading(documentId);
+      await hospitalAPI.deleteDocument(id, documentId);
+      setExistingDocuments(prev => prev.filter(doc => doc._id !== documentId));
+      toast.success('Document deleted successfully');
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      handleApiError(error);
+    } finally {
+      setDeleteFileLoading('');
+    }
+  };
+
   const handleDeleteExistingFile = async () => {
     if (!existingFile || !id) return;
     
     try {
-      setDeleteFileLoading(true);
+      setDeleteFileLoading('legacy');
       await hospitalAPI.deleteHospitalFile(id);
       setExistingFile(null);
       toast.success('File deleted successfully');
@@ -152,12 +265,12 @@ const HospitalForm: React.FC = () => {
       console.error('Error deleting file:', error);
       handleApiError(error);
     } finally {
-      setDeleteFileLoading(false);
+      setDeleteFileLoading('');
     }
   };
 
   const handleViewFile = (filename: string) => {
-    window.open(hospitalAPI.viewFile(filename), '_blank');
+    hospitalAPI.viewFile(filename);
   };
 
   const handleDownloadFile = (filename: string, originalName: string) => {
@@ -175,8 +288,18 @@ const HospitalForm: React.FC = () => {
   const getFileIcon = (mimetype: string) => {
     if (mimetype?.includes('pdf')) return <FileText className="w-5 h-5 text-red-600" />;
     if (mimetype?.includes('word') || mimetype?.includes('document')) return <FileText className="w-5 h-5 text-blue-600" />;
-    if (mimetype?.includes('image')) return <FileText className="w-5 h-5 text-green-600" />;
+    if (mimetype?.includes('sheet') || mimetype?.includes('excel')) return <FileText className="w-5 h-5 text-green-600" />;
+    if (mimetype?.includes('image')) return <FileText className="w-5 h-5 text-purple-600" />;
     return <FileText className="w-5 h-5 text-gray-600" />;
+  };
+
+  const getFileTypeColor = (fileType: string) => {
+    switch (fileType) {
+      case 'agreement': return 'bg-blue-100 text-blue-800';
+      case 'license': return 'bg-green-100 text-green-800';
+      case 'certificate': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const onSubmit = async (data: HospitalFormData) => {
@@ -184,9 +307,12 @@ const HospitalForm: React.FC = () => {
     setUploadProgress(0);
     
     try {
-      // Prepare form data
+      // Prepare form data with multiple files
       const formData: HospitalFormData = {
         ...data,
+        documents: selectedFiles.map(f => f.file),
+        fileTypes: selectedFiles.map(f => f.fileType),
+        descriptions: selectedFiles.map(f => f.description),
         agreementFile: selectedFile || undefined,
       };
 
@@ -217,7 +343,7 @@ const HospitalForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
         <button
@@ -310,131 +436,6 @@ const HospitalForm: React.FC = () => {
                 />
                 {errors.phone && (
                   <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>
-                )}
-              </div>
-
-              {/* File Upload Section */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Agreement Document
-                </label>
-                
-                {/* Existing File Display */}
-                {existingFile && !selectedFile && (
-                  <div className="mb-3 p-3 bg-gray-50 rounded-lg border">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        {getFileIcon(existingFile.mimetype)}
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{existingFile.originalName}</p>
-                          <p className="text-xs text-gray-500">
-                            {formatFileSize(existingFile.size)} • Uploaded {new Date(existingFile.uploadedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => handleViewFile(existingFile.filename)}
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded"
-                          title="View File"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadFile(existingFile.filename, existingFile.originalName)}
-                          className="text-green-600 hover:text-green-800 p-1 rounded"
-                          title="Download File"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleDeleteExistingFile}
-                          disabled={deleteFileLoading}
-                          className="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
-                          title="Delete File"
-                        >
-                          {deleteFileLoading ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Selected File Preview */}
-                {selectedFile && (
-                  <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        {getFileIcon(selectedFile.type)}
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                          <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={removeSelectedFile}
-                        className="text-red-600 hover:text-red-800 p-1 rounded"
-                        title="Remove File"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* File Upload Area */}
-                {!selectedFile && (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <span className="text-blue-600 hover:text-blue-500 font-medium">Upload a file</span>
-                      <span className="text-gray-500"> or drag and drop</span>
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      id="file-upload"
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      onChange={handleFileSelect}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, JPEG, PNG up to 10MB</p>
-                  </div>
-                )}
-
-                {/* Upload Progress */}
-                {uploadProgress > 0 && uploadProgress < 100 && (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Uploading...</span>
-                      <span className="text-gray-600">{uploadProgress}%</span>
-                    </div>
-                    <div className="mt-1 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Image Preview */}
-                {filePreview && (
-                  <div className="mt-3">
-                    <img
-                      src={filePreview}
-                      alt="File preview"
-                      className="max-w-full h-32 object-contain rounded-lg border"
-                    />
-                  </div>
                 )}
               </div>
             </div>
@@ -601,6 +602,293 @@ const HospitalForm: React.FC = () => {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Documents Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
+              Documents
+            </h3>
+
+            {/* Existing Documents */}
+            {existingDocuments.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium text-gray-700 mb-3">Existing Documents</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {existingDocuments.map((doc) => (
+                    <div key={doc._id} className="p-4 bg-gray-50 rounded-lg border">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          {getFileIcon(doc.mimetype)}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {doc.originalName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {formatFileSize(doc.size)} • {new Date(doc.uploadedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExistingDocument(doc._id)}
+                          disabled={deleteFileLoading === doc._id}
+                          className="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                          title="Delete Document"
+                        >
+                          {deleteFileLoading === doc._id ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getFileTypeColor(doc.fileType)}`}>
+                          {doc.fileType}
+                        </span>
+                        <div className="flex items-center space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => handleViewFile(doc.filename)}
+                            className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                            title="View File"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadFile(doc.filename, doc.originalName)}
+                            className="text-green-600 hover:text-green-800 p-1 rounded"
+                            title="Download"
+                          >
+                            <Download className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {doc.description && (
+                        <p className="text-xs text-gray-600 mt-2">{doc.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Legacy File Display */}
+            {existingFile && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium text-gray-700 mb-3">Agreement File (Legacy)</h4>
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      {getFileIcon(existingFile.mimetype)}
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{existingFile.originalName}</p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(existingFile.size)} • Uploaded {new Date(existingFile.uploadedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleViewFile(existingFile.filename)}
+                        className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                        title="View File"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadFile(existingFile.filename, existingFile.originalName)}
+                        className="text-green-600 hover:text-green-800 p-1 rounded"
+                        title="Download File"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteExistingFile}
+                        disabled={deleteFileLoading === 'legacy'}
+                        className="text-red-600 hover:text-red-800 p-1 rounded disabled:opacity-50"
+                        title="Delete File"
+                      >
+                        {deleteFileLoading === 'legacy' ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* New Files to Upload */}
+            {selectedFiles.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium text-gray-700 mb-3">New Documents to Upload</h4>
+                <div className="space-y-4">
+                  {selectedFiles.map((fileData) => (
+                    <div key={fileData.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          {getFileIcon(fileData.file.type)}
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{fileData.file.name}</p>
+                            <p className="text-xs text-gray-500">{formatFileSize(fileData.file.size)}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeSelectedFile(fileData.id)}
+                          className="text-red-600 hover:text-red-800 p-1 rounded"
+                          title="Remove File"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Document Type
+                          </label>
+                          <select
+                            value={fileData.fileType}
+                            onChange={(e) => updateFileMetadata(fileData.id, 'fileType', e.target.value)}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="other">Other</option>
+                            <option value="agreement">Agreement</option>
+                            <option value="license">License</option>
+                            <option value="certificate">Certificate</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Description
+                          </label>
+                          <input
+                            type="text"
+                            value={fileData.description}
+                            onChange={(e) => updateFileMetadata(fileData.id, 'description', e.target.value)}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Optional description"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Single File Upload (Legacy Support) */}
+            {selectedFile && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium text-gray-700 mb-3">Agreement File (Legacy)</h4>
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      {getFileIcon(selectedFile.type)}
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                        <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removeSingleFile}
+                      className="text-red-600 hover:text-red-800 p-1 rounded"
+                      title="Remove File"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {filePreview && (
+                    <div className="mt-3">
+                      <img
+                        src={filePreview}
+                        alt="File preview"
+                        className="max-w-full h-32 object-contain rounded-lg border"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* File Upload Areas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Multiple File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Multiple Documents
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <label htmlFor="multiple-files" className="cursor-pointer">
+                    <span className="text-blue-600 hover:text-blue-500 font-medium">Upload multiple files</span>
+                    <span className="text-gray-500"> or drag and drop</span>
+                  </label>
+                  <input
+                    id="multiple-files"
+                    type="file"
+                    className="hidden"
+                    multiple
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.txt"
+                    onChange={handleFileSelect}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG, TXT up to 10MB each</p>
+                </div>
+              </div>
+
+              {/* Single File Upload (Legacy) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Agreement File (Legacy)
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <label htmlFor="single-file" className="cursor-pointer">
+                    <span className="text-blue-600 hover:text-blue-500 font-medium">Upload single file</span>
+                    <span className="text-gray-500"> or drag and drop</span>
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    id="single-file"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={handleSingleFileSelect}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, JPEG, PNG up to 10MB</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Upload Progress */}
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Uploading...</span>
+                  <span className="text-gray-600">{uploadProgress}%</span>
+                </div>
+                <div className="mt-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Status */}

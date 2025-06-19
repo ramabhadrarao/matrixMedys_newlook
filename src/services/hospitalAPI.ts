@@ -1,6 +1,24 @@
-// src/services/hospitalAPI.ts - Updated with proper file handling
+// src/services/hospitalAPI.ts - Updated with multiple file support
 import api, { handleApiError } from './api';
 import { useAuthStore } from '../store/authStore';
+
+export interface HospitalDocument {
+  _id: string;
+  filename: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+  fileType: 'agreement' | 'license' | 'certificate' | 'other';
+  description?: string;
+  uploadedAt: string;
+  uploadedBy: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  downloadUrl?: string;
+  viewUrl?: string;
+}
 
 export interface Hospital {
   _id: string;
@@ -9,6 +27,9 @@ export interface Hospital {
   phone: string;
   gstNumber: string;
   panNumber: string;
+  documents: HospitalDocument[];
+  documentsCount?: number;
+  // Legacy field for backward compatibility
   agreementFile?: {
     filename: string;
     originalName: string;
@@ -74,12 +95,17 @@ export interface HospitalFormData {
   phone: string;
   gstNumber: string;
   panNumber: string;
-  agreementFile?: File;
   gstAddress: string;
   city: string;
   state: string;
   pincode: string;
   isActive?: boolean;
+  // Support for multiple files
+  documents?: File[];
+  fileTypes?: string[];
+  descriptions?: string[];
+  // Legacy support
+  agreementFile?: File;
 }
 
 export interface HospitalContactFormData {
@@ -91,6 +117,12 @@ export interface HospitalContactFormData {
   location: string;
   pincode: string;
   isActive?: boolean;
+}
+
+export interface DocumentFormData {
+  file: File;
+  fileType: 'agreement' | 'license' | 'certificate' | 'other';
+  description?: string;
 }
 
 // Helper function for file uploads with progress
@@ -163,7 +195,22 @@ const createFormDataRequest = async (
       Object.keys(data).forEach(key => {
         const value = (data as any)[key];
         if (value !== undefined && value !== null) {
-          if (key === 'agreementFile' && value instanceof File) {
+          if (key === 'documents' && Array.isArray(value)) {
+            // Handle multiple documents
+            value.forEach((file: File) => {
+              requestData.append('documents', file);
+            });
+          } else if (key === 'fileTypes' && Array.isArray(value)) {
+            // Handle file types array
+            value.forEach((type: string) => {
+              requestData.append('fileTypes', type);
+            });
+          } else if (key === 'descriptions' && Array.isArray(value)) {
+            // Handle descriptions array
+            value.forEach((desc: string) => {
+              requestData.append('descriptions', desc);
+            });
+          } else if (key === 'agreementFile' && value instanceof File) {
             requestData.append('agreementFile', value);
           } else {
             requestData.append(key, value.toString());
@@ -213,15 +260,6 @@ const viewFileWithAuth = (filename: string) => {
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   const token = useAuthStore.getState().accessToken;
   
-  // Create a temporary form to POST the request with auth header
-  const form = document.createElement('form');
-  form.method = 'GET';
-  form.target = '_blank';
-  form.action = `${API_BASE_URL}/files/view/${filename}`;
-  
-  // Add authorization as a header (we'll use a different approach)
-  // Since we can't add custom headers to a form submission, we'll use fetch with blob
-  
   fetch(`${API_BASE_URL}/files/view/${filename}`, {
     method: 'GET',
     headers: {
@@ -237,7 +275,6 @@ const viewFileWithAuth = (filename: string) => {
   .then(blob => {
     const url = window.URL.createObjectURL(blob);
     window.open(url, '_blank');
-    // Clean up the URL after a delay to ensure the file opens
     setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   })
   .catch(error => {
@@ -276,12 +313,12 @@ export const hospitalAPI = {
     try {
       console.log('Creating hospital with data:', data);
       
-      // Check if there's a file to upload
-      if (data.agreementFile instanceof File) {
+      // Check if there are files to upload
+      if ((data.documents && data.documents.length > 0) || data.agreementFile instanceof File) {
         return await createFormDataRequest('/hospitals', data, 'POST', onProgress);
       } else {
-        // No file, use regular API
-        const { agreementFile, ...hospitalData } = data;
+        // No files, use regular API
+        const { documents, fileTypes, descriptions, agreementFile, ...hospitalData } = data;
         const response = await api.post('/hospitals', hospitalData);
         console.log('Create hospital response:', response.data);
         return response;
@@ -296,12 +333,12 @@ export const hospitalAPI = {
     try {
       console.log('Updating hospital:', id, 'with data:', data);
       
-      // Check if there's a file to upload
-      if (data.agreementFile instanceof File) {
+      // Check if there are files to upload
+      if ((data.documents && data.documents.length > 0) || data.agreementFile instanceof File) {
         return await createFormDataRequest(`/hospitals/${id}`, data, 'PUT', onProgress);
       } else {
-        // No file, use regular API
-        const { agreementFile, ...hospitalData } = data;
+        // No files, use regular API
+        const { documents, fileTypes, descriptions, agreementFile, ...hospitalData } = data;
         const response = await api.put(`/hospitals/${id}`, hospitalData);
         console.log('Update hospital response:', response.data);
         return response;
@@ -324,7 +361,50 @@ export const hospitalAPI = {
     }
   },
 
-  // Delete hospital agreement file
+  // Document management
+  addDocument: async (hospitalId: string, documentData: DocumentFormData, onProgress?: (progress: number) => void) => {
+    try {
+      console.log('Adding document to hospital:', hospitalId);
+      
+      const formData = new FormData();
+      formData.append('document', documentData.file);
+      formData.append('fileType', documentData.fileType);
+      if (documentData.description) {
+        formData.append('description', documentData.description);
+      }
+      
+      return await createFormDataRequest(`/hospitals/${hospitalId}/documents`, formData, 'POST', onProgress);
+    } catch (error) {
+      console.error('Error adding document:', error);
+      throw error;
+    }
+  },
+
+  updateDocument: async (hospitalId: string, documentId: string, data: { fileType?: string; description?: string }) => {
+    try {
+      console.log('Updating document:', documentId, 'for hospital:', hospitalId);
+      const response = await api.put(`/hospitals/${hospitalId}/documents/${documentId}`, data);
+      console.log('Update document response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error updating document:', error);
+      throw error;
+    }
+  },
+
+  deleteDocument: async (hospitalId: string, documentId: string) => {
+    try {
+      console.log('Deleting document:', documentId, 'for hospital:', hospitalId);
+      const response = await api.delete(`/hospitals/${hospitalId}/documents/${documentId}`);
+      console.log('Delete document response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      throw error;
+    }
+  },
+
+  // Legacy file deletion (backward compatibility)
   deleteHospitalFile: async (id: string) => {
     try {
       console.log('Deleting hospital file for ID:', id);
@@ -337,7 +417,7 @@ export const hospitalAPI = {
     }
   },
 
-  // File operations - Updated with proper authentication
+  // File operations
   viewFile: (filename: string) => {
     try {
       viewFileWithAuth(filename);

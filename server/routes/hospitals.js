@@ -1,10 +1,15 @@
-// server/routes/hospitals.js - Updated with file upload
+// server/routes/hospitals.js - Updated with multiple file support
 import express from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
-import upload from '../middleware/upload.js';
+import { 
+  uploadSingleFile, 
+  uploadMultipleFiles, 
+  uploadDocument, 
+  handleUploadError 
+} from '../middleware/upload.js';
 import {
   getHospitals,
   getHospital,
@@ -12,6 +17,9 @@ import {
   updateHospital,
   deleteHospital,
   deleteHospitalFile,
+  addHospitalDocument,
+  updateHospitalDocument,
+  deleteHospitalDocument,
   getHospitalContacts,
   createHospitalContact,
   updateHospitalContact,
@@ -44,34 +52,67 @@ const contactValidation = [
   body('pincode').trim().isLength({ min: 6, max: 6 }).withMessage('Pincode must be exactly 6 digits'),
 ];
 
+// Document validation
+const documentValidation = [
+  body('fileType').optional().isIn(['agreement', 'license', 'certificate', 'other']).withMessage('Invalid file type'),
+  body('description').optional().trim().isLength({ max: 500 }).withMessage('Description must be less than 500 characters'),
+];
+
 // Hospital routes
 router.get('/', authenticate, checkPermission('hospitals', 'view'), getHospitals);
 router.get('/:id', authenticate, checkPermission('hospitals', 'view'), getHospital);
 
-// Create hospital with optional file upload
+// Create hospital with multiple file upload support
 router.post('/', 
   authenticate, 
   checkPermission('hospitals', 'create'),
-  upload.single('agreementFile'), // Add file upload middleware
+  uploadMultipleFiles, // Support multiple files
   hospitalValidation, 
   validate, 
-  createHospital
+  createHospital,
+  handleUploadError
 );
 
-// Update hospital with optional file upload
+// Update hospital with multiple file upload support
 router.put('/:id', 
   authenticate, 
   checkPermission('hospitals', 'update'),
-  upload.single('agreementFile'), // Add file upload middleware
+  uploadMultipleFiles, // Support multiple files
   hospitalValidation, 
   validate, 
-  updateHospital
+  updateHospital,
+  handleUploadError
 );
 
 router.delete('/:id', authenticate, checkPermission('hospitals', 'delete'), deleteHospital);
 
-// Delete hospital file specifically
+// Legacy file deletion (backward compatibility)
 router.delete('/:id/file', authenticate, checkPermission('hospitals', 'update'), deleteHospitalFile);
+
+// Document management routes
+router.post('/:id/documents', 
+  authenticate, 
+  checkPermission('hospitals', 'update'),
+  uploadDocument,
+  documentValidation,
+  validate,
+  addHospitalDocument,
+  handleUploadError
+);
+
+router.put('/:id/documents/:documentId', 
+  authenticate, 
+  checkPermission('hospitals', 'update'),
+  documentValidation,
+  validate,
+  updateHospitalDocument
+);
+
+router.delete('/:id/documents/:documentId', 
+  authenticate, 
+  checkPermission('hospitals', 'update'), 
+  deleteHospitalDocument
+);
 
 // Hospital contacts routes
 router.get('/:hospitalId/contacts', authenticate, checkPermission('hospitals', 'view'), getHospitalContacts);
