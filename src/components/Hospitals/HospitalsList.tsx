@@ -1,4 +1,4 @@
-// src/components/Hospitals/HospitalsList.tsx - Updated with file handling
+// src/components/Hospitals/HospitalsList.tsx - Updated with working file operations
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -140,14 +140,25 @@ const HospitalsList: React.FC = () => {
     return <FileText className="w-4 h-4 text-gray-600" />;
   };
 
-  // Handle file download
-  const handleDownloadFile = (filename: string, originalName: string) => {
-    hospitalAPI.downloadFile(filename, originalName);
+  // Handle file download - Updated with proper error handling
+  const handleDownloadFile = async (filename: string, originalName: string) => {
+    try {
+      await hospitalAPI.downloadFile(filename, originalName);
+      toast.success('File download started');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download file');
+    }
   };
 
-  // Handle file view
+  // Handle file view - Updated with proper error handling
   const handleViewFile = (filename: string) => {
-    window.open(hospitalAPI.viewFile(filename), '_blank');
+    try {
+      hospitalAPI.viewFile(filename);
+    } catch (error) {
+      console.error('View error:', error);
+      toast.error('Failed to view file');
+    }
   };
 
   return (
@@ -509,7 +520,7 @@ const HospitalsList: React.FC = () => {
               ))}
             </div>
 
-           {/* Pagination - Continuation */}
+           {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-sm text-gray-700">

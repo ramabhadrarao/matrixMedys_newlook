@@ -1,4 +1,4 @@
-// src/components/Hospitals/HospitalDetails.tsx - Updated with file viewing
+// src/components/Hospitals/HospitalDetails.tsx - Updated with working file operations
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -187,17 +187,24 @@ const HospitalDetails: React.FC = () => {
     return <FileText className="w-5 h-5 text-gray-600" />;
   };
 
+  // Updated file handling methods with proper authentication
   const handleViewFile = (filename: string) => {
-    window.open(`/api/files/view/${filename}`, '_blank');
+    try {
+      hospitalAPI.viewFile(filename);
+    } catch (error) {
+      console.error('View error:', error);
+      toast.error('Failed to view file');
+    }
   };
 
-  const handleDownloadFile = (filename: string, originalName: string) => {
-    const link = document.createElement('a');
-    link.href = `/api/files/download/${filename}`;
-    link.download = originalName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadFile = async (filename: string, originalName: string) => {
+    try {
+      await hospitalAPI.downloadFile(filename, originalName);
+      toast.success('File download started');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download file');
+    }
   };
 
   if (loading) {
@@ -331,16 +338,17 @@ const HospitalDetails: React.FC = () => {
                     <Download className="w-4 h-4 mr-1" />
                     Download
                   </button>
-                  <a
-                    href={`/api/files/view/${hospital.agreementFile.filename}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => {
+                      const url = hospitalAPI.getFileUrl(hospital.agreementFile!.filename, 'view');
+                      window.open(url, '_blank');
+                    }}
                     className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                     title="Open in New Tab"
                   >
                     <ExternalLink className="w-4 h-4 mr-1" />
                     Open
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>

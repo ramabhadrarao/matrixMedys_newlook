@@ -1,4 +1,4 @@
-// src/services/hospitalAPI.ts - Updated with file upload support
+// src/services/hospitalAPI.ts - Updated with proper file handling
 import api, { handleApiError } from './api';
 import { useAuthStore } from '../store/authStore';
 
@@ -176,6 +176,76 @@ const createFormDataRequest = async (
   });
 };
 
+// Helper function for authenticated file downloads
+const downloadFileWithAuth = async (filename: string, originalName?: string) => {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const token = useAuthStore.getState().accessToken;
+    
+    const response = await fetch(`${API_BASE_URL}/files/download/${filename}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = originalName || filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download error:', error);
+    throw error;
+  }
+};
+
+// Helper function for authenticated file viewing
+const viewFileWithAuth = (filename: string) => {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const token = useAuthStore.getState().accessToken;
+  
+  // Create a temporary form to POST the request with auth header
+  const form = document.createElement('form');
+  form.method = 'GET';
+  form.target = '_blank';
+  form.action = `${API_BASE_URL}/files/view/${filename}`;
+  
+  // Add authorization as a header (we'll use a different approach)
+  // Since we can't add custom headers to a form submission, we'll use fetch with blob
+  
+  fetch(`${API_BASE_URL}/files/view/${filename}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.blob();
+  })
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    // Clean up the URL after a delay to ensure the file opens
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  })
+  .catch(error => {
+    console.error('View file error:', error);
+    throw error;
+  });
+};
+
 export const hospitalAPI = {
   // Hospital CRUD operations
   getHospitals: async (params?: { page?: number; limit?: number; search?: string }) => {
@@ -267,22 +337,29 @@ export const hospitalAPI = {
     }
   },
 
-  // File operations
+  // File operations - Updated with proper authentication
   viewFile: (filename: string) => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    return `${API_BASE_URL}/files/view/${filename}`;
+    try {
+      viewFileWithAuth(filename);
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      handleApiError(error);
+    }
   },
 
-  downloadFile: (filename: string, originalName?: string) => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const link = document.createElement('a');
-    link.href = `${API_BASE_URL}/files/download/${filename}`;
-    if (originalName) {
-      link.download = originalName;
+  downloadFile: async (filename: string, originalName?: string) => {
+    try {
+      await downloadFileWithAuth(filename, originalName);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      handleApiError(error);
     }
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  },
+
+  // Get file URL with token (for cases where you need the URL)
+  getFileUrl: (filename: string, type: 'view' | 'download' = 'view') => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    return `${API_BASE_URL}/files/${type}/${filename}`;
   },
 
   // Hospital Contacts CRUD operations

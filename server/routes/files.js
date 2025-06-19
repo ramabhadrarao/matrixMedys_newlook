@@ -1,4 +1,4 @@
-// server/routes/files.js
+// server/routes/files.js - Updated with better error handling and CORS
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -73,13 +73,22 @@ router.get('/download/:filename', authenticate, (req, res) => {
         break;
     }
 
-    // Set headers
+    // Set headers for download
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', stats.size);
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-cache');
 
     // Stream the file
     const fileStream = fs.createReadStream(filePath);
+    
+    fileStream.on('error', (error) => {
+      console.error('File stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error reading file' });
+      }
+    });
+
     fileStream.pipe(res);
     
   } catch (error) {
@@ -119,10 +128,27 @@ router.get('/view/:filename', authenticate, (req, res) => {
         return res.redirect(`/api/files/download/${filename}`);
     }
 
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    // Get file stats
+    const stats = fs.statSync(filePath);
 
+    // Set headers for inline viewing
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache for viewing
+    res.setHeader('Access-Control-Allow-Origin', process.env.CLIENT_URL || 'http://localhost:5173');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+    // Stream the file
     const fileStream = fs.createReadStream(filePath);
+    
+    fileStream.on('error', (error) => {
+      console.error('File stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error reading file' });
+      }
+    });
+
     fileStream.pipe(res);
     
   } catch (error) {
