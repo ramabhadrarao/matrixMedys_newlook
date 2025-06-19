@@ -1,4 +1,4 @@
-// src/components/Hospitals/HospitalForm.tsx - Fixed version with working API
+// src/components/Hospitals/HospitalForm.tsx - Updated with proper file handling
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -15,19 +15,9 @@ interface State {
   code: string;
 }
 
-interface FileInfo {
-  filename: string;
-  originalName: string;
-  mimetype: string;
-  size: number;
-  uploadedAt: string;
-  uploadedBy: string;
-}
-
 const HospitalForm: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { accessToken } = useAuthStore();
   const isEdit = !!id;
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -36,7 +26,7 @@ const HospitalForm: React.FC = () => {
   const [states, setStates] = useState<State[]>([]);
   const [statesLoading, setStatesLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [existingFile, setExistingFile] = useState<FileInfo | null>(null);
+  const [existingFile, setExistingFile] = useState<any>(null);
   const [filePreview, setFilePreview] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteFileLoading, setDeleteFileLoading] = useState(false);
@@ -155,28 +145,23 @@ const HospitalForm: React.FC = () => {
     
     try {
       setDeleteFileLoading(true);
-      
-      // Call API to delete the file using fetch
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/hospitals/${id}/file`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete file');
-      }
-      
+      await hospitalAPI.deleteHospitalFile(id);
       setExistingFile(null);
       toast.success('File deleted successfully');
     } catch (error) {
       console.error('Error deleting file:', error);
-      toast.error('Failed to delete file');
+      handleApiError(error);
     } finally {
       setDeleteFileLoading(false);
     }
+  };
+
+  const handleViewFile = (filename: string) => {
+    window.open(hospitalAPI.viewFile(filename), '_blank');
+  };
+
+  const handleDownloadFile = (filename: string, originalName: string) => {
+    hospitalAPI.downloadFile(filename, originalName);
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -188,9 +173,9 @@ const HospitalForm: React.FC = () => {
   };
 
   const getFileIcon = (mimetype: string) => {
-    if (mimetype.includes('pdf')) return <FileText className="w-5 h-5 text-red-600" />;
-    if (mimetype.includes('word') || mimetype.includes('document')) return <FileText className="w-5 h-5 text-blue-600" />;
-    if (mimetype.includes('image')) return <FileText className="w-5 h-5 text-green-600" />;
+    if (mimetype?.includes('pdf')) return <FileText className="w-5 h-5 text-red-600" />;
+    if (mimetype?.includes('word') || mimetype?.includes('document')) return <FileText className="w-5 h-5 text-blue-600" />;
+    if (mimetype?.includes('image')) return <FileText className="w-5 h-5 text-green-600" />;
     return <FileText className="w-5 h-5 text-gray-600" />;
   };
 
@@ -199,64 +184,24 @@ const HospitalForm: React.FC = () => {
     setUploadProgress(0);
     
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      
-      // Create FormData for file upload
-      const formData = new FormData();
-      
-      // Append form fields
-      Object.keys(data).forEach(key => {
-        const value = data[key as keyof HospitalFormData];
-        if (value !== undefined && value !== null) {
-          formData.append(key, value.toString());
-        }
-      });
-      
-      // Append file if selected
-      if (selectedFile) {
-        formData.append('agreementFile', selectedFile);
+      // Prepare form data
+      const formData: HospitalFormData = {
+        ...data,
+        agreementFile: selectedFile || undefined,
+      };
+
+      if (isEdit && id) {
+        await hospitalAPI.updateHospital(id, formData, setUploadProgress);
+        toast.success('Hospital updated successfully');
+      } else {
+        await hospitalAPI.createHospital(formData, setUploadProgress);
+        toast.success('Hospital created successfully');
       }
       
-      // Use fetch with progress tracking
-      const response = await new Promise<Response>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(progress);
-          }
-        };
-        
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(new Response(xhr.responseText, { status: xhr.status }));
-          } else {
-            reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-          }
-        };
-        
-        xhr.onerror = () => {
-          reject(new Error('Network error occurred'));
-        };
-        
-        xhr.open(isEdit ? 'PUT' : 'POST', `${API_BASE_URL}/hospitals${isEdit ? `/${id}` : ''}`, true);
-        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-        xhr.send(formData);
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Operation failed');
-      }
-
-      const result = await response.json();
-      toast.success(isEdit ? 'Hospital updated successfully' : 'Hospital created successfully');
       navigate('/hospitals');
-      
     } catch (error: any) {
       console.error('Submit error:', error);
-      toast.error(error.message || 'Operation failed');
+      handleApiError(error);
     } finally {
       setLoading(false);
       setUploadProgress(0);
@@ -388,23 +333,22 @@ const HospitalForm: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <a
-                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/files/view/${existingFile.filename}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => handleViewFile(existingFile.filename)}
                           className="text-blue-600 hover:text-blue-800 p-1 rounded"
                           title="View File"
                         >
                           <Eye className="w-4 h-4" />
-                        </a>
-                        <a
-                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/files/download/${existingFile.filename}`}
-                          download
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadFile(existingFile.filename, existingFile.originalName)}
                           className="text-green-600 hover:text-green-800 p-1 rounded"
                           title="Download File"
                         >
                           <Download className="w-4 h-4" />
-                        </a>
+                        </button>
                         <button
                           type="button"
                           onClick={handleDeleteExistingFile}

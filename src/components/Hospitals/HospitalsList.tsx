@@ -1,4 +1,4 @@
-// src/components/Hospitals/HospitalsList.tsx - Updated to handle new file structure
+// src/components/Hospitals/HospitalsList.tsx - Updated with file handling
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -142,19 +142,12 @@ const HospitalsList: React.FC = () => {
 
   // Handle file download
   const handleDownloadFile = (filename: string, originalName: string) => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const link = document.createElement('a');
-    link.href = `${API_BASE_URL}/files/download/${filename}`;
-    link.download = originalName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    hospitalAPI.downloadFile(filename, originalName);
   };
 
   // Handle file view
   const handleViewFile = (filename: string) => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    window.open(`${API_BASE_URL}/files/view/${filename}`, '_blank');
+    window.open(hospitalAPI.viewFile(filename), '_blank');
   };
 
   return (
@@ -516,7 +509,7 @@ const HospitalsList: React.FC = () => {
               ))}
             </div>
 
-            {/* Pagination */}
+           {/* Pagination - Continuation */}
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-sm text-gray-700">

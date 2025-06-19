@@ -1,30 +1,6 @@
-// src/services/hospitalAPI.ts - Fixed version with proper FormData handling
-import axios from 'axios';
-import { handleApiError } from './api';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-// Create a separate axios instance for file uploads
-const createApiInstance = (contentType = 'application/json') => {
-  const instance = axios.create({
-    baseURL: API_BASE_URL,
-    timeout: 30000, // Increased timeout for file uploads
-    headers: {
-      'Content-Type': contentType,
-    },
-  });
-
-  // Add auth token interceptor
-  instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  });
-
-  return instance;
-};
+// src/services/hospitalAPI.ts - Updated with file upload support
+import api, { handleApiError } from './api';
+import { useAuthStore } from '../store/authStore';
 
 export interface Hospital {
   _id: string;
@@ -98,7 +74,7 @@ export interface HospitalFormData {
   phone: string;
   gstNumber: string;
   panNumber: string;
-  agreementFile?: string;
+  agreementFile?: File;
   gstAddress: string;
   city: string;
   state: string;
@@ -117,12 +93,94 @@ export interface HospitalContactFormData {
   isActive?: boolean;
 }
 
+// Helper function for file uploads with progress
+const createFormDataRequest = async (
+  url: string, 
+  data: HospitalFormData | FormData, 
+  method: 'POST' | 'PUT' = 'POST',
+  onProgress?: (progress: number) => void
+) => {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const token = useAuthStore.getState().accessToken;
+  
+  return new Promise<any>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          onProgress(progress);
+        }
+      };
+    }
+    
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          resolve({ data: response });
+        } catch (e) {
+          resolve({ data: xhr.responseText });
+        }
+      } else {
+        try {
+          const errorData = JSON.parse(xhr.responseText);
+          const error = new Error(errorData.message || `HTTP ${xhr.status}: ${xhr.statusText}`);
+          (error as any).response = { 
+            status: xhr.status, 
+            data: errorData 
+          };
+          reject(error);
+        } catch (e) {
+          const error = new Error(`HTTP ${xhr.status}: ${xhr.statusText}`);
+          (error as any).response = { 
+            status: xhr.status, 
+            data: { message: xhr.statusText } 
+          };
+          reject(error);
+        }
+      }
+    };
+    
+    xhr.onerror = () => {
+      reject(new Error('Network error occurred'));
+    };
+    
+    xhr.open(method, `${API_BASE_URL}${url}`, true);
+    
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+    
+    // Prepare data
+    let requestData: FormData;
+    if (data instanceof FormData) {
+      requestData = data;
+    } else {
+      requestData = new FormData();
+      Object.keys(data).forEach(key => {
+        const value = (data as any)[key];
+        if (value !== undefined && value !== null) {
+          if (key === 'agreementFile' && value instanceof File) {
+            requestData.append('agreementFile', value);
+          } else {
+            requestData.append(key, value.toString());
+          }
+        }
+      });
+    }
+    
+    xhr.send(requestData);
+  });
+};
+
 export const hospitalAPI = {
   // Hospital CRUD operations
   getHospitals: async (params?: { page?: number; limit?: number; search?: string }) => {
     try {
       console.log('Fetching hospitals with params:', params);
-      const api = createApiInstance();
       const response = await api.get('/hospitals', { params });
       console.log('Hospitals API response:', response.data);
       return response;
@@ -135,7 +193,6 @@ export const hospitalAPI = {
   getHospital: async (id: string) => {
     try {
       console.log('Fetching hospital with ID:', id);
-      const api = createApiInstance();
       const response = await api.get(`/hospitals/${id}`);
       console.log('Hospital API response:', response.data);
       return response;
@@ -145,44 +202,40 @@ export const hospitalAPI = {
     }
   },
   
-  createHospital: async (data: HospitalFormData | FormData) => {
+  createHospital: async (data: HospitalFormData, onProgress?: (progress: number) => void) => {
     try {
       console.log('Creating hospital with data:', data);
       
-      // Determine if we're sending FormData (with file) or regular JSON
-      const isFormData = data instanceof FormData;
-      const api = createApiInstance(isFormData ? 'multipart/form-data' : 'application/json');
-      
-      // Remove Content-Type header for FormData to let browser set it with boundary
-      if (isFormData) {
-        delete api.defaults.headers['Content-Type'];
+      // Check if there's a file to upload
+      if (data.agreementFile instanceof File) {
+        return await createFormDataRequest('/hospitals', data, 'POST', onProgress);
+      } else {
+        // No file, use regular API
+        const { agreementFile, ...hospitalData } = data;
+        const response = await api.post('/hospitals', hospitalData);
+        console.log('Create hospital response:', response.data);
+        return response;
       }
-      
-      const response = await api.post('/hospitals', data);
-      console.log('Create hospital response:', response.data);
-      return response;
     } catch (error) {
       console.error('Error creating hospital:', error);
       throw error;
     }
   },
   
-  updateHospital: async (id: string, data: HospitalFormData | FormData) => {
+  updateHospital: async (id: string, data: HospitalFormData, onProgress?: (progress: number) => void) => {
     try {
       console.log('Updating hospital:', id, 'with data:', data);
       
-      // Determine if we're sending FormData (with file) or regular JSON
-      const isFormData = data instanceof FormData;
-      const api = createApiInstance(isFormData ? 'multipart/form-data' : 'application/json');
-      
-      // Remove Content-Type header for FormData to let browser set it with boundary
-      if (isFormData) {
-        delete api.defaults.headers['Content-Type'];
+      // Check if there's a file to upload
+      if (data.agreementFile instanceof File) {
+        return await createFormDataRequest(`/hospitals/${id}`, data, 'PUT', onProgress);
+      } else {
+        // No file, use regular API
+        const { agreementFile, ...hospitalData } = data;
+        const response = await api.put(`/hospitals/${id}`, hospitalData);
+        console.log('Update hospital response:', response.data);
+        return response;
       }
-      
-      const response = await api.put(`/hospitals/${id}`, data);
-      console.log('Update hospital response:', response.data);
-      return response;
     } catch (error) {
       console.error('Error updating hospital:', error);
       throw error;
@@ -192,7 +245,6 @@ export const hospitalAPI = {
   deleteHospital: async (id: string) => {
     try {
       console.log('Deleting hospital with ID:', id);
-      const api = createApiInstance();
       const response = await api.delete(`/hospitals/${id}`);
       console.log('Delete hospital response:', response.data);
       return response;
@@ -202,11 +254,10 @@ export const hospitalAPI = {
     }
   },
 
-  // Delete hospital file specifically
+  // Delete hospital agreement file
   deleteHospitalFile: async (id: string) => {
     try {
       console.log('Deleting hospital file for ID:', id);
-      const api = createApiInstance();
       const response = await api.delete(`/hospitals/${id}/file`);
       console.log('Delete hospital file response:', response.data);
       return response;
@@ -216,11 +267,28 @@ export const hospitalAPI = {
     }
   },
 
+  // File operations
+  viewFile: (filename: string) => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    return `${API_BASE_URL}/files/view/${filename}`;
+  },
+
+  downloadFile: (filename: string, originalName?: string) => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const link = document.createElement('a');
+    link.href = `${API_BASE_URL}/files/download/${filename}`;
+    if (originalName) {
+      link.download = originalName;
+    }
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  },
+
   // Hospital Contacts CRUD operations
   getHospitalContacts: async (hospitalId: string, params?: { page?: number; limit?: number; search?: string }) => {
     try {
       console.log('Fetching hospital contacts for hospital:', hospitalId, 'with params:', params);
-      const api = createApiInstance();
       const response = await api.get(`/hospitals/${hospitalId}/contacts`, { params });
       console.log('Hospital contacts API response:', response.data);
       return response;
@@ -233,7 +301,6 @@ export const hospitalAPI = {
   createHospitalContact: async (hospitalId: string, data: HospitalContactFormData) => {
     try {
       console.log('Creating hospital contact for hospital:', hospitalId, 'with data:', data);
-      const api = createApiInstance();
       const response = await api.post(`/hospitals/${hospitalId}/contacts`, data);
       console.log('Create hospital contact response:', response.data);
       return response;
@@ -246,7 +313,6 @@ export const hospitalAPI = {
   updateHospitalContact: async (hospitalId: string, contactId: string, data: HospitalContactFormData) => {
     try {
       console.log('Updating hospital contact:', contactId, 'for hospital:', hospitalId, 'with data:', data);
-      const api = createApiInstance();
       const response = await api.put(`/hospitals/${hospitalId}/contacts/${contactId}`, data);
       console.log('Update hospital contact response:', response.data);
       return response;
@@ -259,7 +325,6 @@ export const hospitalAPI = {
   deleteHospitalContact: async (hospitalId: string, contactId: string) => {
     try {
       console.log('Deleting hospital contact:', contactId, 'for hospital:', hospitalId);
-      const api = createApiInstance();
       const response = await api.delete(`/hospitals/${hospitalId}/contacts/${contactId}`);
       console.log('Delete hospital contact response:', response.data);
       return response;
