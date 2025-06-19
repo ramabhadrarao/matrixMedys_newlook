@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.tsx - Updated with Profile Information route
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -29,6 +29,7 @@ import HospitalDetails from './components/Hospitals/HospitalDetails';
 // Settings Components
 import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
+import ProfileInformation from './components/Settings/ProfileInformation';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -150,7 +151,7 @@ function App() {
             {/* Settings Routes */}
             <Route path="settings" element={<Settings />} />
             <Route path="settings/change-password" element={<ChangePassword />} />
-            <Route path="settings/profile" element={<div className="p-6 text-center text-gray-500">Profile settings coming soon...</div>} />
+            <Route path="settings/profile" element={<ProfileInformation />} />
             <Route path="settings/notifications" element={<div className="p-6 text-center text-gray-500">Notification settings coming soon...</div>} />
             <Route path="settings/permissions" element={<div className="p-6 text-center text-gray-500">Permission management coming soon...</div>} />
             <Route path="settings/appearance" element={<div className="p-6 text-center text-gray-500">Appearance settings coming soon...</div>} />
