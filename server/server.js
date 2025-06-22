@@ -12,6 +12,8 @@ import stateRoutes from './routes/states.js';
 import userRoutes from './routes/users.js';
 import permissionRoutes from './routes/permissions.js';
 import hospitalRoutes from './routes/hospitals.js';
+import doctorRoutes from './routes/doctors.js';
+import portfolioRoutes from './routes/portfolios.js';
 import dashboardRoutes from './routes/dashboard.js';
 import fileRoutes from './routes/files.js'; // New file routes
 
@@ -74,7 +76,8 @@ app.use('/api/states', stateRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/hospitals', hospitalRoutes);
-
+app.use('/api/doctors', doctorRoutes);
+app.use('/api/portfolios', portfolioRoutes);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
