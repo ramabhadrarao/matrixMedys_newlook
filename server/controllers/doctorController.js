@@ -84,7 +84,11 @@ export const getDoctor = async (req, res) => {
 
 export const createDoctor = async (req, res) => {
   try {
-    const {
+    console.log('Create doctor request body:', req.body);
+    console.log('Request files:', req.files);
+    
+    // Parse form data properly
+    let {
       name,
       email,
       phone,
@@ -94,26 +98,84 @@ export const createDoctor = async (req, res) => {
       targets
     } = req.body;
     
+    // Handle form data arrays - they come as strings when sent via FormData
+    if (typeof specialization === 'string') {
+      specialization = [specialization];
+    } else if (!Array.isArray(specialization)) {
+      specialization = [];
+    }
+    
+    if (typeof hospitals === 'string') {
+      hospitals = [hospitals];
+    } else if (!Array.isArray(hospitals)) {
+      hospitals = [];
+    }
+    
+    // Parse targets if it comes as a string
+    if (typeof targets === 'string') {
+      try {
+        targets = JSON.parse(targets);
+      } catch (e) {
+        targets = [];
+      }
+    } else if (!Array.isArray(targets)) {
+      targets = [];
+    }
+    
+    console.log('Parsed data:', { name, email, phone, specialization, hospitals, location, targets });
+    
+    // Validate required fields
+    if (!name || !email || !phone || !location) {
+      return res.status(400).json({ 
+        message: 'Missing required fields',
+        errors: [
+          !name && { param: 'name', msg: 'Name is required' },
+          !email && { param: 'email', msg: 'Email is required' },
+          !phone && { param: 'phone', msg: 'Phone is required' },
+          !location && { param: 'location', msg: 'Location is required' }
+        ].filter(Boolean)
+      });
+    }
+    
     // Check if email already exists
     const existingDoctor = await Doctor.findOne({ email });
     if (existingDoctor) {
-      return res.status(400).json({ message: 'Doctor with this email already exists' });
+      return res.status(400).json({ 
+        message: 'Doctor with this email already exists',
+        errors: [{ param: 'email', msg: 'Email already exists' }]
+      });
     }
     
     // Validate specializations exist
-    if (specialization && specialization.length > 0) {
-      const portfolios = await Portfolio.find({ _id: { $in: specialization } });
-      if (portfolios.length !== specialization.length) {
-        return res.status(400).json({ message: 'Some specializations are invalid' });
-      }
+    if (!specialization || specialization.length === 0) {
+      return res.status(400).json({ 
+        message: 'At least one specialization is required',
+        errors: [{ param: 'specialization', msg: 'At least one specialization is required' }]
+      });
+    }
+    
+    const portfolios = await Portfolio.find({ _id: { $in: specialization } });
+    if (portfolios.length !== specialization.length) {
+      return res.status(400).json({ 
+        message: 'Some specializations are invalid',
+        errors: [{ param: 'specialization', msg: 'Invalid specialization IDs provided' }]
+      });
     }
     
     // Validate hospitals exist
-    if (hospitals && hospitals.length > 0) {
-      const hospitalDocs = await Hospital.find({ _id: { $in: hospitals } });
-      if (hospitalDocs.length !== hospitals.length) {
-        return res.status(400).json({ message: 'Some hospitals are invalid' });
-      }
+    if (!hospitals || hospitals.length === 0) {
+      return res.status(400).json({ 
+        message: 'At least one hospital is required',
+        errors: [{ param: 'hospitals', msg: 'At least one hospital is required' }]
+      });
+    }
+    
+    const hospitalDocs = await Hospital.find({ _id: { $in: hospitals } });
+    if (hospitalDocs.length !== hospitals.length) {
+      return res.status(400).json({ 
+        message: 'Some hospitals are invalid',
+        errors: [{ param: 'hospitals', msg: 'Invalid hospital IDs provided' }]
+      });
     }
     
     const doctorData = {
@@ -187,7 +249,7 @@ export const createDoctor = async (req, res) => {
 export const updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
+    let {
       name,
       email,
       phone,
@@ -197,6 +259,30 @@ export const updateDoctor = async (req, res) => {
       targets,
       isActive
     } = req.body;
+    
+    // Handle form data arrays - they come as strings when sent via FormData
+    if (typeof specialization === 'string') {
+      specialization = [specialization];
+    } else if (!Array.isArray(specialization)) {
+      specialization = [];
+    }
+    
+    if (typeof hospitals === 'string') {
+      hospitals = [hospitals];
+    } else if (!Array.isArray(hospitals)) {
+      hospitals = [];
+    }
+    
+    // Parse targets if it comes as a string
+    if (typeof targets === 'string') {
+      try {
+        targets = JSON.parse(targets);
+      } catch (e) {
+        targets = [];
+      }
+    } else if (!Array.isArray(targets)) {
+      targets = [];
+    }
     
     const doctor = await Doctor.findById(id);
     if (!doctor) {
@@ -212,19 +298,29 @@ export const updateDoctor = async (req, res) => {
     }
     
     // Validate specializations exist
-    if (specialization && specialization.length > 0) {
-      const portfolios = await Portfolio.find({ _id: { $in: specialization } });
-      if (portfolios.length !== specialization.length) {
-        return res.status(400).json({ message: 'Some specializations are invalid' });
-      }
+    if (!specialization || specialization.length === 0) {
+      return res.status(400).json({ 
+        message: 'At least one specialization is required',
+        errors: [{ param: 'specialization', msg: 'At least one specialization is required' }]
+      });
+    }
+    
+    const portfolios = await Portfolio.find({ _id: { $in: specialization } });
+    if (portfolios.length !== specialization.length) {
+      return res.status(400).json({ message: 'Some specializations are invalid' });
     }
     
     // Validate hospitals exist
-    if (hospitals && hospitals.length > 0) {
-      const hospitalDocs = await Hospital.find({ _id: { $in: hospitals } });
-      if (hospitalDocs.length !== hospitals.length) {
-        return res.status(400).json({ message: 'Some hospitals are invalid' });
-      }
+    if (!hospitals || hospitals.length === 0) {
+      return res.status(400).json({ 
+        message: 'At least one hospital is required',
+        errors: [{ param: 'hospitals', msg: 'At least one hospital is required' }]
+      });
+    }
+    
+    const hospitalDocs = await Hospital.find({ _id: { $in: hospitals } });
+    if (hospitalDocs.length !== hospitals.length) {
+      return res.status(400).json({ message: 'Some hospitals are invalid' });
     }
     
     // Update fields

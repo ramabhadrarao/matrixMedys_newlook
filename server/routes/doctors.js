@@ -27,9 +27,32 @@ const doctorValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
   body('phone').trim().isLength({ min: 10 }).withMessage('Valid phone number required'),
   body('location').trim().isLength({ min: 2 }).withMessage('Location must be at least 2 characters'),
-  body('specialization').optional().isArray().withMessage('Specialization must be an array'),
-  body('hospitals').optional().isArray().withMessage('Hospitals must be an array'),
-  body('targets').optional().isArray().withMessage('Targets must be an array'),
+  body('specialization')
+    .custom((value, { req }) => {
+      // Handle both string and array formats from FormData
+      const specs = Array.isArray(value) ? value : (value ? [value] : []);
+      return specs.length > 0;
+    })
+    .withMessage('At least one specialization is required'),
+  body('hospitals')
+    .custom((value, { req }) => {
+      // Handle both string and array formats from FormData
+      const hosps = Array.isArray(value) ? value : (value ? [value] : []);
+      return hosps.length > 0;
+    })
+    .withMessage('At least one hospital is required'),
+  body('targets').optional().custom((value) => {
+    // If targets is a string, try to parse it as JSON
+    if (typeof value === 'string') {
+      try {
+        JSON.parse(value);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    return Array.isArray(value) || value === undefined;
+  }).withMessage('Targets must be a valid array'),
 ];
 
 // Attachment validation

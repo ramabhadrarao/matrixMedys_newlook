@@ -183,6 +183,19 @@ const createFormDataRequest = async (
             value.forEach((desc: string) => {
               requestData.append('descriptions', desc);
             });
+          } else if (key === 'specialization' && Array.isArray(value)) {
+            // Send each specialization ID separately
+            value.forEach((id: string) => {
+              requestData.append('specialization', id);
+            });
+          } else if (key === 'hospitals' && Array.isArray(value)) {
+            // Send each hospital ID separately
+            value.forEach((id: string) => {
+              requestData.append('hospitals', id);
+            });
+          } else if (key === 'targets' && Array.isArray(value)) {
+            // Send targets as JSON string
+            requestData.append('targets', JSON.stringify(value));
           } else if (Array.isArray(value)) {
             value.forEach((item: string) => {
               requestData.append(key, item);

@@ -75,16 +75,32 @@ const doctorSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  specialization: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Portfolio',
-    required: true,
-  }],
-  hospitals: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Hospital',
-    required: true,
-  }],
+  specialization: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Portfolio',
+    }],
+    validate: {
+      validator: function(v) {
+        return v && v.length > 0;
+      },
+      message: 'At least one specialization is required'
+    },
+    required: [true, 'Specialization is required']
+  },
+  hospitals: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Hospital',
+    }],
+    validate: {
+      validator: function(v) {
+        return v && v.length > 0;
+      },
+      message: 'At least one hospital is required'
+    },
+    required: [true, 'Hospitals are required']
+  },
   location: {
     type: String,
     required: true,
