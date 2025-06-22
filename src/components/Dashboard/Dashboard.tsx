@@ -1,4 +1,4 @@
-// src/components/Dashboard/Dashboard.tsx
+// src/components/Dashboard/Dashboard.tsx - Enhanced with Doctor & Portfolio Cards
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -16,7 +16,13 @@ import {
   BarChart3,
   PieChart,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  UserCheck,
+  Briefcase,
+  Target,
+  FileText,
+  Award,
+  TrendingDown
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
@@ -31,7 +37,12 @@ const iconMap = {
   Activity,
   TrendingUp,
   BarChart3,
-  PieChart
+  PieChart,
+  UserCheck,
+  Briefcase,
+  Target,
+  FileText,
+  Award
 };
 
 interface DashboardCard {
@@ -142,6 +153,12 @@ const Dashboard: React.FC = () => {
         icon: 'bg-orange-500',
         button: 'bg-orange-600 hover:bg-orange-700'
       },
+      emerald: {
+        bg: 'bg-emerald-50',
+        text: 'text-emerald-600',
+        icon: 'bg-emerald-500',
+        button: 'bg-emerald-600 hover:bg-emerald-700'
+      },
       red: {
         bg: 'bg-red-50',
         text: 'text-red-600',
@@ -165,6 +182,182 @@ const Dashboard: React.FC = () => {
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return new Date(timestamp).toLocaleDateString();
+  };
+
+  // Enhanced card rendering for different resource types
+  const renderCardStats = (card: DashboardCard) => {
+    const colors = getColorClasses(card.color);
+    
+    switch (card.resource) {
+      case 'doctors':
+        return (
+          <div className="space-y-3">
+            {/* Basic Stats */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Active:</span>
+                <span className="font-medium text-green-600">{card.stats.active}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Inactive:</span>
+                <span className="font-medium text-red-600">{card.stats.inactive}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Recent:</span>
+                <span className="font-medium text-blue-600 flex items-center">
+                  {card.stats.recent}
+                  {card.stats.recent > 0 && <ArrowUpRight className="w-3 h-3 ml-1" />}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Files:</span>
+                <span className="font-medium text-purple-600">{card.stats.totalAttachments || 0}</span>
+              </div>
+            </div>
+
+            {/* Doctor-specific stats */}
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-600">Annual Targets:</span>
+                <span className="font-medium text-emerald-600">
+                  {formatNumber(card.stats.currentYearTargets || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Avg per Doctor:</span>
+                <span className="font-medium text-emerald-600">
+                  {formatNumber(card.stats.averageTargetPerDoctor || 0)}
+                </span>
+              </div>
+            </div>
+
+            {/* Top specializations */}
+            {card.stats.topSpecializations && card.stats.topSpecializations.length > 0 && (
+              <div className="pt-2 border-t border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">Top Specializations:</div>
+                <div className="space-y-1">
+                  {card.stats.topSpecializations.slice(0, 2).map((spec: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600 truncate">{spec._id}</span>
+                      <span className="font-medium text-blue-600">{spec.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'portfolios':
+        return (
+          <div className="space-y-3">
+            {/* Basic Stats */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Active:</span>
+                <span className="font-medium text-green-600">{card.stats.active}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Inactive:</span>
+                <span className="font-medium text-red-600">{card.stats.inactive}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Used:</span>
+                <span className="font-medium text-blue-600">{card.stats.used || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Unused:</span>
+                <span className="font-medium text-gray-600">{card.stats.unused || 0}</span>
+              </div>
+            </div>
+
+            {/* Portfolio-specific stats */}
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-600">Total Assignments:</span>
+                <span className="font-medium text-orange-600">{card.stats.totalAssignments || 0}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-600">Utilization Rate:</span>
+                <span className="font-medium text-orange-600">{card.stats.utilizationRate || 0}%</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Avg Doctors/Portfolio:</span>
+                <span className="font-medium text-orange-600">{card.stats.avgDoctorsPerPortfolio || 0}</span>
+              </div>
+            </div>
+
+            {/* Utilization bar */}
+            <div className="pt-2 border-t border-gray-200">
+              <div className="text-xs text-gray-500 mb-1">Portfolio Utilization</div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${card.stats.utilizationRate || 0}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        // Default stats for other cards (hospitals, states, users)
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Active:</span>
+                <span className="font-medium text-green-600">{card.stats.active}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Inactive:</span>
+                <span className="font-medium text-red-600">{card.stats.inactive}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Recent:</span>
+                <span className="font-medium text-blue-600 flex items-center">
+                  {card.stats.recent}
+                  {card.stats.recent > 0 && <ArrowUpRight className="w-3 h-3 ml-1" />}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Growth:</span>
+                <span className="font-medium text-gray-900">
+                  {card.stats.recent > 0 ? '+' : ''}{card.stats.recent}
+                </span>
+              </div>
+            </div>
+
+            {/* Resource-specific additional stats */}
+            {card.resource === 'hospitals' && card.stats.totalContacts && (
+              <div className="pt-2 border-t border-gray-200">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Total Contacts:</span>
+                  <span className="font-medium text-purple-600">{card.stats.totalContacts}</span>
+                </div>
+              </div>
+            )}
+
+            {card.resource === 'states' && card.stats.totalPopulation && (
+              <div className="pt-2 border-t border-gray-200">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Population:</span>
+                  <span className="font-medium text-blue-600">{formatNumber(card.stats.totalPopulation)}</span>
+                </div>
+              </div>
+            )}
+
+            {card.resource === 'users' && card.stats.withPermissions !== undefined && (
+              <div className="pt-2 border-t border-gray-200">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">With Permissions:</span>
+                  <span className="font-medium text-green-600">{card.stats.withPermissions}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+    }
   };
 
   if (loading) {
@@ -231,58 +424,8 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm text-gray-600">{card.description}</p>
                   </div>
 
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Active:</span>
-                      <span className="font-medium text-green-600">{card.stats.active}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Inactive:</span>
-                      <span className="font-medium text-red-600">{card.stats.inactive}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Recent:</span>
-                      <span className="font-medium text-blue-600 flex items-center">
-                        {card.stats.recent}
-                        {card.stats.recent > 0 && <ArrowUpRight className="w-3 h-3 ml-1" />}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Growth:</span>
-                      <span className="font-medium text-gray-900">
-                        {card.stats.recent > 0 ? '+' : ''}{card.stats.recent}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Special stats for different modules */}
-                  {card.resource === 'hospitals' && card.stats.totalContacts && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Total Contacts:</span>
-                        <span className="font-medium text-purple-600">{card.stats.totalContacts}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {card.resource === 'states' && card.stats.totalPopulation && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Population:</span>
-                        <span className="font-medium text-blue-600">{formatNumber(card.stats.totalPopulation)}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {card.resource === 'users' && card.stats.withPermissions !== undefined && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">With Permissions:</span>
-                        <span className="font-medium text-green-600">{card.stats.withPermissions}</span>
-                      </div>
-                    </div>
-                  )}
+                  {/* Render appropriate stats based on card type */}
+                  {renderCardStats(card)}
 
                   {/* Actions */}
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200">

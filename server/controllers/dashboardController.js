@@ -1,4 +1,4 @@
-// server/controllers/dashboardController.js - Updated with Doctor information
+// server/controllers/dashboardController.js - Enhanced Doctors & Portfolios sections
 import State from '../models/State.js';
 import User from '../models/User.js';
 import Hospital from '../models/Hospital.js';
@@ -175,7 +175,7 @@ export const getDashboardStats = async (req, res) => {
       }
     }
     
-    // Doctors Statistics
+    // ========== DOCTORS STATISTICS ==========
     if (resourcePermissions.doctors && resourcePermissions.doctors.includes('view')) {
       try {
         const totalDoctors = await Doctor.countDocuments();
@@ -239,12 +239,40 @@ export const getDashboardStats = async (req, res) => {
           {
             $group: {
               _id: null,
-              totalTargets: { $sum: '$targets.target' }
+              totalTargets: { $sum: '$targets.target' },
+              doctorsWithTargets: { $addToSet: '$_id' }
             }
           }
         ]);
         
         const currentYearTargets = totalTargets[0]?.totalTargets || 0;
+        const doctorsWithTargetsCount = totalTargets[0]?.doctorsWithTargets?.length || 0;
+        
+        // Get doctors by hospital distribution
+        const doctorsByHospital = await Doctor.aggregate([
+          { $unwind: '$hospitals' },
+          {
+            $lookup: {
+              from: 'hospitals',
+              localField: 'hospitals',
+              foreignField: '_id',
+              as: 'hospitalInfo'
+            }
+          },
+          { $unwind: '$hospitalInfo' },
+          {
+            $group: {
+              _id: '$hospitalInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $sort: { count: -1 }
+          },
+          {
+            $limit: 5
+          }
+        ]);
         
         dashboardCards.push({
           id: 'doctors',
@@ -259,7 +287,10 @@ export const getDashboardStats = async (req, res) => {
             recent: recentDoctors,
             totalAttachments,
             currentYearTargets,
-            topSpecializations: doctorsBySpecialization
+            doctorsWithTargets: doctorsWithTargetsCount,
+            averageTargetPerDoctor: doctorsWithTargetsCount > 0 ? Math.round(currentYearTargets / doctorsWithTargetsCount) : 0,
+            topSpecializations: doctorsBySpecialization,
+            topHospitals: doctorsByHospital
           },
           actions: resourcePermissions.doctors,
           route: '/doctors',
@@ -270,7 +301,7 @@ export const getDashboardStats = async (req, res) => {
       }
     }
     
-    // Portfolios Statistics
+    // ========== PORTFOLIOS STATISTICS ==========
     if (resourcePermissions.portfolios && resourcePermissions.portfolios.includes('view')) {
       try {
         const totalPortfolios = await Portfolio.countDocuments();
@@ -283,7 +314,7 @@ export const getDashboardStats = async (req, res) => {
           createdAt: { $gte: thirtyDaysAgo }
         });
         
-        // Get portfolios usage
+        // Get portfolios usage by doctors
         const portfolioUsage = await Doctor.aggregate([
           { $unwind: '$specialization' },
           {
@@ -293,16 +324,62 @@ export const getDashboardStats = async (req, res) => {
             }
           },
           {
+            $lookup: {
+              from: 'portfolios',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'portfolioInfo'
+            }
+          },
+          { $unwind: '$portfolioInfo' },
+          {
             $group: {
               _id: null,
               usedPortfolios: { $sum: 1 },
-              totalDoctorAssignments: { $sum: '$doctorCount' }
+              totalDoctorAssignments: { $sum: '$doctorCount' },
+              avgDoctorsPerPortfolio: { $avg: '$doctorCount' }
             }
           }
         ]);
         
-        const usage = portfolioUsage[0] || { usedPortfolios: 0, totalDoctorAssignments: 0 };
+        const usage = portfolioUsage[0] || { 
+          usedPortfolios: 0, 
+          totalDoctorAssignments: 0,
+          avgDoctorsPerPortfolio: 0
+        };
         const unusedPortfolios = totalPortfolios - usage.usedPortfolios;
+        
+        // Get most popular portfolios
+        const mostUsedPortfolios = await Doctor.aggregate([
+          { $unwind: '$specialization' },
+          {
+            $group: {
+              _id: '$specialization',
+              doctorCount: { $sum: 1 }
+            }
+          },
+          {
+            $lookup: {
+              from: 'portfolios',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'portfolioInfo'
+            }
+          },
+          { $unwind: '$portfolioInfo' },
+          {
+            $sort: { doctorCount: -1 }
+          },
+          {
+            $limit: 5
+          },
+          {
+            $project: {
+              name: '$portfolioInfo.name',
+              doctorCount: 1
+            }
+          }
+        ]);
         
         dashboardCards.push({
           id: 'portfolios',
@@ -317,7 +394,10 @@ export const getDashboardStats = async (req, res) => {
             recent: recentPortfolios,
             used: usage.usedPortfolios,
             unused: unusedPortfolios,
-            totalAssignments: usage.totalDoctorAssignments
+            totalAssignments: usage.totalDoctorAssignments,
+            avgDoctorsPerPortfolio: Math.round(usage.avgDoctorsPerPortfolio || 0),
+            utilizationRate: totalPortfolios > 0 ? Math.round((usage.usedPortfolios / totalPortfolios) * 100) : 0,
+            mostUsedPortfolios: mostUsedPortfolios
           },
           actions: resourcePermissions.portfolios,
           route: '/portfolios',
@@ -373,7 +453,7 @@ export const getRecentActivity = async (req, res) => {
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name')
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentStates.forEach(state => {
@@ -395,7 +475,7 @@ export const getRecentActivity = async (req, res) => {
     if (viewableResources.includes('users')) {
       const recentUsers = await User.find()
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentUsers.forEach(user => {
@@ -420,7 +500,7 @@ export const getRecentActivity = async (req, res) => {
         .populate('updatedBy', 'name')
         .populate('state', 'name')
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentHospitals.forEach(hospital => {
@@ -438,14 +518,14 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // Recent Doctors
+    // ========== RECENT DOCTORS ==========
     if (viewableResources.includes('doctors')) {
       const recentDoctors = await Doctor.find()
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name')
         .populate('specialization', 'name')
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentDoctors.forEach(doctor => {
@@ -455,7 +535,7 @@ export const getRecentActivity = async (req, res) => {
           type: 'doctor',
           action: doctor.createdAt.getTime() === doctor.updatedAt.getTime() ? 'created' : 'updated',
           title: doctor.name,
-          description: `Doctor specializing in ${specializations}`,
+          description: `Dr. ${doctor.name} - ${specializations}`,
           user: doctor.updatedBy || doctor.createdBy,
           timestamp: doctor.updatedAt,
           resource: 'doctors',
@@ -464,13 +544,13 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // Recent Portfolios
+    // ========== RECENT PORTFOLIOS ==========
     if (viewableResources.includes('portfolios')) {
       const recentPortfolios = await Portfolio.find()
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name')
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentPortfolios.forEach(portfolio => {
