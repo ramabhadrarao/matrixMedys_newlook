@@ -14,9 +14,12 @@ import {
   Eye,
   FileText,
   Target,
-  Calendar
+  Calendar,
+  Search,
+  Check,
+  ChevronDown
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { doctorAPI, portfolioAPI, DoctorFormData, Portfolio, MonthlyTarget } from '../../services/doctorAPI';
 import { hospitalAPI } from '../../services/hospitalAPI';
@@ -51,12 +54,21 @@ const DoctorForm: React.FC = () => {
   const navigate = useNavigate();
   const isEdit = !!id;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hospitalSearchRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEdit);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [allHospitals, setAllHospitals] = useState<Hospital[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  
+  // Hospital selection states
+  const [selectedHospitals, setSelectedHospitals] = useState<Hospital[]>([]);
+  const [hospitalSearchTerm, setHospitalSearchTerm] = useState('');
+  const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
+  const [hospitalSearchResults, setHospitalSearchResults] = useState<Hospital[]>([]);
+  const [hospitalSearchLoading, setHospitalSearchLoading] = useState(false);
   
   // File states
   const [selectedFiles, setSelectedFiles] = useState<FileWithMetadata[]>([]);
@@ -89,6 +101,18 @@ const DoctorForm: React.FC = () => {
     name: 'targets'
   });
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowHospitalDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     fetchInitialData();
     if (isEdit && id) {
@@ -96,21 +120,48 @@ const DoctorForm: React.FC = () => {
     }
   }, [id, isEdit]);
 
+  // Search hospitals with debounce
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (hospitalSearchTerm.trim()) {
+        searchHospitals(hospitalSearchTerm);
+      } else {
+        setHospitalSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [hospitalSearchTerm]);
+
   const fetchInitialData = async () => {
     try {
       setDataLoading(true);
-      const [portfoliosResponse, hospitalsResponse] = await Promise.all([
-        portfolioAPI.getPortfolios({ limit: 100 }),
-        hospitalAPI.getHospitals({ limit: 100 })
+      const [portfoliosResponse] = await Promise.all([
+        portfolioAPI.getPortfolios({ limit: 100 })
       ]);
       
       setPortfolios(portfoliosResponse.data.portfolios || []);
-      setHospitals(hospitalsResponse.data.hospitals || []);
     } catch (error) {
       console.error('Error fetching initial data:', error);
       handleApiError(error);
     } finally {
       setDataLoading(false);
+    }
+  };
+
+  const searchHospitals = async (searchTerm: string) => {
+    try {
+      setHospitalSearchLoading(true);
+      const response = await hospitalAPI.getHospitals({ 
+        search: searchTerm,
+        limit: 20 
+      });
+      setHospitalSearchResults(response.data.hospitals || []);
+    } catch (error) {
+      console.error('Error searching hospitals:', error);
+      handleApiError(error);
+    } finally {
+      setHospitalSearchLoading(false);
     }
   };
 
@@ -129,6 +180,9 @@ const DoctorForm: React.FC = () => {
       setValue('hospitals', doctor.hospitals.map((hospital: any) => hospital._id));
       setValue('targets', doctor.targets || []);
       
+      // Set selected hospitals
+      setSelectedHospitals(doctor.hospitals || []);
+      
       if (doctor.attachments && doctor.attachments.length > 0) {
         setExistingAttachments(doctor.attachments);
       }
@@ -138,6 +192,23 @@ const DoctorForm: React.FC = () => {
     } finally {
       setInitialLoading(false);
     }
+  };
+
+  const handleAddHospital = (hospital: Hospital) => {
+    if (!selectedHospitals.find(h => h._id === hospital._id)) {
+      const newSelectedHospitals = [...selectedHospitals, hospital];
+      setSelectedHospitals(newSelectedHospitals);
+      setValue('hospitals', newSelectedHospitals.map(h => h._id));
+      setHospitalSearchTerm('');
+      setShowHospitalDropdown(false);
+      hospitalSearchRef.current?.focus();
+    }
+  };
+
+  const handleRemoveHospital = (hospitalId: string) => {
+    const newSelectedHospitals = selectedHospitals.filter(h => h._id !== hospitalId);
+    setSelectedHospitals(newSelectedHospitals);
+    setValue('hospitals', newSelectedHospitals.map(h => h._id));
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,12 +298,18 @@ const DoctorForm: React.FC = () => {
   };
 
   const onSubmit = async (data: DoctorFormData) => {
+    if (selectedHospitals.length === 0) {
+      toast.error('Please select at least one hospital');
+      return;
+    }
+
     setLoading(true);
     setUploadProgress(0);
     
     try {
       const formData: DoctorFormData = {
         ...data,
+        hospitals: selectedHospitals.map(h => h._id),
         attachments: selectedFiles.map(f => f.file),
         fileTypes: selectedFiles.map(f => f.fileType),
         descriptions: selectedFiles.map(f => f.description),
@@ -452,7 +529,7 @@ const DoctorForm: React.FC = () => {
             </div>
           </div>
 
-          {/* Hospitals */}
+          {/* Hospitals - New Implementation */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
               Associated Hospitals
@@ -460,26 +537,114 @@ const DoctorForm: React.FC = () => {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Hospitals *
+                Search and Add Hospitals *
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-3">
-                {hospitals.map((hospital) => (
-                  <label key={hospital._id} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
-                    <input
-                      {...register('hospitals', {
-                        required: 'At least one hospital is required',
-                      })}
-                      type="checkbox"
-                      value={hospital._id}
-                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{hospital.name}</span>
-                      <p className="text-xs text-gray-500">{hospital.city}, {hospital.state.name}</p>
+              
+              {/* Search Input */}
+              <div className="relative" ref={dropdownRef}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    ref={hospitalSearchRef}
+                    type="text"
+                    value={hospitalSearchTerm}
+                    onChange={(e) => {
+                      setHospitalSearchTerm(e.target.value);
+                      setShowHospitalDropdown(true);
+                    }}
+                    onFocus={() => setShowHospitalDropdown(true)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Type to search hospitals..."
+                  />
+                  {hospitalSearchLoading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                     </div>
-                  </label>
-                ))}
+                  )}
+                </div>
+
+                {/* Dropdown Results */}
+                <AnimatePresence>
+                  {showHospitalDropdown && hospitalSearchResults.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto"
+                    >
+                      {hospitalSearchResults.map((hospital) => {
+                        const isSelected = selectedHospitals.some(h => h._id === hospital._id);
+                        return (
+                          <button
+                            key={hospital._id}
+                            type="button"
+                            onClick={() => handleAddHospital(hospital)}
+                            disabled={isSelected}
+                            className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                              isSelected ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-gray-900">{hospital.name}</p>
+                                <p className="text-sm text-gray-500">{hospital.city}, {hospital.state.name}</p>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-green-600" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* No Results */}
+                {showHospitalDropdown && hospitalSearchTerm && !hospitalSearchLoading && hospitalSearchResults.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 p-4 text-center text-gray-500"
+                  >
+                    No hospitals found
+                  </motion.div>
+                )}
               </div>
+
+              {/* Selected Hospitals */}
+              {selectedHospitals.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">Selected Hospitals ({selectedHospitals.length}):</p>
+                  <div className="space-y-2">
+                    {selectedHospitals.map((hospital) => (
+                      <div
+                        key={hospital._id}
+                        className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">{hospital.name}</p>
+                          <p className="text-sm text-gray-600">{hospital.city}, {hospital.state.name}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveHospital(hospital._id)}
+                          className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedHospitals.length === 0 && (
+                <p className="mt-2 text-sm text-gray-500">
+                  Start typing to search and select hospitals
+                </p>
+              )}
+
               {errors.hospitals && (
                 <p className="mt-1 text-sm text-red-600">{errors.hospitals.message}</p>
               )}
