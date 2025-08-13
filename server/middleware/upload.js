@@ -1,4 +1,4 @@
-// server/middleware/upload.js - Updated for doctor attachments
+// server/middleware/upload.js - Updated for principal documents
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -11,8 +11,9 @@ const __dirname = path.dirname(__filename);
 const uploadsDir = path.join(__dirname, '../uploads');
 const hospitalDocsDir = path.join(uploadsDir, 'hospital-documents');
 const doctorAttachmentsDir = path.join(uploadsDir, 'doctor-attachments');
+const principalDocsDir = path.join(uploadsDir, 'principal-documents');
 
-[uploadsDir, hospitalDocsDir, doctorAttachmentsDir].forEach(dir => {
+[uploadsDir, hospitalDocsDir, doctorAttachmentsDir, principalDocsDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -56,6 +57,7 @@ const fileFilter = (req, file, cb) => {
 // Configure multer for different upload scenarios
 const hospitalStorage = createStorage(hospitalDocsDir);
 const doctorStorage = createStorage(doctorAttachmentsDir);
+const principalStorage = createStorage(principalDocsDir);
 
 // Hospital file uploads
 const uploadHospitalSingle = multer({
@@ -93,9 +95,29 @@ const uploadDoctorMultiple = multer({
   }
 });
 
+// Principal file uploads
+const uploadPrincipalSingle = multer({
+  storage: principalStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
+
+const uploadPrincipalMultiple = multer({
+  storage: principalStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit per file
+    files: 20, // Maximum 20 files for principals
+  }
+});
+
 // Generic storage (auto-detects based on route)
 const getUploadPath = (req) => {
-  if (req.route?.path?.includes('doctors') || req.originalUrl?.includes('doctors')) {
+  if (req.route?.path?.includes('principals') || req.originalUrl?.includes('principals')) {
+    return principalDocsDir;
+  } else if (req.route?.path?.includes('doctors') || req.originalUrl?.includes('doctors')) {
     return doctorAttachmentsDir;
   } else if (req.route?.path?.includes('hospitals') || req.originalUrl?.includes('hospitals')) {
     return hospitalDocsDir;
@@ -121,7 +143,7 @@ const uploadDynamic = multer({
   fileFilter: fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit per file
-    files: 15, // Maximum 15 files
+    files: 20, // Maximum 20 files
   }
 });
 
@@ -130,7 +152,7 @@ export const uploadSingleFile = uploadHospitalSingle.single('agreementFile');
 export const uploadMultipleFiles = uploadHospitalMultiple.array('documents', 10);
 export const uploadMixedFiles = uploadDynamic.fields([
   { name: 'agreementFile', maxCount: 1 },
-  { name: 'documents', maxCount: 10 },
+  { name: 'documents', maxCount: 20 },
   { name: 'attachments', maxCount: 15 }
 ]);
 export const uploadDocument = uploadDynamic.single('document');
@@ -138,6 +160,10 @@ export const uploadDocument = uploadDynamic.single('document');
 // Doctor-specific uploads
 export const uploadDoctorAttachment = uploadDoctorSingle.single('attachment');
 export const uploadDoctorAttachments = uploadDoctorMultiple.array('attachments', 15);
+
+// Principal-specific uploads
+export const uploadPrincipalDocument = uploadPrincipalSingle.single('document');
+export const uploadPrincipalDocuments = uploadPrincipalMultiple.array('documents', 20);
 
 // Error handler middleware
 export const handleUploadError = (err, req, res, next) => {
@@ -149,7 +175,7 @@ export const handleUploadError = (err, req, res, next) => {
     }
     if (err.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({ 
-        message: 'Too many files. Maximum 15 files allowed.' 
+        message: 'Too many files. Maximum 20 files allowed.' 
       });
     }
     if (err.code === 'LIMIT_UNEXPECTED_FILE') {
@@ -176,5 +202,7 @@ export default {
   uploadDocument: uploadDocument,
   uploadDoctorAttachment: uploadDoctorAttachment,
   uploadDoctorAttachments: uploadDoctorAttachments,
+  uploadPrincipalDocument: uploadPrincipalDocument,
+  uploadPrincipalDocuments: uploadPrincipalDocuments,
   handleError: handleUploadError
 };

@@ -5,11 +5,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const generateAccessToken = (payload) => {
-  // Ensure we're generating tokens with proper expiration
+  // Remove iat from options - it's automatically added by jwt.sign
   const token = jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '15m',
-    // Add issued at time to ensure token is valid from current time
-    iat: Math.floor(Date.now() / 1000)
+    expiresIn: process.env.JWT_EXPIRE || '15m'
   });
   
   console.log('Generated access token expires in:', process.env.JWT_EXPIRE || '15m');
@@ -17,10 +15,9 @@ export const generateAccessToken = (payload) => {
 };
 
 export const generateRefreshToken = (payload) => {
+  // Remove iat from options - it's automatically added by jwt.sign
   const token = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
-    // Add issued at time to ensure token is valid from current time
-    iat: Math.floor(Date.now() / 1000)
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d'
   });
   
   console.log('Generated refresh token expires in:', process.env.JWT_REFRESH_EXPIRE || '7d');

@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 export const getDoctors = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', specialization = '', hospital = '' } = req.query;
+    const { page = 1, limit = 10, search = '', portfolio = '', hospital = '' } = req.query;
     
     let query = {};
     
@@ -23,8 +23,8 @@ export const getDoctors = async (req, res) => {
       ];
     }
     
-    if (specialization) {
-      query.specialization = { $in: [specialization] };
+    if (portfolio) {
+      query.portfolio = { $in: [portfolio] };
     }
     
     if (hospital) {
@@ -32,7 +32,7 @@ export const getDoctors = async (req, res) => {
     }
     
     const doctors = await Doctor.find(query)
-      .populate('specialization', 'name description')
+      .populate('portfolio', 'name description')
       .populate('hospitals', 'name city state')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email')
@@ -63,7 +63,7 @@ export const getDoctor = async (req, res) => {
     const { id } = req.params;
     
     const doctor = await Doctor.findById(id)
-      .populate('specialization', 'name description')
+      .populate('portfolio', 'name description')
       .populate('hospitals', 'name city state email phone')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email')
@@ -92,17 +92,17 @@ export const createDoctor = async (req, res) => {
       name,
       email,
       phone,
-      specialization,
+      portfolio,
       hospitals,
       location,
       targets
     } = req.body;
     
     // Handle form data arrays - they come as strings when sent via FormData
-    if (typeof specialization === 'string') {
-      specialization = [specialization];
-    } else if (!Array.isArray(specialization)) {
-      specialization = [];
+    if (typeof portfolio === 'string') {
+      portfolio = [portfolio];
+    } else if (!Array.isArray(portfolio)) {
+      portfolio = [];
     }
     
     if (typeof hospitals === 'string') {
@@ -122,7 +122,7 @@ export const createDoctor = async (req, res) => {
       targets = [];
     }
     
-    console.log('Parsed data:', { name, email, phone, specialization, hospitals, location, targets });
+    console.log('Parsed data:', { name, email, phone, portfolio, hospitals, location, targets });
     
     // Validate required fields
     if (!name || !email || !phone || !location) {
@@ -146,19 +146,19 @@ export const createDoctor = async (req, res) => {
       });
     }
     
-    // Validate specializations exist
-    if (!specialization || specialization.length === 0) {
+    // Validate portfolios exist
+    if (!portfolio || portfolio.length === 0) {
       return res.status(400).json({ 
-        message: 'At least one specialization is required',
-        errors: [{ param: 'specialization', msg: 'At least one specialization is required' }]
+        message: 'At least one portfolio is required',
+        errors: [{ param: 'portfolio', msg: 'At least one portfolio is required' }]
       });
     }
     
-    const portfolios = await Portfolio.find({ _id: { $in: specialization } });
-    if (portfolios.length !== specialization.length) {
+    const portfolios = await Portfolio.find({ _id: { $in: portfolio } });
+    if (portfolios.length !== portfolio.length) {
       return res.status(400).json({ 
-        message: 'Some specializations are invalid',
-        errors: [{ param: 'specialization', msg: 'Invalid specialization IDs provided' }]
+        message: 'Some portfolios are invalid',
+        errors: [{ param: 'portfolio', msg: 'Invalid portfolio IDs provided' }]
       });
     }
     
@@ -182,7 +182,7 @@ export const createDoctor = async (req, res) => {
       name,
       email,
       phone,
-      specialization: specialization || [],
+      portfolio: portfolio || [],
       hospitals: hospitals || [],
       location,
       targets: targets || [],
@@ -218,7 +218,7 @@ export const createDoctor = async (req, res) => {
     
     const doctor = new Doctor(doctorData);
     await doctor.save();
-    await doctor.populate('specialization', 'name description');
+    await doctor.populate('portfolio', 'name description');
     await doctor.populate('hospitals', 'name city state');
     await doctor.populate('createdBy', 'name email');
     await doctor.populate('attachments.uploadedBy', 'name email');
@@ -253,7 +253,7 @@ export const updateDoctor = async (req, res) => {
       name,
       email,
       phone,
-      specialization,
+      portfolio,
       hospitals,
       location,
       targets,
@@ -261,10 +261,10 @@ export const updateDoctor = async (req, res) => {
     } = req.body;
     
     // Handle form data arrays - they come as strings when sent via FormData
-    if (typeof specialization === 'string') {
-      specialization = [specialization];
-    } else if (!Array.isArray(specialization)) {
-      specialization = [];
+    if (typeof portfolio === 'string') {
+      portfolio = [portfolio];
+    } else if (!Array.isArray(portfolio)) {
+      portfolio = [];
     }
     
     if (typeof hospitals === 'string') {
@@ -297,17 +297,17 @@ export const updateDoctor = async (req, res) => {
       }
     }
     
-    // Validate specializations exist
-    if (!specialization || specialization.length === 0) {
+    // Validate portfolios exist
+    if (!portfolio || portfolio.length === 0) {
       return res.status(400).json({ 
-        message: 'At least one specialization is required',
-        errors: [{ param: 'specialization', msg: 'At least one specialization is required' }]
+        message: 'At least one portfolio is required',
+        errors: [{ param: 'portfolio', msg: 'At least one portfolio is required' }]
       });
     }
     
-    const portfolios = await Portfolio.find({ _id: { $in: specialization } });
-    if (portfolios.length !== specialization.length) {
-      return res.status(400).json({ message: 'Some specializations are invalid' });
+    const portfolios = await Portfolio.find({ _id: { $in: portfolio } });
+    if (portfolios.length !== portfolio.length) {
+      return res.status(400).json({ message: 'Some portfolios are invalid' });
     }
     
     // Validate hospitals exist
@@ -327,7 +327,7 @@ export const updateDoctor = async (req, res) => {
     doctor.name = name;
     doctor.email = email;
     doctor.phone = phone;
-    doctor.specialization = specialization || [];
+    doctor.portfolio = portfolio || [];
     doctor.hospitals = hospitals || [];
     doctor.location = location;
     doctor.targets = targets || [];
@@ -363,7 +363,7 @@ export const updateDoctor = async (req, res) => {
     }
     
     await doctor.save();
-    await doctor.populate('specialization', 'name description');
+    await doctor.populate('portfolio', 'name description');
     await doctor.populate('hospitals', 'name city state');
     await doctor.populate('createdBy', 'name email');
     await doctor.populate('updatedBy', 'name email');

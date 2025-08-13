@@ -1,4 +1,4 @@
-// server/server.js - Updated with file routes
+// server/server.js - Updated with principal routes
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -14,8 +14,9 @@ import permissionRoutes from './routes/permissions.js';
 import hospitalRoutes from './routes/hospitals.js';
 import doctorRoutes from './routes/doctors.js';
 import portfolioRoutes from './routes/portfolios.js';
+import principalRoutes from './routes/principals.js'; // New principal routes
 import dashboardRoutes from './routes/dashboard.js';
-import fileRoutes from './routes/files.js'; // New file routes
+import fileRoutes from './routes/files.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,10 +31,6 @@ connectDB();
 
 // Security middleware
 app.use(helmet());
-//app.use(cors({
-//  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-//  credentials: true,
-//}));
 app.use(cors({
   origin: [
     'http://69.62.73.201:5173', // Development
@@ -42,6 +39,7 @@ app.use(cors({
   ],
   credentials: true,
 }));
+
 // Rate limiting - More relaxed for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -71,13 +69,15 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/files', fileRoutes); // File management routes
+app.use('/api/files', fileRoutes);
 app.use('/api/states', stateRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/portfolios', portfolioRoutes);
+app.use('/api/principals', principalRoutes); // New principal routes
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -116,5 +116,5 @@ app.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Auth rate limit: ${process.env.NODE_ENV === 'production' ? '5' : '50'} requests per 15 minutes`);
   console.log(`File uploads directory: ${path.join(__dirname, 'uploads')}`);
+  console.log('Modules loaded: auth, states, users, permissions, hospitals, doctors, portfolios, principals');
 });
-

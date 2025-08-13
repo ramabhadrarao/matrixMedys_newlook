@@ -27,13 +27,13 @@ const doctorValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
   body('phone').trim().isLength({ min: 10 }).withMessage('Valid phone number required'),
   body('location').trim().isLength({ min: 2 }).withMessage('Location must be at least 2 characters'),
-  body('specialization')
+  body('portfolio')  // Changed from specialization
     .custom((value, { req }) => {
       // Handle both string and array formats from FormData
-      const specs = Array.isArray(value) ? value : (value ? [value] : []);
-      return specs.length > 0;
+      const portfolios = Array.isArray(value) ? value : (value ? [value] : []);
+      return portfolios.length > 0;
     })
-    .withMessage('At least one specialization is required'),
+    .withMessage('At least one portfolio is required'),
   body('hospitals')
     .custom((value, { req }) => {
       // Handle both string and array formats from FormData

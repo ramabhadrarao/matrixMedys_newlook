@@ -75,7 +75,7 @@ const doctorSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  specialization: {
+  portfolio: {  // Changed from specialization
     type: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Portfolio',
@@ -84,9 +84,9 @@ const doctorSchema = new mongoose.Schema({
       validator: function(v) {
         return v && v.length > 0;
       },
-      message: 'At least one specialization is required'
+      message: 'At least one portfolio is required'
     },
-    required: [true, 'Specialization is required']
+    required: [true, 'Portfolio is required']
   },
   hospitals: {
     type: [{
@@ -127,8 +127,7 @@ const doctorSchema = new mongoose.Schema({
 
 // Index for search performance
 doctorSchema.index({ name: 'text', email: 'text', location: 'text' });
-//doctorSchema.index({ email: 1 });
-doctorSchema.index({ specialization: 1 });
+doctorSchema.index({ portfolio: 1 });
 doctorSchema.index({ hospitals: 1 });
 
 // Virtual to get total attachments count
