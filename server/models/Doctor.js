@@ -127,7 +127,7 @@ const doctorSchema = new mongoose.Schema({
 
 // Index for search performance
 doctorSchema.index({ name: 'text', email: 'text', location: 'text' });
-doctorSchema.index({ email: 1 });
+//doctorSchema.index({ email: 1 });
 doctorSchema.index({ specialization: 1 });
 doctorSchema.index({ hospitals: 1 });
 
