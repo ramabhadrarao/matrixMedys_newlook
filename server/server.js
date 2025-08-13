@@ -12,6 +12,8 @@ import stateRoutes from './routes/states.js';
 import userRoutes from './routes/users.js';
 import permissionRoutes from './routes/permissions.js';
 import hospitalRoutes from './routes/hospitals.js';
+import doctorRoutes from './routes/doctors.js';
+import portfolioRoutes from './routes/portfolios.js';
 import dashboardRoutes from './routes/dashboard.js';
 import fileRoutes from './routes/files.js'; // New file routes
 
@@ -28,11 +30,18 @@ connectDB();
 
 // Security middleware
 app.use(helmet());
+//app.use(cors({
+//  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+//  credentials: true,
+//}));
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: [
+    'http://69.62.73.201:5173', // Development
+    'http://69.62.73.201',      // Production
+    'http://localhost:5173'      // Local development
+  ],
   credentials: true,
 }));
-
 // Rate limiting - More relaxed for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -67,7 +76,8 @@ app.use('/api/states', stateRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/hospitals', hospitalRoutes);
-
+app.use('/api/doctors', doctorRoutes);
+app.use('/api/portfolios', portfolioRoutes);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

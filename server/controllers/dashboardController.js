@@ -1,8 +1,10 @@
-// server/controllers/dashboardController.js
+// server/controllers/dashboardController.js - Enhanced Doctors & Portfolios sections
 import State from '../models/State.js';
 import User from '../models/User.js';
 import Hospital from '../models/Hospital.js';
 import HospitalContact from '../models/HospitalContact.js';
+import Doctor from '../models/Doctor.js';
+import Portfolio from '../models/Portfolio.js';
 import Permission from '../models/Permission.js';
 import UserPermission from '../models/UserPermission.js';
 
@@ -38,14 +40,12 @@ export const getDashboardStats = async (req, res) => {
         const activeStates = await State.countDocuments({ isActive: true });
         const inactiveStates = totalStates - activeStates;
         
-        // Get recent states (last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentStates = await State.countDocuments({
           createdAt: { $gte: thirtyDaysAgo }
         });
         
-        // Get total population and area
         const statesData = await State.find({}, 'population area');
         const totalPopulation = statesData.reduce((sum, state) => sum + (state.population || 0), 0);
         const totalArea = statesData.reduce((sum, state) => sum + (state.area || 0), 0);
@@ -80,14 +80,12 @@ export const getDashboardStats = async (req, res) => {
         const activeUsers = await User.countDocuments({ isActive: true });
         const inactiveUsers = totalUsers - activeUsers;
         
-        // Get recent users (last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentUsers = await User.countDocuments({
           createdAt: { $gte: thirtyDaysAgo }
         });
         
-        // Get users with permissions count
         const usersWithPermissions = await UserPermission.distinct('userId');
         const usersWithoutPermissions = totalUsers - usersWithPermissions.length;
         
@@ -121,18 +119,15 @@ export const getDashboardStats = async (req, res) => {
         const activeHospitals = await Hospital.countDocuments({ isActive: true });
         const inactiveHospitals = totalHospitals - activeHospitals;
         
-        // Get recent hospitals (last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentHospitals = await Hospital.countDocuments({
           createdAt: { $gte: thirtyDaysAgo }
         });
         
-        // Get total contacts
         const totalContacts = await HospitalContact.countDocuments();
         const activeContacts = await HospitalContact.countDocuments({ isActive: true });
         
-        // Get hospitals by state
         const hospitalsByState = await Hospital.aggregate([
           {
             $lookup: {
@@ -180,6 +175,239 @@ export const getDashboardStats = async (req, res) => {
       }
     }
     
+    // ========== DOCTORS STATISTICS ==========
+    if (resourcePermissions.doctors && resourcePermissions.doctors.includes('view')) {
+      try {
+        const totalDoctors = await Doctor.countDocuments();
+        const activeDoctors = await Doctor.countDocuments({ isActive: true });
+        const inactiveDoctors = totalDoctors - activeDoctors;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentDoctors = await Doctor.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Get total attachments count
+        const doctorsWithAttachments = await Doctor.aggregate([
+          {
+            $project: {
+              attachmentsCount: { $size: '$attachments' }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalAttachments: { $sum: '$attachmentsCount' }
+            }
+          }
+        ]);
+        
+        const totalAttachments = doctorsWithAttachments[0]?.totalAttachments || 0;
+        
+        // Get doctors by specialization
+        const doctorsBySpecialization = await Doctor.aggregate([
+          { $unwind: '$specialization' },
+          {
+            $lookup: {
+              from: 'portfolios',
+              localField: 'specialization',
+              foreignField: '_id',
+              as: 'portfolioInfo'
+            }
+          },
+          { $unwind: '$portfolioInfo' },
+          {
+            $group: {
+              _id: '$portfolioInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $sort: { count: -1 }
+          },
+          {
+            $limit: 5
+          }
+        ]);
+        
+        // Calculate total targets for current year
+        const currentYear = new Date().getFullYear();
+        const totalTargets = await Doctor.aggregate([
+          { $unwind: '$targets' },
+          { $match: { 'targets.year': currentYear } },
+          {
+            $group: {
+              _id: null,
+              totalTargets: { $sum: '$targets.target' },
+              doctorsWithTargets: { $addToSet: '$_id' }
+            }
+          }
+        ]);
+        
+        const currentYearTargets = totalTargets[0]?.totalTargets || 0;
+        const doctorsWithTargetsCount = totalTargets[0]?.doctorsWithTargets?.length || 0;
+        
+        // Get doctors by hospital distribution
+        const doctorsByHospital = await Doctor.aggregate([
+          { $unwind: '$hospitals' },
+          {
+            $lookup: {
+              from: 'hospitals',
+              localField: 'hospitals',
+              foreignField: '_id',
+              as: 'hospitalInfo'
+            }
+          },
+          { $unwind: '$hospitalInfo' },
+          {
+            $group: {
+              _id: '$hospitalInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $sort: { count: -1 }
+          },
+          {
+            $limit: 5
+          }
+        ]);
+        
+        dashboardCards.push({
+          id: 'doctors',
+          title: 'Doctors',
+          resource: 'doctors',
+          icon: 'UserCheck',
+          color: 'emerald',
+          stats: {
+            total: totalDoctors,
+            active: activeDoctors,
+            inactive: inactiveDoctors,
+            recent: recentDoctors,
+            totalAttachments,
+            currentYearTargets,
+            doctorsWithTargets: doctorsWithTargetsCount,
+            averageTargetPerDoctor: doctorsWithTargetsCount > 0 ? Math.round(currentYearTargets / doctorsWithTargetsCount) : 0,
+            topSpecializations: doctorsBySpecialization,
+            topHospitals: doctorsByHospital
+          },
+          actions: resourcePermissions.doctors,
+          route: '/doctors',
+          description: 'Medical professionals and specialists'
+        });
+      } catch (error) {
+        console.error('Error fetching doctors stats:', error);
+      }
+    }
+    
+    // ========== PORTFOLIOS STATISTICS ==========
+    if (resourcePermissions.portfolios && resourcePermissions.portfolios.includes('view')) {
+      try {
+        const totalPortfolios = await Portfolio.countDocuments();
+        const activePortfolios = await Portfolio.countDocuments({ isActive: true });
+        const inactivePortfolios = totalPortfolios - activePortfolios;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentPortfolios = await Portfolio.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Get portfolios usage by doctors
+        const portfolioUsage = await Doctor.aggregate([
+          { $unwind: '$specialization' },
+          {
+            $group: {
+              _id: '$specialization',
+              doctorCount: { $sum: 1 }
+            }
+          },
+          {
+            $lookup: {
+              from: 'portfolios',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'portfolioInfo'
+            }
+          },
+          { $unwind: '$portfolioInfo' },
+          {
+            $group: {
+              _id: null,
+              usedPortfolios: { $sum: 1 },
+              totalDoctorAssignments: { $sum: '$doctorCount' },
+              avgDoctorsPerPortfolio: { $avg: '$doctorCount' }
+            }
+          }
+        ]);
+        
+        const usage = portfolioUsage[0] || { 
+          usedPortfolios: 0, 
+          totalDoctorAssignments: 0,
+          avgDoctorsPerPortfolio: 0
+        };
+        const unusedPortfolios = totalPortfolios - usage.usedPortfolios;
+        
+        // Get most popular portfolios
+        const mostUsedPortfolios = await Doctor.aggregate([
+          { $unwind: '$specialization' },
+          {
+            $group: {
+              _id: '$specialization',
+              doctorCount: { $sum: 1 }
+            }
+          },
+          {
+            $lookup: {
+              from: 'portfolios',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'portfolioInfo'
+            }
+          },
+          { $unwind: '$portfolioInfo' },
+          {
+            $sort: { doctorCount: -1 }
+          },
+          {
+            $limit: 5
+          },
+          {
+            $project: {
+              name: '$portfolioInfo.name',
+              doctorCount: 1
+            }
+          }
+        ]);
+        
+        dashboardCards.push({
+          id: 'portfolios',
+          title: 'Portfolios',
+          resource: 'portfolios',
+          icon: 'Briefcase',
+          color: 'orange',
+          stats: {
+            total: totalPortfolios,
+            active: activePortfolios,
+            inactive: inactivePortfolios,
+            recent: recentPortfolios,
+            used: usage.usedPortfolios,
+            unused: unusedPortfolios,
+            totalAssignments: usage.totalDoctorAssignments,
+            avgDoctorsPerPortfolio: Math.round(usage.avgDoctorsPerPortfolio || 0),
+            utilizationRate: totalPortfolios > 0 ? Math.round((usage.usedPortfolios / totalPortfolios) * 100) : 0,
+            mostUsedPortfolios: mostUsedPortfolios
+          },
+          actions: resourcePermissions.portfolios,
+          route: '/portfolios',
+          description: 'Medical specializations and portfolios'
+        });
+      } catch (error) {
+        console.error('Error fetching portfolios stats:', error);
+      }
+    }
+    
     // System Overview
     const systemStats = {
       totalPermissions: await Permission.countDocuments(),
@@ -219,13 +447,13 @@ export const getRecentActivity = async (req, res) => {
     
     const activities = [];
     
-    // Recent States (if user can view states)
+    // Recent States
     if (viewableResources.includes('states')) {
       const recentStates = await State.find()
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name')
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentStates.forEach(state => {
@@ -243,11 +471,11 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // Recent Users (if user can view users)
+    // Recent Users
     if (viewableResources.includes('users')) {
       const recentUsers = await User.find()
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentUsers.forEach(user => {
@@ -265,14 +493,14 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // Recent Hospitals (if user can view hospitals)
+    // Recent Hospitals
     if (viewableResources.includes('hospitals')) {
       const recentHospitals = await Hospital.find()
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name')
         .populate('state', 'name')
         .sort({ updatedAt: -1 })
-        .limit(5)
+        .limit(3)
         .lean();
       
       recentHospitals.forEach(hospital => {
@@ -286,6 +514,56 @@ export const getRecentActivity = async (req, res) => {
           timestamp: hospital.updatedAt,
           resource: 'hospitals',
           icon: 'Building2'
+        });
+      });
+    }
+    
+    // ========== RECENT DOCTORS ==========
+    if (viewableResources.includes('doctors')) {
+      const recentDoctors = await Doctor.find()
+        .populate('createdBy', 'name')
+        .populate('updatedBy', 'name')
+        .populate('specialization', 'name')
+        .sort({ updatedAt: -1 })
+        .limit(3)
+        .lean();
+      
+      recentDoctors.forEach(doctor => {
+        const specializations = doctor.specialization?.map(s => s.name).join(', ') || 'General';
+        activities.push({
+          id: doctor._id,
+          type: 'doctor',
+          action: doctor.createdAt.getTime() === doctor.updatedAt.getTime() ? 'created' : 'updated',
+          title: doctor.name,
+          description: `Dr. ${doctor.name} - ${specializations}`,
+          user: doctor.updatedBy || doctor.createdBy,
+          timestamp: doctor.updatedAt,
+          resource: 'doctors',
+          icon: 'UserCheck'
+        });
+      });
+    }
+    
+    // ========== RECENT PORTFOLIOS ==========
+    if (viewableResources.includes('portfolios')) {
+      const recentPortfolios = await Portfolio.find()
+        .populate('createdBy', 'name')
+        .populate('updatedBy', 'name')
+        .sort({ updatedAt: -1 })
+        .limit(3)
+        .lean();
+      
+      recentPortfolios.forEach(portfolio => {
+        activities.push({
+          id: portfolio._id,
+          type: 'portfolio',
+          action: portfolio.createdAt.getTime() === portfolio.updatedAt.getTime() ? 'created' : 'updated',
+          title: portfolio.name,
+          description: `Portfolio: ${portfolio.description}`,
+          user: portfolio.updatedBy || portfolio.createdBy,
+          timestamp: portfolio.updatedAt,
+          resource: 'portfolios',
+          icon: 'Briefcase'
         });
       });
     }

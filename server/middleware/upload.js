@@ -1,4 +1,4 @@
-// server/middleware/upload.js - Updated for multiple file support
+// server/middleware/upload.js - Updated for doctor attachments
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -7,22 +7,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Create uploads directory if it doesn't exist
+// Create uploads directories if they don't exist
 const uploadsDir = path.join(__dirname, '../uploads');
 const hospitalDocsDir = path.join(uploadsDir, 'hospital-documents');
+const doctorAttachmentsDir = path.join(uploadsDir, 'doctor-attachments');
 
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+[uploadsDir, hospitalDocsDir, doctorAttachmentsDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
-if (!fs.existsSync(hospitalDocsDir)) {
-  fs.mkdirSync(hospitalDocsDir, { recursive: true });
-}
-
-// Configure multer storage
-const storage = multer.diskStorage({
+// Configure multer storage for different file types
+const createStorage = (uploadPath) => multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, hospitalDocsDir);
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     // Generate unique filename with timestamp
@@ -54,18 +53,21 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configure multer for single file upload
-const uploadSingle = multer({
-  storage: storage,
+// Configure multer for different upload scenarios
+const hospitalStorage = createStorage(hospitalDocsDir);
+const doctorStorage = createStorage(doctorAttachmentsDir);
+
+// Hospital file uploads
+const uploadHospitalSingle = multer({
+  storage: hospitalStorage,
   fileFilter: fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   }
 });
 
-// Configure multer for multiple file upload
-const uploadMultiple = multer({
-  storage: storage,
+const uploadHospitalMultiple = multer({
+  storage: hospitalStorage,
   fileFilter: fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit per file
@@ -73,20 +75,69 @@ const uploadMultiple = multer({
   }
 });
 
-// Middleware for single file upload (backward compatibility)
-export const uploadSingleFile = uploadSingle.single('agreementFile');
+// Doctor file uploads
+const uploadDoctorSingle = multer({
+  storage: doctorStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
 
-// Middleware for multiple file upload
-export const uploadMultipleFiles = uploadMultiple.array('documents', 10);
+const uploadDoctorMultiple = multer({
+  storage: doctorStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit per file
+    files: 15, // Maximum 15 files for doctors
+  }
+});
 
-// Middleware for mixed upload (single + multiple)
-export const uploadMixedFiles = uploadMultiple.fields([
+// Generic storage (auto-detects based on route)
+const getUploadPath = (req) => {
+  if (req.route?.path?.includes('doctors') || req.originalUrl?.includes('doctors')) {
+    return doctorAttachmentsDir;
+  } else if (req.route?.path?.includes('hospitals') || req.originalUrl?.includes('hospitals')) {
+    return hospitalDocsDir;
+  }
+  return hospitalDocsDir; // Default to hospital docs
+};
+
+const dynamicStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = getUploadPath(req);
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname);
+    const filename = `${file.fieldname}-${uniqueSuffix}${extension}`;
+    cb(null, filename);
+  }
+});
+
+const uploadDynamic = multer({
+  storage: dynamicStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit per file
+    files: 15, // Maximum 15 files
+  }
+});
+
+// Middleware exports
+export const uploadSingleFile = uploadHospitalSingle.single('agreementFile');
+export const uploadMultipleFiles = uploadHospitalMultiple.array('documents', 10);
+export const uploadMixedFiles = uploadDynamic.fields([
   { name: 'agreementFile', maxCount: 1 },
-  { name: 'documents', maxCount: 10 }
+  { name: 'documents', maxCount: 10 },
+  { name: 'attachments', maxCount: 15 }
 ]);
+export const uploadDocument = uploadDynamic.single('document');
 
-// Middleware for adding single document
-export const uploadDocument = uploadSingle.single('document');
+// Doctor-specific uploads
+export const uploadDoctorAttachment = uploadDoctorSingle.single('attachment');
+export const uploadDoctorAttachments = uploadDoctorMultiple.array('attachments', 15);
 
 // Error handler middleware
 export const handleUploadError = (err, req, res, next) => {
@@ -98,7 +149,7 @@ export const handleUploadError = (err, req, res, next) => {
     }
     if (err.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({ 
-        message: 'Too many files. Maximum 10 files allowed.' 
+        message: 'Too many files. Maximum 15 files allowed.' 
       });
     }
     if (err.code === 'LIMIT_UNEXPECTED_FILE') {
@@ -123,5 +174,7 @@ export default {
   uploadMultiple: uploadMultipleFiles,
   uploadMixed: uploadMixedFiles,
   uploadDocument: uploadDocument,
+  uploadDoctorAttachment: uploadDoctorAttachment,
+  uploadDoctorAttachments: uploadDoctorAttachments,
   handleError: handleUploadError
 };

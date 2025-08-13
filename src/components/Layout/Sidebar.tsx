@@ -1,3 +1,4 @@
+// src/components/Layout/Sidebar.tsx - Updated with Doctor navigation
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
@@ -5,6 +6,8 @@ import {
   MapPin, 
   Users, 
   Building2,
+  UserCheck,
+  Briefcase,
   Settings, 
   LogOut,
   ChevronRight
@@ -33,6 +36,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       name: 'Hospitals',
       icon: Building2,
       permission: { resource: 'hospitals', action: 'view' },
+    },
+    {
+      path: '/doctors',
+      name: 'Doctors',
+      icon: UserCheck,
+      permission: { resource: 'doctors', action: 'view' },
+    },
+    {
+      path: '/portfolios',
+      name: 'Portfolios',
+      icon: Briefcase,
+      permission: { resource: 'portfolios', action: 'view' },
     },
     {
       path: '/users',

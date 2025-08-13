@@ -1,4 +1,4 @@
-// src/App.tsx - Updated with Profile Information route
+// src/App.tsx - Updated with Doctors and Portfolios routes
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -25,6 +25,15 @@ import PermissionsManagement from './components/Users/PermissionsManagement';
 import HospitalsList from './components/Hospitals/HospitalsList';
 import HospitalForm from './components/Hospitals/HospitalForm';
 import HospitalDetails from './components/Hospitals/HospitalDetails';
+
+// Doctor Components
+import DoctorsList from './components/Doctors/DoctorsList';
+import DoctorForm from './components/Doctors/DoctorForm';
+import DoctorDetails from './components/Doctors/DoctorDetails';
+
+// Portfolio Components
+import PortfoliosList from './components/Portfolios/PortfoliosList';
+import PortfolioForm from './components/Portfolios/PortfolioForm';
 
 // Settings Components
 import Settings from './components/Settings/Settings';
@@ -135,6 +144,17 @@ function App() {
             <Route path="hospitals/new" element={<HospitalForm />} />
             <Route path="hospitals/:id" element={<HospitalDetails />} />
             <Route path="hospitals/:id/edit" element={<HospitalForm />} />
+            
+            {/* Doctor Routes */}
+            <Route path="doctors" element={<DoctorsList />} />
+            <Route path="doctors/new" element={<DoctorForm />} />
+            <Route path="doctors/:id" element={<DoctorDetails />} />
+            <Route path="doctors/:id/edit" element={<DoctorForm />} />
+            
+            {/* Portfolio Routes */}
+            <Route path="portfolios" element={<PortfoliosList />} />
+            <Route path="portfolios/new" element={<PortfolioForm />} />
+            <Route path="portfolios/:id/edit" element={<PortfolioForm />} />
             
             {/* States Routes - Moved to Settings/Masters */}
             <Route path="states" element={<StatesList />} />
