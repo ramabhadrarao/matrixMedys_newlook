@@ -1,3 +1,4 @@
+// server/models/User.js
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
@@ -13,6 +14,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
+    // Remove the index: true as unique: true already creates an index
   },
   password: {
     type: String,
