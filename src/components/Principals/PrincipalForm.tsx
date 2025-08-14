@@ -22,7 +22,8 @@ import {
   CreditCard,
   Briefcase,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -51,6 +52,17 @@ interface AddressField {
   title: string;
   city: string;
   state: string;
+  pincode: string;
+}
+
+interface ContactPersonField {
+  portfolio?: string;
+  departmentName: string;
+  personName: string;
+  email: string;
+  mobile: string;
+  address?: string;
+  location: string;
   pincode: string;
 }
 
@@ -127,13 +139,19 @@ const PrincipalForm: React.FC = () => {
     defaultValues: {
       isActive: true,
       portfolio: [],
-      addresses: [{ title: '', city: '', state: '', pincode: '' }]
+      addresses: [{ title: '', city: '', state: '', pincode: '' }],
+      contactPersons: [] // Initialize empty contact persons array
     },
   });
 
   const { fields: addressFields, append: appendAddress, remove: removeAddress } = useFieldArray({
     control,
     name: 'addresses' as any
+  });
+
+  const { fields: contactFields, append: appendContact, remove: removeContact } = useFieldArray({
+    control,
+    name: 'contactPersons' as any
   });
 
   const watchedPortfolios = watch('portfolio');
@@ -192,6 +210,20 @@ const PrincipalForm: React.FC = () => {
           city: addr.city,
           state: addr.state._id || addr.state,
           pincode: addr.pincode
+        })));
+      }
+      
+      // Set contact persons
+      if (principal.contactPersons && principal.contactPersons.length > 0) {
+        setValue('contactPersons', principal.contactPersons.map((contact: any) => ({
+          portfolio: contact.portfolio?._id || '',
+          departmentName: contact.departmentName,
+          personName: contact.personName,
+          email: contact.email,
+          mobile: contact.mobile,
+          address: contact.address || '',
+          location: contact.location,
+          pincode: contact.pincode
         })));
       }
       
@@ -286,6 +318,19 @@ const PrincipalForm: React.FC = () => {
 
   const addAddressField = () => {
     appendAddress({ title: '', city: '', state: '', pincode: '' });
+  };
+
+  const addContactField = () => {
+    appendContact({
+      portfolio: '',
+      departmentName: '',
+      personName: '',
+      email: '',
+      mobile: '',
+      address: '',
+      location: '',
+      pincode: ''
+    });
   };
 
   const validateForm = (data: PrincipalFormData): boolean => {
@@ -767,6 +812,192 @@ const PrincipalForm: React.FC = () => {
                             placeholder="Enter pincode"
                           />
                         </FormField>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+
+          {/* Contact Persons */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
+                <Users className="w-5 h-5 inline mr-2" />
+                Contact Persons
+              </h3>
+              <button
+                type="button"
+                onClick={addContactField}
+                className="inline-flex items-center px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Contact Person
+              </button>
+            </div>
+            
+            {contactFields.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                <p className="text-gray-600 font-medium">No contact persons added yet</p>
+                <p className="text-sm text-gray-500 mt-1">Click "Add Contact Person" to add a new contact</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <AnimatePresence>
+                  {contactFields.map((field, index) => (
+                    <motion.div
+                      key={field.id}
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 20 }}
+                      className="p-4 bg-purple-50 rounded-lg border border-purple-200"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium text-gray-700">Contact Person {index + 1}</h4>
+                        <button
+                          type="button"
+                          onClick={() => removeContact(index)}
+                          className="text-red-600 hover:text-red-800 p-1 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          label="Person Name"
+                          required
+                          error={errors.contactPersons?.[index]?.personName?.message}
+                        >
+                          <input
+                            {...register(`contactPersons.${index}.personName` as const, {
+                              required: 'Person name is required',
+                            })}
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter person name"
+                          />
+                        </FormField>
+                        
+                        <FormField
+                          label="Department Name"
+                          required
+                          error={errors.contactPersons?.[index]?.departmentName?.message}
+                        >
+                          <input
+                            {...register(`contactPersons.${index}.departmentName` as const, {
+                              required: 'Department name is required',
+                            })}
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter department name"
+                          />
+                        </FormField>
+                        
+                        <FormField
+                          label="Portfolio (Optional)"
+                          error={errors.contactPersons?.[index]?.portfolio?.message}
+                        >
+                          <select
+                            {...register(`contactPersons.${index}.portfolio` as const)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">Select Portfolio</option>
+                            {portfolios.map((portfolio) => (
+                              <option key={portfolio._id} value={portfolio._id}>
+                                {portfolio.name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormField>
+                        
+                        <FormField
+                          label="Email"
+                          required
+                          error={errors.contactPersons?.[index]?.email?.message}
+                        >
+                          <input
+                            {...register(`contactPersons.${index}.email` as const, {
+                              required: 'Email is required',
+                              pattern: {
+                                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                                message: 'Please enter a valid email',
+                              },
+                            })}
+                            type="email"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter email address"
+                          />
+                        </FormField>
+                        
+                        <FormField
+                          label="Mobile"
+                          required
+                          error={errors.contactPersons?.[index]?.mobile?.message}
+                        >
+                          <input
+                            {...register(`contactPersons.${index}.mobile` as const, {
+                              required: 'Mobile is required',
+                              minLength: {
+                                value: 10,
+                                message: 'Mobile must be at least 10 digits',
+                              },
+                            })}
+                            type="tel"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter mobile number"
+                          />
+                        </FormField>
+                        
+                        <FormField
+                          label="Location"
+                          required
+                          error={errors.contactPersons?.[index]?.location?.message}
+                        >
+                          <input
+                            {...register(`contactPersons.${index}.location` as const, {
+                              required: 'Location is required',
+                            })}
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="e.g., Floor 2, Wing A"
+                          />
+                        </FormField>
+                        
+                        <FormField
+                          label="Pincode"
+                          required
+                          error={errors.contactPersons?.[index]?.pincode?.message}
+                        >
+                          <input
+                            {...register(`contactPersons.${index}.pincode` as const, {
+                              required: 'Pincode is required',
+                              pattern: {
+                                value: /^[0-9]{6}$/,
+                                message: 'Pincode must be 6 digits',
+                              },
+                            })}
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter pincode"
+                          />
+                        </FormField>
+                        
+                        <div className="md:col-span-2">
+                          <FormField
+                            label="Address (Optional)"
+                            error={errors.contactPersons?.[index]?.address?.message}
+                          >
+                            <textarea
+                              {...register(`contactPersons.${index}.address` as const)}
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Enter complete address"
+                            />
+                          </FormField>
+                        </div>
                       </div>
                     </motion.div>
                   ))}

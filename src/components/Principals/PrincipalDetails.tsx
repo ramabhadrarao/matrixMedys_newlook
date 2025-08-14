@@ -24,7 +24,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Users
+  Users,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -824,6 +825,38 @@ const PrincipalDetails: React.FC = () => {
             ))}
           </div>
         )}
+      </motion.div>
+
+      {/* Metadata Information */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="bg-gray-50 rounded-lg p-6"
+      >
+        <h3 className="text-sm font-medium text-gray-900 mb-4">Additional Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-gray-600">Created by:</span>
+            <span className="ml-2 font-medium text-gray-900">{principal.createdBy.name}</span>
+          </div>
+          <div>
+            <span className="text-gray-600">Created on:</span>
+            <span className="ml-2 font-medium text-gray-900">{formatDate(principal.createdAt)}</span>
+          </div>
+          {principal.updatedBy && (
+            <>
+              <div>
+                <span className="text-gray-600">Last updated by:</span>
+                <span className="ml-2 font-medium text-gray-900">{principal.updatedBy.name}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Last updated on:</span>
+                <span className="ml-2 font-medium text-gray-900">{formatDate(principal.updatedAt)}</span>
+              </div>
+            </>
+          )}
+        </div>
       </motion.div>
 
       {/* Add/Edit Address Modal */}
