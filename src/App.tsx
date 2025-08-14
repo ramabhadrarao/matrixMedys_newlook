@@ -160,7 +160,11 @@ function App() {
             <Route path="portfolios" element={<PortfoliosList />} />
             <Route path="portfolios/new" element={<PortfolioForm />} />
             <Route path="portfolios/:id/edit" element={<PortfolioForm />} />
-            
+            {/* Principal Routes */}
+            <Route path="principals" element={<PrincipalsList />} />
+            <Route path="principals/new" element={<PrincipalForm />} />
+            <Route path="principals/:id" element={<PrincipalDetails />} />
+            <Route path="principals/:id/edit" element={<PrincipalForm />} />
             {/* States Routes - Moved to Settings/Masters */}
             <Route path="states" element={<StatesList />} />
             <Route path="states/new" element={<StateForm />} />
