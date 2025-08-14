@@ -1,4 +1,4 @@
-// src/components/Layout/Sidebar.tsx - Updated with Doctor navigation
+// src/components/Layout/Sidebar.tsx - Updated with Doctor and Principal navigation
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
@@ -42,6 +42,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       name: 'Doctors',
       icon: UserCheck,
       permission: { resource: 'doctors', action: 'view' },
+    },
+    {
+      path: '/principals',
+      name: 'Principals',
+      icon: Building2,
+      permission: { resource: 'principals', action: 'view' },
     },
     {
       path: '/portfolios',

@@ -35,6 +35,11 @@ import DoctorDetails from './components/Doctors/DoctorDetails';
 import PortfoliosList from './components/Portfolios/PortfoliosList';
 import PortfolioForm from './components/Portfolios/PortfolioForm';
 
+// Principal Components
+import PrincipalsList from './components/Principals/PrincipalsList';
+import PrincipalForm from './components/Principals/PrincipalForm';
+import PrincipalDetails from './components/Principals/PrincipalDetails';
+
 // Settings Components
 import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
