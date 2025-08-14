@@ -51,7 +51,7 @@ export interface Doctor {
   name: string;
   email: string;
   phone: string;
-  specialization: Portfolio[];
+  portfolio: Portfolio[];
   hospitals: {
     _id: string;
     name: string;
@@ -87,7 +87,7 @@ export interface DoctorFormData {
   name: string;
   email: string;
   phone: string;
-  specialization: string[];
+  portfolio: string[];  // Changed from specialization
   hospitals: string[];
   location: string;
   targets: MonthlyTarget[];
@@ -183,10 +183,10 @@ const createFormDataRequest = async (
             value.forEach((desc: string) => {
               requestData.append('descriptions', desc);
             });
-          } else if (key === 'specialization' && Array.isArray(value)) {
-            // Send each specialization ID separately
+          } else if (key === 'portfolio' && Array.isArray(value)) {
+            // Send each portfolio ID separately
             value.forEach((id: string) => {
-              requestData.append('specialization', id);
+              requestData.append('portfolio', id);
             });
           } else if (key === 'hospitals' && Array.isArray(value)) {
             // Send each hospital ID separately

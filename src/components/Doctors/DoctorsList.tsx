@@ -38,7 +38,7 @@ const DoctorsList: React.FC = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSpecialization, setSelectedSpecialization] = useState('');
+  const [selectedPortfolio, setSelectedPortfolio] = useState('');
   const [selectedHospital, setSelectedHospital] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -70,17 +70,17 @@ const DoctorsList: React.FC = () => {
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (searchTerm !== '' || selectedSpecialization || selectedHospital) {
+      if (searchTerm !== '' || selectedPortfolio || selectedHospital) {
         setCurrentPage(1);
         fetchDoctors();
-      } else if (searchTerm === '' && !selectedSpecialization && !selectedHospital) {
+      } else if (searchTerm === '' && !selectedPortfolio && !selectedHospital) {
         setCurrentPage(1);
         fetchDoctors();
       }
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedSpecialization, selectedHospital]);
+  }, [searchTerm, selectedPortfolio, selectedHospital]);
 
   const fetchDoctors = async () => {
     try {
@@ -89,7 +89,7 @@ const DoctorsList: React.FC = () => {
         page: currentPage,
         limit: 10,
         ...(searchTerm && { search: searchTerm.trim() }),
-        ...(selectedSpecialization && { specialization: selectedSpecialization }),
+        ...(selectedPortfolio && { portfolio: selectedPortfolio }),
         ...(selectedHospital && { hospital: selectedHospital })
       };
       
@@ -153,7 +153,7 @@ const DoctorsList: React.FC = () => {
 
   const clearFilters = () => {
     setSearchTerm('');
-    setSelectedSpecialization('');
+    setSelectedPortfolio('');
     setSelectedHospital('');
     setCurrentPage(1);
   };
@@ -207,7 +207,7 @@ const DoctorsList: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Doctor Management</h1>
           <p className="text-gray-600 mt-1">
-            Manage doctors, specializations, and medical professionals
+            Manage doctors, portfolios, and medical professionals
             {totalDoctors > 0 && ` • ${totalDoctors} total doctors`}
           </p>
         </div>
@@ -244,7 +244,7 @@ const DoctorsList: React.FC = () => {
               type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2 border rounded-lg transition-colors duration-200 ${
-                showFilters || selectedSpecialization || selectedHospital
+                showFilters || selectedPortfolio || selectedHospital
                   ? 'bg-blue-50 border-blue-300 text-blue-700'
                   : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
@@ -260,7 +260,7 @@ const DoctorsList: React.FC = () => {
               {loading ? 'Searching...' : 'Search'}
             </button>
             
-            {(searchTerm || selectedSpecialization || selectedHospital) && (
+            {(searchTerm || selectedPortfolio || selectedHospital) && (
               <button
                 type="button"
                 onClick={clearFilters}
@@ -281,15 +281,15 @@ const DoctorsList: React.FC = () => {
             >
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Specialization
+                  Portfolio
                 </label>
                 <select
-                  value={selectedSpecialization}
-                  onChange={(e) => setSelectedSpecialization(e.target.value)}
+                  value={selectedPortfolio}
+                  onChange={(e) => setSelectedPortfolio(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={filtersLoading}
                 >
-                  <option value="">All Specializations</option>
+                  <option value="">All Portfolios</option>
                   {portfolios.map((portfolio) => (
                     <option key={portfolio._id} value={portfolio._id}>
                       {portfolio.name}
@@ -332,7 +332,7 @@ const DoctorsList: React.FC = () => {
           <div className="p-8 text-center">
             <UserCheck className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 text-lg">No doctors found</p>
-            {(searchTerm || selectedSpecialization || selectedHospital) && (
+            {(searchTerm || selectedPortfolio || selectedHospital) && (
               <p className="text-gray-400 text-sm mt-2">
                 Try adjusting your search criteria or clear the filters
               </p>
@@ -352,7 +352,7 @@ const DoctorsList: React.FC = () => {
                       Contact
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Specializations
+                      Portfolios
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Hospitals
@@ -415,18 +415,18 @@ const DoctorsList: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-1">
-                            {doctor.specialization.slice(0, 2).map((spec) => (
+                            {doctor.portfolio.slice(0, 2).map((port) => (
                               <span
-                                key={spec._id}
+                                key={port._id}
                                 className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                               >
                                 <Briefcase className="w-3 h-3 mr-1" />
-                                {spec.name}
+                                {port.name}
                               </span>
                             ))}
-                            {doctor.specialization.length > 2 && (
+                            {doctor.portfolio.length > 2 && (
                               <span className="text-xs text-gray-500">
-                                +{doctor.specialization.length - 2} more
+                                +{doctor.portfolio.length - 2} more
                               </span>
                             )}
                           </div>
@@ -578,19 +578,19 @@ const DoctorsList: React.FC = () => {
                               {doctor.location}
                             </div>
                             
-                            {/* Specializations */}
+                            {/* Portfolios */}
                             <div className="flex flex-wrap gap-1 mt-2">
-                              {doctor.specialization.slice(0, 3).map((spec) => (
+                              {doctor.portfolio.slice(0, 3).map((port) => (
                                 <span
-                                  key={spec._id}
+                                  key={port._id}
                                   className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                                 >
-                                  {spec.name}
+                                  {port.name}
                                 </span>
                               ))}
-                              {doctor.specialization.length > 3 && (
+                              {doctor.portfolio.length > 3 && (
                                 <span className="text-xs text-gray-500">
-                                  +{doctor.specialization.length - 3} more
+                                  +{doctor.portfolio.length - 3} more
                                 </span>
                               )}
                             </div>

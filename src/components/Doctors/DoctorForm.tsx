@@ -136,11 +136,11 @@ const DoctorForm: React.FC = () => {
     setError,
   } = useForm<DoctorFormData>({
     defaultValues: {
-      isActive: true,
-      specialization: [],
-      hospitals: [],
-      targets: []
-    },
+  isActive: true,
+  portfolio: [],  // Changed from specialization
+  hospitals: [],
+  targets: []
+},
   });
 
   const { fields: targetFields, append: appendTarget, remove: removeTarget } = useFieldArray({
@@ -148,7 +148,8 @@ const DoctorForm: React.FC = () => {
     name: 'targets'
   });
 
-  const watchedSpecializations = watch('specialization');
+  //const watchedSpecializations = watch('specialization');
+  const watchedPortfolios = watch('portfolio');
 
   // Clear validation errors when user starts typing
   useEffect(() => {
@@ -233,7 +234,8 @@ const DoctorForm: React.FC = () => {
       setValue('phone', doctor.phone);
       setValue('location', doctor.location);
       setValue('isActive', doctor.isActive);
-      setValue('specialization', doctor.specialization.map((spec: any) => spec._id));
+      //setValue('specialization', doctor.specialization.map((spec: any) => spec._id));
+      setValue('portfolio', doctor.portfolio.map((p: any) => p._id));
       setValue('hospitals', doctor.hospitals.map((hospital: any) => hospital._id));
       setValue('targets', doctor.targets || []);
       
@@ -371,34 +373,33 @@ const DoctorForm: React.FC = () => {
   };
 
   const validateForm = (data: DoctorFormData): boolean => {
-    const errors: Record<string, string> = {};
-    
-    // Validate hospitals
-    if (selectedHospitals.length === 0) {
-      errors.hospitals = 'Please select at least one hospital';
-      setError('hospitals', { message: 'At least one hospital is required' });
+  const errors: Record<string, string> = {};
+  
+  // Validate hospitals
+  if (selectedHospitals.length === 0) {
+    errors.hospitals = 'Please select at least one hospital';
+    setError('hospitals', { message: 'At least one hospital is required' });
+  }
+  
+  // Validate portfolios (CHANGED FROM specialization)
+  if (!data.portfolio || data.portfolio.length === 0) {
+    errors.portfolio = 'Please select at least one portfolio';
+    setError('portfolio', { message: 'At least one portfolio is required' });
+  }
+  
+  // Validate targets for duplicate months
+  const monthYearCombos = new Set();
+  targetFields.forEach((field, index) => {
+    const combo = `${field.month}-${field.year}`;
+    if (monthYearCombos.has(combo)) {
+      errors[`targets.${index}.month`] = 'Duplicate month for the same year';
     }
-    
-    // Validate specializations
-    if (!data.specialization || data.specialization.length === 0) {
-      errors.specialization = 'Please select at least one specialization';
-      setError('specialization', { message: 'At least one specialization is required' });
-    }
-    
-    // Validate targets for duplicate months
-    const monthYearCombos = new Set();
-    targetFields.forEach((field, index) => {
-      const combo = `${field.month}-${field.year}`;
-      if (monthYearCombos.has(combo)) {
-        errors[`targets.${index}.month`] = 'Duplicate month for the same year';
-      }
-      monthYearCombos.add(combo);
-    });
-    
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
+    monthYearCombos.add(combo);
+  });
+  
+  setValidationErrors(errors);
+  return Object.keys(errors).length === 0;
+};
   const onSubmit = async (data: DoctorFormData) => {
     // Clear previous validation errors
     setValidationErrors({});
@@ -623,62 +624,62 @@ const DoctorForm: React.FC = () => {
             </div>
           </div>
 
-          {/* Specializations - Enhanced */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
-                <Briefcase className="w-5 h-5 inline mr-2" />
-                Specializations
-              </h3>
-              <span className="text-sm text-gray-500">
-                {watchedSpecializations?.length || 0} selected
-              </span>
-            </div>
-            
-            <FormField
-              label="Select Specializations"
-              required
-              error={errors.specialization?.message || validationErrors.specialization}
-            >
-              <div className={`border rounded-lg p-4 max-h-64 overflow-y-auto ${
-                errors.specialization || validationErrors.specialization ? 'border-red-300' : 'border-gray-300'
-              }`}>
-                {portfolios.length === 0 ? (
-                  <p className="text-center text-gray-500 py-4">No specializations available</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {portfolios.map((portfolio) => {
-                      const isChecked = watchedSpecializations?.includes(portfolio._id);
-                      return (
-                        <label 
-                          key={portfolio._id} 
-                          className={`flex items-start space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                            isChecked ? 'bg-blue-50 border border-blue-300' : 'hover:bg-gray-50 border border-transparent'
-                          }`}
-                        >
-                          <input
-                            {...register('specialization', {
-                              required: 'At least one specialization is required',
-                            })}
-                            type="checkbox"
-                            value={portfolio._id}
-                            className="mt-1 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-gray-900">{portfolio.name}</span>
-                              {isChecked && <CheckCircle className="w-4 h-4 text-blue-600 ml-2" />}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">{portfolio.description}</p>
-                          </div>
-                        </label>
-                      );
-                    })}
+          {/* Portfolios - Updated */}
+<div className="space-y-4">
+  <div className="flex items-center justify-between">
+    <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
+      <Briefcase className="w-5 h-5 inline mr-2" />
+      Portfolios
+    </h3>
+    <span className="text-sm text-gray-500">
+      {watchedPortfolios?.length || 0} selected
+    </span>
+  </div>
+  
+  <FormField
+    label="Select Portfolios"
+    required
+    error={errors.portfolio?.message || validationErrors.portfolio}
+  >
+    <div className={`border rounded-lg p-4 max-h-64 overflow-y-auto ${
+      errors.portfolio || validationErrors.portfolio ? 'border-red-300' : 'border-gray-300'
+    }`}>
+      {portfolios.length === 0 ? (
+        <p className="text-center text-gray-500 py-4">No portfolios available</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {portfolios.map((portfolio) => {
+            const isChecked = watchedPortfolios?.includes(portfolio._id);
+            return (
+              <label 
+                key={portfolio._id} 
+                className={`flex items-start space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                  isChecked ? 'bg-blue-50 border border-blue-300' : 'hover:bg-gray-50 border border-transparent'
+                }`}
+              >
+                <input
+                  {...register('portfolio', {
+                    required: 'At least one portfolio is required',
+                  })}
+                  type="checkbox"
+                  value={portfolio._id}
+                  className="mt-1 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-gray-900">{portfolio.name}</span>
+                    {isChecked && <CheckCircle className="w-4 h-4 text-blue-600 ml-2" />}
                   </div>
-                )}
-              </div>
-            </FormField>
-          </div>
+                  <p className="text-xs text-gray-500 mt-1">{portfolio.description}</p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </FormField>
+</div>
 
           {/* Hospitals - Enhanced Implementation */}
           <div className="space-y-4">
