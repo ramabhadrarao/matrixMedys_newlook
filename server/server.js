@@ -15,6 +15,9 @@ import hospitalRoutes from './routes/hospitals.js';
 import doctorRoutes from './routes/doctors.js';
 import portfolioRoutes from './routes/portfolios.js';
 import principalRoutes from './routes/principals.js'; // New principal routes
+// Add imports
+import categoryRoutes from './routes/categories.js';
+import productRoutes from './routes/products.js';
 import dashboardRoutes from './routes/dashboard.js';
 import fileRoutes from './routes/files.js';
 
@@ -77,7 +80,9 @@ app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/principals', principalRoutes); // New principal routes
-
+// Add routes (after other routes)
+app.use('/api/categories', categoryRoutes);
+app.use('/api/products', productRoutes);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -116,5 +121,6 @@ app.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Auth rate limit: ${process.env.NODE_ENV === 'production' ? '5' : '50'} requests per 15 minutes`);
   console.log(`File uploads directory: ${path.join(__dirname, 'uploads')}`);
-  console.log('Modules loaded: auth, states, users, permissions, hospitals, doctors, portfolios, principals');
+  console.log('Modules loaded: auth, states, users, permissions, hospitals, doctors, portfolios, principals, categories, products');
+  
 });

@@ -10,7 +10,8 @@
     "seed": "node seeders/permissionSeeder.js",
     "seed:hospitals": "node seeders/hospitalPermissionsSeeder.js",
     "seed:comprehensive": "node seeders/comprehensiveSeeder.js",
-    "seed:states": "node seeders/indianStatesSeeder.js"
+    "seed:states": "node seeders/indianStatesSeeder.js",
+    "seed:category-product": "node seeders/categoryProductSeeder.js"
   },
   "dependencies": {
     "express": "^4.18.2",

@@ -12,8 +12,9 @@ const uploadsDir = path.join(__dirname, '../uploads');
 const hospitalDocsDir = path.join(uploadsDir, 'hospital-documents');
 const doctorAttachmentsDir = path.join(uploadsDir, 'doctor-attachments');
 const principalDocsDir = path.join(uploadsDir, 'principal-documents');
+const productDocsDir = path.join(uploadsDir, 'product-documents');
 
-[uploadsDir, hospitalDocsDir, doctorAttachmentsDir, principalDocsDir].forEach(dir => {
+[uploadsDir, hospitalDocsDir, doctorAttachmentsDir, principalDocsDir, productDocsDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -58,7 +59,7 @@ const fileFilter = (req, file, cb) => {
 const hospitalStorage = createStorage(hospitalDocsDir);
 const doctorStorage = createStorage(doctorAttachmentsDir);
 const principalStorage = createStorage(principalDocsDir);
-
+const productStorage = createStorage(productDocsDir);
 // Hospital file uploads
 const uploadHospitalSingle = multer({
   storage: hospitalStorage,
@@ -112,17 +113,34 @@ const uploadPrincipalMultiple = multer({
     files: 20, // Maximum 20 files for principals
   }
 });
-
+const uploadProductSingle = multer({
+  storage: productStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
+const uploadProductMultiple = multer({
+  storage: productStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit per file
+    files: 10, // Maximum 10 files for products
+  }
+});
 // Generic storage (auto-detects based on route)
+// Update getUploadPath function
 const getUploadPath = (req) => {
-  if (req.route?.path?.includes('principals') || req.originalUrl?.includes('principals')) {
+  if (req.route?.path?.includes('products') || req.originalUrl?.includes('products')) {
+    return productDocsDir;
+  } else if (req.route?.path?.includes('principals') || req.originalUrl?.includes('principals')) {
     return principalDocsDir;
   } else if (req.route?.path?.includes('doctors') || req.originalUrl?.includes('doctors')) {
     return doctorAttachmentsDir;
   } else if (req.route?.path?.includes('hospitals') || req.originalUrl?.includes('hospitals')) {
     return hospitalDocsDir;
   }
-  return hospitalDocsDir; // Default to hospital docs
+  return hospitalDocsDir; // Default
 };
 
 const dynamicStorage = multer.diskStorage({
@@ -165,6 +183,9 @@ export const uploadDoctorAttachments = uploadDoctorMultiple.array('attachments',
 export const uploadPrincipalDocument = uploadPrincipalSingle.single('document');
 export const uploadPrincipalDocuments = uploadPrincipalMultiple.array('documents', 20);
 
+// Export product uploads
+export const uploadProductDocument = uploadProductSingle.single('document');
+export const uploadProductDocuments = uploadProductMultiple.array('documents', 10);
 // Error handler middleware
 export const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
