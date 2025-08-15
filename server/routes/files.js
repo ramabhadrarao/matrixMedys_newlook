@@ -1,4 +1,5 @@
-// server/routes/files.js - Fixed upload middleware import
+// server/routes/files.js - Fixed download and view endpoints
+
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -11,7 +12,24 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Upload file endpoint
+// Helper function to find file in different directories
+const findFilePath = (filename) => {
+  const possiblePaths = [
+    path.join(__dirname, '../uploads/hospital-documents', filename),
+    path.join(__dirname, '../uploads/doctor-attachments', filename),
+    path.join(__dirname, '../uploads/principal-documents', filename),
+  ];
+  
+  for (const filePath of possiblePaths) {
+    if (fs.existsSync(filePath)) {
+      return filePath;
+    }
+  }
+  
+  return null;
+};
+
+// Upload file endpoint (keep as is)
 router.post('/upload', authenticate, uploadSingleFile, handleUploadError, (req, res) => {
   try {
     if (!req.file) {
@@ -37,14 +55,17 @@ router.post('/upload', authenticate, uploadSingleFile, handleUploadError, (req, 
   }
 });
 
-// Download file endpoint
+// Download file endpoint - FIXED
 router.get('/download/:filename', authenticate, (req, res) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(__dirname, '../uploads/hospital-documents', filename);
-
+    
+    // Find file in any of the upload directories
+    const filePath = findFilePath(filename);
+    
     // Check if file exists
-    if (!fs.existsSync(filePath)) {
+    if (!filePath) {
+      console.error('File not found:', filename);
       return res.status(404).json({ message: 'File not found' });
     }
 
@@ -64,12 +85,21 @@ router.get('/download/:filename', authenticate, (req, res) => {
       case '.docx':
         contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         break;
+      case '.xls':
+        contentType = 'application/vnd.ms-excel';
+        break;
+      case '.xlsx':
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        break;
       case '.jpg':
       case '.jpeg':
         contentType = 'image/jpeg';
         break;
       case '.png':
         contentType = 'image/png';
+        break;
+      case '.txt':
+        contentType = 'text/plain';
         break;
     }
 
@@ -97,14 +127,17 @@ router.get('/download/:filename', authenticate, (req, res) => {
   }
 });
 
-// View file endpoint (for browser viewing)
+// View file endpoint - FIXED
 router.get('/view/:filename', authenticate, (req, res) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(__dirname, '../uploads/hospital-documents', filename);
-
+    
+    // Find file in any of the upload directories
+    const filePath = findFilePath(filename);
+    
     // Check if file exists
-    if (!fs.existsSync(filePath)) {
+    if (!filePath) {
+      console.error('File not found for viewing:', filename);
       return res.status(404).json({ message: 'File not found' });
     }
 
@@ -135,7 +168,7 @@ router.get('/view/:filename', authenticate, (req, res) => {
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', stats.size);
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache for viewing
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     res.setHeader('Access-Control-Allow-Origin', process.env.CLIENT_URL || 'http://localhost:5173');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
 
@@ -157,14 +190,16 @@ router.get('/view/:filename', authenticate, (req, res) => {
   }
 });
 
-// Delete file endpoint
+// Delete file endpoint - FIXED
 router.delete('/:filename', authenticate, (req, res) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(__dirname, '../uploads/hospital-documents', filename);
-
+    
+    // Find file in any of the upload directories
+    const filePath = findFilePath(filename);
+    
     // Check if file exists
-    if (!fs.existsSync(filePath)) {
+    if (!filePath) {
       return res.status(404).json({ message: 'File not found' });
     }
 
@@ -179,30 +214,37 @@ router.delete('/:filename', authenticate, (req, res) => {
   }
 });
 
-// List files endpoint (for admin)
+// List files endpoint - FIXED
 router.get('/', authenticate, (req, res) => {
   try {
-    const hospitalDocsDir = path.join(__dirname, '../uploads/hospital-documents');
+    const allFiles = [];
+    const uploadDirs = [
+      { path: path.join(__dirname, '../uploads/hospital-documents'), type: 'hospital' },
+      { path: path.join(__dirname, '../uploads/doctor-attachments'), type: 'doctor' },
+      { path: path.join(__dirname, '../uploads/principal-documents'), type: 'principal' }
+    ];
     
-    if (!fs.existsSync(hospitalDocsDir)) {
-      return res.json({ files: [] });
-    }
-
-    const files = fs.readdirSync(hospitalDocsDir).map(filename => {
-      const filePath = path.join(hospitalDocsDir, filename);
-      const stats = fs.statSync(filePath);
-      
-      return {
-        filename,
-        size: stats.size,
-        createdAt: stats.birthtime,
-        modifiedAt: stats.mtime,
-        downloadUrl: `/api/files/download/${filename}`,
-        viewUrl: `/api/files/view/${filename}`
-      };
+    uploadDirs.forEach(dir => {
+      if (fs.existsSync(dir.path)) {
+        const files = fs.readdirSync(dir.path).map(filename => {
+          const filePath = path.join(dir.path, filename);
+          const stats = fs.statSync(filePath);
+          
+          return {
+            filename,
+            type: dir.type,
+            size: stats.size,
+            createdAt: stats.birthtime,
+            modifiedAt: stats.mtime,
+            downloadUrl: `/api/files/download/${filename}`,
+            viewUrl: `/api/files/view/${filename}`
+          };
+        });
+        allFiles.push(...files);
+      }
     });
 
-    res.json({ files });
+    res.json({ files: allFiles });
     
   } catch (error) {
     console.error('File list error:', error);
