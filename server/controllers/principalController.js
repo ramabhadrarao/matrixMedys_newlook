@@ -190,6 +190,23 @@ export const createPrincipal = async (req, res) => {
       }
     }
     
+    // Validate contact persons portfolios if provided
+    if (contactPersons && contactPersons.length > 0) {
+      const contactPortfolioIds = contactPersons
+        .map(contact => contact.portfolio)
+        .filter(Boolean);
+      
+      if (contactPortfolioIds.length > 0) {
+        const contactPortfolios = await Portfolio.find({ _id: { $in: contactPortfolioIds } });
+        if (contactPortfolios.length !== contactPortfolioIds.length) {
+          return res.status(400).json({ 
+            message: 'Some portfolios in contact persons are invalid',
+            errors: [{ param: 'contactPersons', msg: 'Invalid portfolio IDs in contact persons' }]
+          });
+        }
+      }
+    }
+    
     const principalData = {
       name,
       email,
@@ -352,6 +369,23 @@ export const updatePrincipal = async (req, res) => {
     const portfolios = await Portfolio.find({ _id: { $in: portfolio } });
     if (portfolios.length !== portfolio.length) {
       return res.status(400).json({ message: 'Some portfolios are invalid' });
+    }
+    
+    // Validate contact persons portfolios if provided
+    if (contactPersons && contactPersons.length > 0) {
+      const contactPortfolioIds = contactPersons
+        .map(contact => contact.portfolio)
+        .filter(Boolean);
+      
+      if (contactPortfolioIds.length > 0) {
+        const contactPortfolios = await Portfolio.find({ _id: { $in: contactPortfolioIds } });
+        if (contactPortfolios.length !== contactPortfolioIds.length) {
+          return res.status(400).json({ 
+            message: 'Some portfolios in contact persons are invalid',
+            errors: [{ param: 'contactPersons', msg: 'Invalid portfolio IDs in contact persons' }]
+          });
+        }
+      }
     }
     
     // Update fields

@@ -95,6 +95,16 @@ export interface PrincipalFormData {
     state: string;
     pincode: string;
   }[];
+  contactPersons?: {
+    portfolio?: string;
+    departmentName: string;
+    personName: string;
+    email: string;
+    mobile: string;
+    address?: string;
+    location: string;
+    pincode: string;
+  }[];
   isActive?: boolean;
   documents?: File[];
   documentNames?: string[];
@@ -223,6 +233,8 @@ const createFormDataRequest = async (
             });
           } else if (key === 'addresses' && Array.isArray(value)) {
             requestData.append('addresses', JSON.stringify(value));
+          } else if (key === 'contactPersons' && Array.isArray(value)) {
+            requestData.append('contactPersons', JSON.stringify(value));
           } else {
             requestData.append(key, value.toString());
           }
