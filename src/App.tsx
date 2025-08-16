@@ -39,7 +39,15 @@ import PortfolioForm from './components/Portfolios/PortfolioForm';
 import PrincipalsList from './components/Principals/PrincipalsList';
 import PrincipalForm from './components/Principals/PrincipalForm';
 import PrincipalDetails from './components/Principals/PrincipalDetails';
+// Category Components
+import CategoriesList from './components/Categories/CategoriesList';
+import CategoryForm from './components/Categories/CategoryForm';
 
+// Product Components  
+import ProductsList from './components/Products/ProductsList';
+import ProductForm from './components/Products/ProductForm';
+import CategoryDetails from './components/Categories/CategoryDetails';
+import ProductDetails from './components/Products/ProductDetails';
 // Settings Components
 import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
@@ -165,6 +173,17 @@ function App() {
             <Route path="principals/new" element={<PrincipalForm />} />
             <Route path="principals/:id" element={<PrincipalDetails />} />
             <Route path="principals/:id/edit" element={<PrincipalForm />} />
+          {/* Category Routes */}
+          <Route path="categories" element={<CategoriesList />} />
+          <Route path="categories/new" element={<CategoryForm />} />
+          <Route path="categories/:id" element={<CategoryDetails />} /> {/* Add this */}
+          <Route path="categories/:id/edit" element={<CategoryForm />} />
+
+          {/* Product Routes */}
+          <Route path="products" element={<ProductsList />} />
+          <Route path="products/new" element={<ProductForm />} />
+          <Route path="products/:id" element={<ProductDetails />} /> {/* Update this */}
+          <Route path="products/:id/edit" element={<ProductForm />} />
             {/* States Routes - Moved to Settings/Masters */}
             <Route path="states" element={<StatesList />} />
             <Route path="states/new" element={<StateForm />} />

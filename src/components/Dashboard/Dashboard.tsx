@@ -22,7 +22,9 @@ import {
   Target,
   FileText,
   Award,
-  TrendingDown
+  TrendingDown,
+  FolderTree, // Add this
+  Package     // Add this
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
@@ -42,7 +44,9 @@ const iconMap = {
   Briefcase,
   Target,
   FileText,
-  Award
+  Award,
+  FolderTree, // Add this
+  Package     // Add this
 };
 
 interface DashboardCard {

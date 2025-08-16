@@ -10,7 +10,9 @@ import {
   Briefcase,
   Settings, 
   LogOut,
-  ChevronRight
+  ChevronRight,
+  FolderTree,
+  Package
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -55,6 +57,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       icon: Briefcase,
       permission: { resource: 'portfolios', action: 'view' },
     },
+    {
+  path: '/categories',
+  name: 'Categories',
+  icon: FolderTree,
+  permission: { resource: 'categories', action: 'view' },
+},
+{
+  path: '/products',
+  name: 'Products',
+  icon: Package,
+  permission: { resource: 'products', action: 'view' },
+},
     {
       path: '/users',
       name: 'Users',

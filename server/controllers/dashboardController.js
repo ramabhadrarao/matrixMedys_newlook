@@ -6,6 +6,8 @@ import HospitalContact from '../models/HospitalContact.js';
 import Doctor from '../models/Doctor.js';
 import Portfolio from '../models/Portfolio.js';
 import Principal from '../models/Principal.js';
+import Category from '../models/Category.js';
+import Product from '../models/Product.js';
 import Permission from '../models/Permission.js';
 import UserPermission from '../models/UserPermission.js';
 
@@ -533,7 +535,202 @@ export const getDashboardStats = async (req, res) => {
         console.error('Error fetching principals stats:', error);
       }
     }
+     // ========== CATEGORIES STATISTICS ==========
+    if (resourcePermissions.categories && resourcePermissions.categories.includes('view')) {
+      try {
+        const totalCategories = await Category.countDocuments();
+        const activeCategories = await Category.countDocuments({ isActive: true });
+        const inactiveCategories = totalCategories - activeCategories;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentCategories = await Category.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Get categories with products
+        const categoriesWithProducts = await Category.countDocuments({ productsCount: { $gt: 0 } });
+        const rootCategories = await Category.countDocuments({ parent: null });
+        
+        // Get categories by principal
+        const categoriesByPrincipal = await Category.aggregate([
+          {
+            $lookup: {
+              from: 'principals',
+              localField: 'principal',
+              foreignField: '_id',
+              as: 'principalInfo'
+            }
+          },
+          { $unwind: '$principalInfo' },
+          {
+            $group: {
+              _id: '$principalInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Get categories by portfolio
+        const categoriesByPortfolio = await Category.aggregate([
+          {
+            $lookup: {
+              from: 'portfolios',
+              localField: 'portfolio',
+              foreignField: '_id',
+              as: 'portfolioInfo'
+            }
+          },
+          { $unwind: '$portfolioInfo' },
+          {
+            $group: {
+              _id: '$portfolioInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Calculate total products in all categories
+        const totalProductsInCategories = await Category.aggregate([
+          {
+            $group: {
+              _id: null,
+              totalProducts: { $sum: '$productsCount' }
+            }
+          }
+        ]);
+        
+        dashboardCards.push({
+          id: 'categories',
+          title: 'Categories',
+          resource: 'categories',
+          icon: 'FolderTree',
+          color: 'cyan',
+          stats: {
+            total: totalCategories,
+            active: activeCategories,
+            inactive: inactiveCategories,
+            recent: recentCategories,
+            withProducts: categoriesWithProducts,
+            rootCategories,
+            totalProducts: totalProductsInCategories[0]?.totalProducts || 0,
+            topPrincipals: categoriesByPrincipal,
+            topPortfolios: categoriesByPortfolio
+          },
+          actions: resourcePermissions.categories,
+          route: '/categories',
+          description: 'Product categories and hierarchy'
+        });
+      } catch (error) {
+        console.error('Error fetching categories stats:', error);
+      }
+    }
     
+    // ========== PRODUCTS STATISTICS ==========
+    if (resourcePermissions.products && resourcePermissions.products.includes('view')) {
+      try {
+        const totalProducts = await Product.countDocuments();
+        const activeProducts = await Product.countDocuments({ isActive: true });
+        const inactiveProducts = totalProducts - activeProducts;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentProducts = await Product.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Get products with documents
+        const productsWithDocuments = await Product.countDocuments({ 
+          'documents.0': { $exists: true } 
+        });
+        
+        // Get products by GST percentage
+        const productsByGST = await Product.aggregate([
+          {
+            $group: {
+              _id: '$gstPercentage',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { _id: 1 } }
+        ]);
+        
+        // Get products by category
+        const productsByCategory = await Product.aggregate([
+          {
+            $lookup: {
+              from: 'categories',
+              localField: 'category',
+              foreignField: '_id',
+              as: 'categoryInfo'
+            }
+          },
+          { $unwind: '$categoryInfo' },
+          {
+            $group: {
+              _id: '$categoryInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Get products by unit
+        const productsByUnit = await Product.aggregate([
+          {
+            $group: {
+              _id: '$unit',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } }
+        ]);
+        
+        // Get total documents across all products
+        const totalDocuments = await Product.aggregate([
+          {
+            $project: {
+              documentsCount: { $size: '$documents' }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalDocuments: { $sum: '$documentsCount' }
+            }
+          }
+        ]);
+        
+        dashboardCards.push({
+          id: 'products',
+          title: 'Products',
+          resource: 'products',
+          icon: 'Package',
+          color: 'violet',
+          stats: {
+            total: totalProducts,
+            active: activeProducts,
+            inactive: inactiveProducts,
+            recent: recentProducts,
+            withDocuments: productsWithDocuments,
+            totalDocuments: totalDocuments[0]?.totalDocuments || 0,
+            gstBreakdown: productsByGST,
+            topCategories: productsByCategory,
+            unitBreakdown: productsByUnit
+          },
+          actions: resourcePermissions.products,
+          route: '/products',
+          description: 'Product catalog and inventory'
+        });
+      } catch (error) {
+        console.error('Error fetching products stats:', error);
+      }
+    }
     // System Overview
     const systemStats = {
       totalPermissions: await Permission.countDocuments(),
@@ -719,7 +916,56 @@ export const getRecentActivity = async (req, res) => {
         });
       });
     }
+    // ========== RECENT CATEGORIES ==========
+    if (viewableResources.includes('categories')) {
+      const recentCategories = await Category.find()
+        .populate('createdBy', 'name')
+        .populate('updatedBy', 'name')
+        .populate('principal', 'name')
+        .populate('portfolio', 'name')
+        .sort({ updatedAt: -1 })
+        .limit(3)
+        .lean();
+      
+      recentCategories.forEach(category => {
+        activities.push({
+          id: category._id,
+          type: 'category',
+          action: category.createdAt.getTime() === category.updatedAt.getTime() ? 'created' : 'updated',
+          title: category.name,
+          description: `Category in ${category.principal?.name || 'Unknown'} - ${category.portfolio?.name || 'Unknown'}`,
+          user: category.updatedBy || category.createdBy,
+          timestamp: category.updatedAt,
+          resource: 'categories',
+          icon: 'FolderTree'
+        });
+      });
+    }
     
+    // ========== RECENT PRODUCTS ==========
+    if (viewableResources.includes('products')) {
+      const recentProducts = await Product.find()
+        .populate('createdBy', 'name')
+        .populate('updatedBy', 'name')
+        .populate('category', 'name')
+        .sort({ updatedAt: -1 })
+        .limit(3)
+        .lean();
+      
+      recentProducts.forEach(product => {
+        activities.push({
+          id: product._id,
+          type: 'product',
+          action: product.createdAt.getTime() === product.updatedAt.getTime() ? 'created' : 'updated',
+          title: `${product.name} (${product.code})`,
+          description: `Product in ${product.category?.name || 'Unknown Category'}`,
+          user: product.updatedBy || product.createdBy,
+          timestamp: product.updatedAt,
+          resource: 'products',
+          icon: 'Package'
+        });
+      });
+    }
     // Sort all activities by timestamp and limit
     const sortedActivities = activities
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
