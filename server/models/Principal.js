@@ -230,6 +230,9 @@ principalSchema.virtual('contactPersonsCount').get(function() {
 
 // Virtual to get expired documents
 principalSchema.virtual('expiredDocuments').get(function() {
+  if (!this.documents || !Array.isArray(this.documents)) {
+    return [];
+  }
   const now = new Date();
   return this.documents.filter(doc => 
     doc.hasValidity && doc.endDate && doc.endDate < now
@@ -238,6 +241,9 @@ principalSchema.virtual('expiredDocuments').get(function() {
 
 // Virtual to get documents expiring soon (within 30 days)
 principalSchema.virtual('expiringDocuments').get(function() {
+  if (!this.documents || !Array.isArray(this.documents)) {
+    return [];
+  }
   const now = new Date();
   const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   
@@ -248,7 +254,6 @@ principalSchema.virtual('expiringDocuments').get(function() {
     doc.endDate <= thirtyDaysLater
   );
 });
-
 // Ensure virtual fields are serialized
 principalSchema.set('toJSON', { virtuals: true });
 principalSchema.set('toObject', { virtuals: true });

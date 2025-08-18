@@ -134,6 +134,8 @@ export const getCategory = async (req, res) => {
 };
 
 // Create category
+// server/controllers/categoryController.js - Complete createCategory method
+// server/controllers/categoryController.js - Updated createCategory method
 export const createCategory = async (req, res) => {
   try {
     const {
@@ -145,20 +147,20 @@ export const createCategory = async (req, res) => {
       sortOrder
     } = req.body;
     
-    // Validate principal and portfolio exist
-    const principalExists = await Principal.findById(principal);
+    // Validate principal and portfolio exist (using lean() for better performance)
+    const principalExists = await Principal.findById(principal).lean();
     if (!principalExists) {
       return res.status(400).json({ message: 'Invalid principal' });
     }
     
-    const portfolioExists = await Portfolio.findById(portfolio);
+    const portfolioExists = await Portfolio.findById(portfolio).lean();
     if (!portfolioExists) {
       return res.status(400).json({ message: 'Invalid portfolio' });
     }
     
-    // If parent is provided, validate it exists
+    // If parent is provided and not null/empty, validate it exists
     let parentCategory = null;
-    if (parent) {
+    if (parent && parent !== 'null' && parent !== '') {
       parentCategory = await Category.findById(parent);
       if (!parentCategory) {
         return res.status(400).json({ message: 'Invalid parent category' });
@@ -173,20 +175,63 @@ export const createCategory = async (req, res) => {
       }
     }
     
-    const category = new Category({
-      name,
-      description,
+    // Check if category name already exists in the same principal/portfolio at the same level
+    const existingCategory = await Category.findOne({
+      name: name.trim(),
       principal,
       portfolio,
-      parent: parent || null,
-      sortOrder: sortOrder || 0,
-      createdBy: req.user._id
+      parent: parentCategory ? parent : null
     });
     
+    if (existingCategory) {
+      return res.status(400).json({ 
+        message: 'A category with this name already exists at this level' 
+      });
+    }
+    
+    // Create the category
+    const category = new Category({
+      name: name.trim(),
+      description: description || '',
+      principal,
+      portfolio,
+      parent: parentCategory ? parent : null,
+      sortOrder: sortOrder || 0,
+      createdBy: req.user._id,
+      isActive: true,
+      level: parentCategory ? parentCategory.level + 1 : 0,
+      path: '',
+      ancestors: [],
+      hasChildren: false,
+      childrenCount: 0,
+      productsCount: 0
+    });
+    
+    // Set path and ancestors if has parent
+    if (parentCategory) {
+      category.level = parentCategory.level + 1;
+      category.path = parentCategory.path ? 
+        `${parentCategory.path} > ${parentCategory.name}` : 
+        parentCategory.name;
+      category.ancestors = [...(parentCategory.ancestors || []), parentCategory._id];
+      
+      // Update parent's hasChildren and childrenCount
+      await Category.findByIdAndUpdate(parent, {
+        hasChildren: true,
+        $inc: { childrenCount: 1 }
+      });
+    }
+    
+    // Save the category
     await category.save();
-    await category.populate('principal', 'name');
-    await category.populate('portfolio', 'name');
-    await category.populate('parent', 'name');
+    
+    // Populate only necessary fields for response (selective population)
+    await category.populate([
+      { path: 'principal', select: 'name' },
+      { path: 'portfolio', select: 'name' },
+      { path: 'parent', select: 'name' },
+      { path: 'createdBy', select: 'name email' }
+    ]);
     
     res.status(201).json({
       message: 'Category created successfully',
@@ -194,10 +239,30 @@ export const createCategory = async (req, res) => {
     });
   } catch (error) {
     console.error('Create category error:', error);
-    res.status(500).json({ message: 'Failed to create category' });
+    
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ 
+        message: `A category with this ${field} already exists` 
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        message: 'Validation failed',
+        errors: messages 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to create category',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
-
 // Update category
 export const updateCategory = async (req, res) => {
   try {

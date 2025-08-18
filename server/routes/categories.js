@@ -17,12 +17,16 @@ import {
 const router = express.Router();
 
 // Validation rules
+// server/routes/categories.js - Updated validation
 const categoryValidation = [
   body('name').trim().isLength({ min: 2 }).withMessage('Category name must be at least 2 characters'),
   body('description').optional().trim(),
   body('principal').isMongoId().withMessage('Valid principal ID required'),
   body('portfolio').isMongoId().withMessage('Valid portfolio ID required'),
-  body('parent').optional().isMongoId().withMessage('Valid parent category ID required'),
+  body('parent')
+    .optional({ checkFalsy: true }) // This allows null, undefined, and empty string
+    .isMongoId()
+    .withMessage('Valid parent category ID required'),
   body('sortOrder').optional().isInt({ min: 0 }).withMessage('Sort order must be a positive number')
 ];
 
