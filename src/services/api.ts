@@ -21,6 +21,18 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Debug log for POST/PUT requests
+    if (process.env.NODE_ENV === 'development') {
+      if (config.method === 'post' || config.method === 'put') {
+        console.log(`API ${config.method?.toUpperCase()} Request:`, {
+          url: config.url,
+          data: config.data,
+          headers: config.headers
+        });
+      }
+    }
+    
     return config;
   },
   (error) => {

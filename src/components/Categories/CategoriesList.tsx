@@ -248,14 +248,14 @@ const CategoriesList: React.FC = () => {
         </div>
         
         {canCreate && selectedPrincipal && selectedPortfolio && (
-          <Link
-            to={`/categories/new?principal=${selectedPrincipal}&portfolio=${selectedPortfolio}`}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Category
-          </Link>
-        )}
+  <Link
+    to={`/categories/new?principal=${selectedPrincipal}&portfolio=${selectedPortfolio}`}
+    className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+  >
+    <Plus className="w-4 h-4 mr-2" />
+    Add Category
+  </Link>
+)}
       </div>
 
       {/* Filters */}
@@ -381,38 +381,49 @@ const CategoriesList: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                      <Link
-                        to={`/categories/${category._id}`}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Link>
-                      
-                      {canUpdate && (
-                        <Link
-                          to={`/categories/${category._id}/edit`}
-                          className="text-green-600 hover:text-green-900 p-1 rounded"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                      )}
-                      
-                      {canDelete && category.productsCount === 0 && (
-                        <button
-                          onClick={() => {
-                            setCategoryToDelete(category);
-                            setShowDeleteModal(true);
-                          }}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    // In the renderCategoryTree function of CategoriesList.tsx
+<div className="flex items-center space-x-2">
+  <Link
+    to={`/categories/${category._id}`}
+    className="text-blue-600 hover:text-blue-900 p-1 rounded"
+    title="View Details"
+  >
+    <Eye className="w-4 h-4" />
+  </Link>
+  
+  {canCreate && (
+    <Link
+      to={`/categories/new?principal=${category.principal._id || selectedPrincipal}&portfolio=${category.portfolio._id || selectedPortfolio}&parent=${category._id}`}
+      className="text-green-600 hover:text-green-900 p-1 rounded"
+      title="Add Subcategory"
+    >
+      <Plus className="w-4 h-4" />
+    </Link>
+  )}
+  
+  {canUpdate && (
+    <Link
+      to={`/categories/${category._id}/edit`}
+      className="text-yellow-600 hover:text-yellow-900 p-1 rounded"
+      title="Edit"
+    >
+      <Edit className="w-4 h-4" />
+    </Link>
+  )}
+  
+  {canDelete && !hasChildren && category.productsCount === 0 && (
+    <button
+      onClick={() => {
+        setCategoryToDelete(category);
+        setShowDeleteModal(true);
+      }}
+      className="text-red-600 hover:text-red-900 p-1 rounded"
+      title="Delete"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  )}
+</div>
                   </motion.div>
                 ))}
               </div>

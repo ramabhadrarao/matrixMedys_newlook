@@ -1,3 +1,4 @@
+// src/components/Categories/CategoryForm.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -5,7 +6,9 @@ import {
   ArrowLeft, 
   Save, 
   Loader2,
-  FolderTree
+  FolderTree,
+  Plus,
+  AlertCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -21,12 +24,15 @@ const CategoryForm: React.FC = () => {
   const isEdit = !!id;
   
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(isEdit);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [principals, setPrincipals] = useState<any[]>([]);
   const [portfolios, setPortfolios] = useState<any[]>([]);
   const [parentCategories, setParentCategories] = useState<any[]>([]);
-  const [selectedPrincipal, setSelectedPrincipal] = useState('');
-  const [selectedPortfolio, setSelectedPortfolio] = useState('');
+  const [formInitialized, setFormInitialized] = useState(false);
+  
+  const urlPrincipal = searchParams.get('principal') || '';
+  const urlPortfolio = searchParams.get('portfolio') || '';
+  const urlParent = searchParams.get('parent') || '';
   
   const {
     register,
@@ -34,126 +40,218 @@ const CategoryForm: React.FC = () => {
     setValue,
     watch,
     formState: { errors },
-  } = useForm<CategoryFormData>({
-    defaultValues: {
-      isActive: true,
-      sortOrder: 0,
-    },
-  });
+    reset
+  } = useForm<CategoryFormData>();
 
   const watchPrincipal = watch('principal');
   const watchPortfolio = watch('portfolio');
+  const watchParent = watch('parent');
 
+  // Initialize form
   useEffect(() => {
-    fetchPrincipals();
-    fetchPortfolios();
-    
-    // Set initial values from query params
-    const principalFromQuery = searchParams.get('principal');
-    const portfolioFromQuery = searchParams.get('portfolio');
-    
-    if (principalFromQuery) {
-      setValue('principal', principalFromQuery);
-      setSelectedPrincipal(principalFromQuery);
-    }
-    if (portfolioFromQuery) {
-      setValue('portfolio', portfolioFromQuery);
-      setSelectedPortfolio(portfolioFromQuery);
-    }
-    
-    if (isEdit && id) {
-      fetchCategory(id);
-    }
-  }, [id, isEdit, searchParams]);
+    initializeForm();
+  }, []);
 
+  // Watch for principal/portfolio changes
   useEffect(() => {
-    if (watchPrincipal && watchPortfolio) {
-      fetchParentCategories(watchPrincipal, watchPortfolio);
+    if (formInitialized && watchPrincipal && watchPortfolio && !isEdit) {
+      loadParentCategories(watchPrincipal, watchPortfolio);
     }
-  }, [watchPrincipal, watchPortfolio]);
+  }, [watchPrincipal, watchPortfolio, formInitialized]);
 
-  const fetchPrincipals = async () => {
-    try {
-      const response = await principalAPI.getPrincipals({ limit: 100 });
-      setPrincipals(response.data.principals || []);
-    } catch (error) {
-      handleApiError(error);
-    }
-  };
-
-  const fetchPortfolios = async () => {
-    try {
-      const response = await portfolioAPI.getPortfolios({ limit: 100 });
-      setPortfolios(response.data.portfolios || []);
-    } catch (error) {
-      handleApiError(error);
-    }
-  };
-
-  const fetchParentCategories = async (principalId: string, portfolioId: string) => {
-    try {
-      const response = await categoryAPI.getCategories({
-        principal: principalId,
-        portfolio: portfolioId,
-        flat: true
-      });
-      // Filter out current category if editing
-      const categories = response.data.categories || [];
-      if (isEdit && id) {
-        setParentCategories(categories.filter(cat => cat._id !== id));
-      } else {
-        setParentCategories(categories);
-      }
-    } catch (error) {
-      console.error('Error fetching parent categories:', error);
-    }
-  };
-
-  const fetchCategory = async (categoryId: string) => {
+  const initializeForm = async () => {
     try {
       setInitialLoading(true);
-      const response = await categoryAPI.getCategory(categoryId);
-      const category = response.data.category;
       
-      setValue('name', category.name);
-      setValue('description', category.description);
-      setValue('principal', category.principal._id);
-      setValue('portfolio', category.portfolio._id);
-      setValue('parent', category.parent?._id || '');
-      setValue('sortOrder', category.sortOrder);
-      setValue('isActive', category.isActive);
+      // Load principals and portfolios
+      const [principalsRes, portfoliosRes] = await Promise.all([
+        principalAPI.getPrincipals({ limit: 100 }),
+        portfolioAPI.getPortfolios({ limit: 100 })
+      ]);
       
-      setSelectedPrincipal(category.principal._id);
-      setSelectedPortfolio(category.portfolio._id);
+      setPrincipals(principalsRes.data.principals || []);
+      setPortfolios(portfoliosRes.data.portfolios || []);
+      
+      if (isEdit && id) {
+        // Load category for editing
+        await loadCategory(id);
+      } else {
+        // Set initial values for new category
+        reset({
+          name: '',
+          description: '',
+          principal: urlPrincipal,
+          portfolio: urlPortfolio,
+          parent: '',
+          sortOrder: 0,
+          isActive: true
+        });
+        
+        // Load parent categories if principal and portfolio are provided
+        if (urlPrincipal && urlPortfolio) {
+          await loadParentCategories(urlPrincipal, urlPortfolio, urlParent);
+        }
+      }
+      
+      setFormInitialized(true);
     } catch (error) {
+      console.error('Error initializing form:', error);
       handleApiError(error);
-      navigate('/categories');
     } finally {
       setInitialLoading(false);
     }
   };
 
+  const loadCategory = async (categoryId: string) => {
+    try {
+      const response = await categoryAPI.getCategory(categoryId);
+      const category = response.data.category;
+      
+      // Load parent categories first
+      if (category.principal && category.portfolio) {
+        await loadParentCategories(
+          category.principal._id,
+          category.portfolio._id
+        );
+      }
+      
+      // Then set form values
+      reset({
+        name: category.name,
+        description: category.description || '',
+        principal: category.principal._id,
+        portfolio: category.portfolio._id,
+        parent: category.parent?._id || '',
+        sortOrder: category.sortOrder || 0,
+        isActive: category.isActive !== false
+      });
+      
+    } catch (error) {
+      console.error('Error loading category:', error);
+      handleApiError(error);
+      navigate('/categories');
+    }
+  };
+
+  const loadParentCategories = async (principalId: string, portfolioId: string, parentToSelect?: string) => {
+    try {
+      console.log('Loading categories for principal:', principalId, 'portfolio:', portfolioId);
+      
+      const response = await categoryAPI.getCategories({
+        principal: principalId,
+        portfolio: portfolioId,
+        flat: true
+      });
+      
+      let categories = response.data.categories || [];
+      
+      // Filter out current category if editing
+      if (isEdit && id) {
+        categories = categories.filter(cat => {
+          if (cat._id === id) return false;
+          // Check if this category is a descendant
+          if (cat.ancestors && Array.isArray(cat.ancestors)) {
+            return !cat.ancestors.some((ancestor: any) => {
+              const ancestorId = typeof ancestor === 'string' ? ancestor : ancestor._id;
+              return ancestorId === id;
+            });
+          }
+          return true;
+        });
+      }
+      
+      setParentCategories(categories);
+      
+      // Set parent if specified
+      if (parentToSelect) {
+        setValue('parent', parentToSelect);
+      }
+      
+    } catch (error) {
+      console.error('Error loading parent categories:', error);
+      setParentCategories([]);
+    }
+  };
+
   const onSubmit = async (data: CategoryFormData) => {
+    console.log('Form submission data:', data);
+    
+    // Validate required fields
+    if (!data.name?.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+    
+    if (!data.principal) {
+      toast.error('Principal is required');
+      return;
+    }
+    
+    if (!data.portfolio) {
+      toast.error('Portfolio is required');
+      return;
+    }
+    
     setLoading(true);
     
     try {
-      const formData: CategoryFormData = {
-        ...data,
+      // Clean and prepare the data
+      const payload = {
+        name: data.name.trim(),
+        description: data.description?.trim() || '',
+        principal: data.principal,
+        portfolio: data.portfolio,
         parent: data.parent || null,
+        sortOrder: parseInt(data.sortOrder?.toString() || '0', 10),
+        isActive: data.isActive !== false
       };
-
+      
+      console.log('Sending to API:', payload);
+      
+      let response;
       if (isEdit && id) {
-        await categoryAPI.updateCategory(id, formData);
+        response = await categoryAPI.updateCategory(id, payload);
         toast.success('Category updated successfully');
       } else {
-        await categoryAPI.createCategory(formData);
+        response = await categoryAPI.createCategory(payload);
         toast.success('Category created successfully');
+        
+        // Option to create subcategory
+        const createdCategory = response.data.category;
+        if (createdCategory && !data.parent) {
+          setTimeout(() => {
+            if (window.confirm(`Category "${createdCategory.name}" created! Would you like to add a subcategory?`)) {
+              navigate(`/categories/new?principal=${data.principal}&portfolio=${data.portfolio}&parent=${createdCategory._id}`);
+            } else {
+              navigate('/categories');
+            }
+          }, 500);
+        } else {
+          navigate('/categories');
+        }
+      }
+    } catch (error: any) {
+      console.error('Category submission error:', error);
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to save category';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        console.log('Server error response:', errorData);
+        
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors
+            .map((e: any) => e.msg || e.message || e.param)
+            .join(', ');
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
       }
       
-      navigate('/categories');
-    } catch (error: any) {
-      console.error('Submit error:', error);
-      handleApiError(error);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -161,11 +259,16 @@ const CategoryForm: React.FC = () => {
 
   if (initialLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading form...</p>
+        </div>
       </div>
     );
   }
+
+  const selectedParent = parentCategories.find(c => c._id === watchParent);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -179,190 +282,231 @@ const CategoryForm: React.FC = () => {
         </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEdit ? 'Edit Category' : 'Add New Category'}
+            {isEdit ? 'Edit Category' : 'Create New Category'}
           </h1>
           <p className="text-gray-600 mt-1">
-            {isEdit ? 'Update category information' : 'Create a new product category'}
+            {isEdit ? 'Update category information' : 'Add a new category to your product catalog'}
           </p>
         </div>
       </div>
 
-      {/* Form */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-lg shadow-sm p-6"
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Principal and Portfolio Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Parent Info */}
+      {selectedParent && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <FolderTree className="w-5 h-5 text-blue-600 mr-2" />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Principal *
-              </label>
-              <select
-                {...register('principal', {
-                  required: 'Principal is required',
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isEdit}
-              >
-                <option value="">Select Principal</option>
-                {principals.map((principal) => (
-                  <option key={principal._id} value={principal._id}>
-                    {principal.name}
-                  </option>
-                ))}
-              </select>
-              {errors.principal && (
-                <p className="mt-1 text-sm text-red-600">{errors.principal.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Portfolio *
-              </label>
-              <select
-                {...register('portfolio', {
-                  required: 'Portfolio is required',
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isEdit}
-              >
-                <option value="">Select Portfolio</option>
-                {portfolios.map((portfolio) => (
-                  <option key={portfolio._id} value={portfolio._id}>
-                    {portfolio.name}
-                  </option>
-                ))}
-              </select>
-              {errors.portfolio && (
-                <p className="mt-1 text-sm text-red-600">{errors.portfolio.message}</p>
-              )}
+              <p className="text-sm text-blue-800">
+                Creating subcategory under:
+              </p>
+              <p className="font-semibold text-blue-900">
+                {selectedParent.path ? `${selectedParent.path} > ${selectedParent.name}` : selectedParent.name}
+              </p>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Category Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
-              Category Information
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Form */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Principal and Portfolio */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Organization</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category Name *
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Principal <span className="text-red-500">*</span>
                 </label>
-                <input
-                  {...register('name', {
-                    required: 'Category name is required',
-                    minLength: {
-                      value: 2,
-                      message: 'Name must be at least 2 characters',
-                    },
-                  })}
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter category name"
-                />
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+                <select
+                  {...register('principal', { required: true })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.principal ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  disabled={isEdit}
+                >
+                  <option value="">Select Principal</option>
+                  {principals.map((principal) => (
+                    <option key={principal._id} value={principal._id}>
+                      {principal.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.principal && (
+                  <p className="mt-1 text-sm text-red-600">Principal is required</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Parent Category
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Portfolio <span className="text-red-500">*</span>
                 </label>
                 <select
-                  {...register('parent')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  {...register('portfolio', { required: true })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.portfolio ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  disabled={isEdit}
                 >
-                  <option value="">No Parent (Root Category)</option>
-                  {parentCategories.map((category) => (
-                    <option key={category._id} value={category._id}>
-                      {category.path ? `${category.path} > ${category.name}` : category.name}
+                  <option value="">Select Portfolio</option>
+                  {portfolios.map((portfolio) => (
+                    <option key={portfolio._id} value={portfolio._id}>
+                      {portfolio.name}
                     </option>
                   ))}
                 </select>
+                {errors.portfolio && (
+                  <p className="mt-1 text-sm text-red-600">Portfolio is required</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Category Details */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Category Details</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    {...register('name', { 
+                      required: true,
+                      minLength: 2
+                    })}
+                    type="text"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.name ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter category name"
+                  />
+                  {errors.name && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.name.type === 'minLength' 
+                        ? 'Name must be at least 2 characters' 
+                        : 'Category name is required'}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Parent Category
+                  </label>
+                  {(!watchPrincipal || !watchPortfolio) ? (
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                      <span className="text-gray-500 text-sm flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        Select principal and portfolio first
+                      </span>
+                    </div>
+                  ) : (
+                    <select
+                      {...register('parent')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={isEdit}
+                    >
+                      <option value="">None (Root Category)</option>
+                      {parentCategories.map((category) => (
+                        <option key={category._id} value={category._id}>
+                          {category.level > 0 && '— '.repeat(category.level)}
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Description
                 </label>
                 <textarea
                   {...register('description')}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter category description"
+                  placeholder="Optional description"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sort Order
-                </label>
-                <input
-                  {...register('sortOrder', {
-                    valueAsNumber: true,
-                    min: {
-                      value: 0,
-                      message: 'Sort order must be 0 or greater',
-                    },
-                  })}
-                  type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0"
-                />
-                {errors.sortOrder && (
-                  <p className="mt-1 text-sm text-red-600">{errors.sortOrder.message}</p>
-                )}
-              </div>
-
-              <div className="flex items-center">
-                <label className="flex items-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sort Order
+                  </label>
                   <input
-                    {...register('isActive')}
-                    type="checkbox"
-                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    {...register('sortOrder')}
+                    type="number"
+                    min="0"
+                    defaultValue="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Active Category</span>
-                </label>
+                </div>
+
+                <div className="flex items-center">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      {...register('isActive')}
+                      type="checkbox"
+                      defaultChecked={true}
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Active</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+          {/* Buttons */}
+          <div className="flex justify-end space-x-4 pt-4 border-t">
             <button
               type="button"
               onClick={() => navigate('/categories')}
-              className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors duration-200"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  {isEdit ? 'Updating...' : 'Creating...'}
+                  Saving...
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  {isEdit ? 'Update Category' : 'Create Category'}
+                  {isEdit ? 'Update' : 'Create'} Category
                 </>
               )}
             </button>
           </div>
         </form>
-      </motion.div>
+      </div>
+
+      {/* Debug Panel (Remove in production) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-gray-100 rounded-lg p-4 text-xs">
+          <h4 className="font-semibold mb-2">Debug Info:</h4>
+          <pre className="text-gray-600">
+            {JSON.stringify({
+              principal: watchPrincipal,
+              portfolio: watchPortfolio,
+              parent: watchParent,
+              parentCategoriesCount: parentCategories.length,
+              isEdit,
+              formInitialized
+            }, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 };
