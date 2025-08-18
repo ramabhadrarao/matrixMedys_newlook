@@ -1,4 +1,3 @@
-// src/components/Categories/CategoriesList.tsx - Fixed tree view with proper nesting
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -7,18 +6,16 @@ import {
   Edit, 
   Trash2, 
   Eye,
-  ChevronLeft,
+  ChevronDown,
   ChevronRight,
   FolderTree,
   Folder,
   FolderOpen,
   Package,
-  ChevronDown,
-  ChevronRight as ChevronRightIcon,
   Filter,
   X,
   RefreshCw,
-  MoreVertical
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -34,6 +31,7 @@ interface CategoryWithChildren extends Category {
 
 const CategoriesList: React.FC = () => {
   const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPrincipal, setSelectedPrincipal] = useState('');
@@ -44,7 +42,6 @@ const CategoriesList: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [showFilters, setShowFilters] = useState(false);
   
   const navigate = useNavigate();
@@ -57,12 +54,12 @@ const CategoriesList: React.FC = () => {
   useEffect(() => {
     fetchPrincipals();
     fetchPortfolios();
-    fetchCategories();
+    fetchAllCategories();
   }, []);
 
   useEffect(() => {
-    fetchCategories();
-  }, [selectedPrincipal, selectedPortfolio, viewMode, searchTerm]);
+    applyFilters();
+  }, [selectedPrincipal, selectedPortfolio, searchTerm, allCategories]);
 
   const fetchPrincipals = async () => {
     try {
@@ -82,51 +79,85 @@ const CategoriesList: React.FC = () => {
     }
   };
 
-  const fetchCategories = async () => {
+  const fetchAllCategories = async () => {
     try {
       setLoading(true);
+      const response = await categoryAPI.getCategories({ flat: true });
+      const flatCategories = response.data.categories || [];
+      setAllCategories(flatCategories);
       
-      let response;
-      if (viewMode === 'tree') {
-        if (selectedPrincipal && selectedPortfolio) {
-          // Get tree for specific principal and portfolio
-          response = await categoryAPI.getCategoryTree(selectedPrincipal, selectedPortfolio);
-          setCategories(response.data.tree || []);
-        } else {
-          // Get all categories and build tree
-          response = await categoryAPI.getCategories({ flat: false });
-          const allCategories = response.data.categories || [];
-          
-          // Build tree from flat list
-          const tree = buildCategoryTree(allCategories);
-          setCategories(tree);
-        }
-      } else {
-        // Flat view
-        const params: any = { flat: true };
-        if (selectedPrincipal) params.principal = selectedPrincipal;
-        if (selectedPortfolio) params.portfolio = selectedPortfolio;
-        
-        response = await categoryAPI.getCategories(params);
-        let flatCategories = response.data.categories || [];
-        
-        // Apply search filter
-        if (searchTerm) {
-          const searchLower = searchTerm.toLowerCase();
-          flatCategories = flatCategories.filter((cat: Category) => 
-            cat.name.toLowerCase().includes(searchLower) ||
-            (cat.description && cat.description.toLowerCase().includes(searchLower))
-          );
-        }
-        
-        setCategories(flatCategories);
-      }
+      // Build initial tree and auto-expand first two levels
+      const tree = buildCategoryTree(flatCategories);
+      setCategories(tree);
+      
+      // Auto-expand level 0 and level 1 categories
+      const expandIds = new Set<string>();
+      const collectExpandIds = (cats: CategoryWithChildren[], maxLevel: number, currentLevel = 0) => {
+        if (currentLevel >= maxLevel) return;
+        cats.forEach(cat => {
+          expandIds.add(cat._id);
+          if (cat.children && cat.children.length > 0) {
+            collectExpandIds(cat.children, maxLevel, currentLevel + 1);
+          }
+        });
+      };
+      collectExpandIds(tree, 2); // Expand first 2 levels
+      setExpandedCategories(expandIds);
     } catch (error) {
       handleApiError(error);
+      setAllCategories([]);
       setCategories([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filteredCategories = [...allCategories];
+    
+    // Filter by principal
+    if (selectedPrincipal) {
+      filteredCategories = filteredCategories.filter(cat => {
+        const principalId = typeof cat.principal === 'object' ? cat.principal._id : cat.principal;
+        return principalId === selectedPrincipal;
+      });
+    }
+    
+    // Filter by portfolio
+    if (selectedPortfolio) {
+      filteredCategories = filteredCategories.filter(cat => {
+        const portfolioId = typeof cat.portfolio === 'object' ? cat.portfolio._id : cat.portfolio;
+        return portfolioId === selectedPortfolio;
+      });
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchingIds = new Set<string>();
+      
+      // Find all matching categories and their ancestors
+      filteredCategories.forEach(cat => {
+        if (cat.name.toLowerCase().includes(searchLower) ||
+            (cat.description && cat.description.toLowerCase().includes(searchLower))) {
+          matchingIds.add(cat._id);
+          // Add all ancestors to ensure the path is visible
+          if (cat.ancestors) {
+            cat.ancestors.forEach((ancestor: any) => {
+              const ancestorId = typeof ancestor === 'string' ? ancestor : ancestor._id;
+              matchingIds.add(ancestorId);
+            });
+          }
+        }
+      });
+      
+      // Filter to only include matching categories and their ancestors
+      filteredCategories = allCategories.filter(cat => matchingIds.has(cat._id));
+    }
+    
+    // Always build tree structure
+    const tree = buildCategoryTree(filteredCategories);
+    setCategories(tree);
   };
 
   const buildCategoryTree = (flatCategories: Category[]): CategoryWithChildren[] => {
@@ -154,11 +185,10 @@ const CategoriesList: React.FC = () => {
             parentNode.children = [];
           }
           parentNode.children.push(categoryNode);
-          // Update parent's hasChildren flag
           parentNode.hasChildren = true;
-          parentNode.childrenCount = (parentNode.childrenCount || 0) + 1;
+          parentNode.childrenCount = parentNode.children.length;
         } else {
-          // Parent not found, add as root
+          // Parent not in filtered list, add as root
           tree.push(categoryNode);
         }
       } else {
@@ -188,7 +218,10 @@ const CategoriesList: React.FC = () => {
     return tree;
   };
 
-  const toggleCategoryExpand = (categoryId: string) => {
+  const toggleCategoryExpand = (categoryId: string, event?: React.MouseEvent) => {
+    if (event) {
+      event.stopPropagation();
+    }
     setExpandedCategories(prev => {
       const newSet = new Set(prev);
       if (newSet.has(categoryId)) {
@@ -204,9 +237,7 @@ const CategoriesList: React.FC = () => {
     const allIds = new Set<string>();
     const collectIds = (cats: CategoryWithChildren[]) => {
       cats.forEach(cat => {
-        if (cat.hasChildren || (cat.children && cat.children.length > 0)) {
-          allIds.add(cat._id);
-        }
+        allIds.add(cat._id);
         if (cat.children) {
           collectIds(cat.children);
         }
@@ -224,7 +255,6 @@ const CategoriesList: React.FC = () => {
     setSelectedPrincipal('');
     setSelectedPortfolio('');
     setSearchTerm('');
-    setShowFilters(false);
   };
 
   const handleDelete = async () => {
@@ -236,7 +266,7 @@ const CategoriesList: React.FC = () => {
       toast.success('Category deleted successfully');
       setShowDeleteModal(false);
       setCategoryToDelete(null);
-      fetchCategories();
+      fetchAllCategories();
     } catch (error) {
       handleApiError(error);
     } finally {
@@ -244,150 +274,202 @@ const CategoriesList: React.FC = () => {
     }
   };
 
+  const getLevelColor = (level: number) => {
+    const colors = [
+      'bg-purple-50 border-purple-200', // Level 0
+      'bg-blue-50 border-blue-200',     // Level 1
+      'bg-green-50 border-green-200',   // Level 2
+      'bg-yellow-50 border-yellow-200', // Level 3
+      'bg-pink-50 border-pink-200',     // Level 4+
+    ];
+    return colors[Math.min(level, colors.length - 1)];
+  };
+
+  const getLevelBadgeColor = (level: number) => {
+    const colors = [
+      'bg-purple-100 text-purple-700', // Level 0
+      'bg-blue-100 text-blue-700',     // Level 1
+      'bg-green-100 text-green-700',   // Level 2
+      'bg-yellow-100 text-yellow-700', // Level 3
+      'bg-pink-100 text-pink-700',     // Level 4+
+    ];
+    return colors[Math.min(level, colors.length - 1)];
+  };
+
   const renderCategoryTree = (categories: CategoryWithChildren[], level = 0): JSX.Element[] => {
     return categories.map((category) => {
       const isExpanded = expandedCategories.has(category._id);
       const hasChildren = category.children && category.children.length > 0;
+      const indentSize = level * 32; // 32px per level for clear hierarchy
       
       return (
-        <div key={category._id}>
-          <AnimatePresence>
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="group"
+        <div key={category._id} className="category-node">
+          {/* Category Row */}
+          <div 
+            className={`group relative border-l-4 ${getLevelColor(level)} hover:shadow-md transition-all duration-200 mb-1 rounded-r-lg`}
+          >
+            <div 
+              className="flex items-center justify-between py-3 pr-4"
+              style={{ paddingLeft: `${indentSize + 16}px` }}
             >
-              <div 
-                className={`flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded-lg transition-colors`}
-                style={{ paddingLeft: `${level * 24 + 12}px` }}
-              >
-                <div className="flex items-center flex-1 min-w-0">
-                  {/* Expand/Collapse Button */}
-                  <button
-                    onClick={() => toggleCategoryExpand(category._id)}
-                    className={`p-1 mr-2 hover:bg-gray-200 rounded transition-colors ${!hasChildren ? 'invisible' : ''}`}
-                  >
-                    {hasChildren && (
-                      isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-gray-600" />
-                      ) : (
-                        <ChevronRightIcon className="w-4 h-4 text-gray-600" />
-                      )
-                    )}
-                  </button>
-                  
-                  {/* Category Icon */}
-                  <div className="mr-3 flex-shrink-0">
-                    {hasChildren ? (
-                      isExpanded ? (
-                        <FolderOpen className="w-5 h-5 text-blue-600" />
-                      ) : (
-                        <Folder className="w-5 h-5 text-blue-500" />
-                      )
+              {/* Left Section: Expand/Icon/Info */}
+              <div className="flex items-center flex-1 min-w-0">
+                {/* Expand/Collapse Button */}
+                <button
+                  onClick={(e) => toggleCategoryExpand(category._id, e)}
+                  className={`p-1 mr-3 hover:bg-gray-200 rounded-lg transition-colors ${
+                    !hasChildren ? 'invisible' : ''
+                  }`}
+                  aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                >
+                  {hasChildren && (
+                    isExpanded ? (
+                      <ChevronDown className="w-5 h-5 text-gray-600" />
                     ) : (
-                      <Package className="w-5 h-5 text-gray-400" />
-                    )}
-                  </div>
-                  
-                  {/* Category Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-2">
-                      <span className="font-medium text-gray-900">{category.name}</span>
-                      <span className="text-xs text-gray-400">L{category.level || 0}</span>
-                      
-                      {category.productsCount > 0 && (
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
-                          {category.productsCount} products
-                        </span>
-                      )}
-                      
-                      {hasChildren && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
-                          {category.children?.length} subcategories
-                        </span>
-                      )}
-                    </div>
-                    
-                    {category.description && (
-                      <p className="text-sm text-gray-600 mt-1 truncate">{category.description}</p>
-                    )}
-                    
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-gray-400">
-                        {typeof category.principal === 'object' ? category.principal.name : 'Principal'} • 
-                        {typeof category.portfolio === 'object' ? category.portfolio.name : 'Portfolio'}
-                      </span>
-                    </div>
-                  </div>
+                      <ChevronRight className="w-5 h-5 text-gray-600" />
+                    )
+                  )}
+                </button>
+                
+                {/* Category Icon */}
+                <div className="mr-3 flex-shrink-0">
+                  {hasChildren ? (
+                    isExpanded ? (
+                      <FolderOpen className="w-6 h-6 text-blue-600" />
+                    ) : (
+                      <Folder className="w-6 h-6 text-blue-500" />
+                    )
+                  ) : (
+                    <Package className="w-6 h-6 text-gray-400" />
+                  )}
                 </div>
                 
-                {/* Actions */}
-                <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {/* Add Subcategory */}
-                  {canCreate && (
-                    <Link
-                      to={`/categories/new?parent=${category._id}`}
-                      className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
-                      title="Add Subcategory"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Link>
+                {/* Category Information */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center flex-wrap gap-2 mb-1">
+                    <span className="font-semibold text-gray-900 text-base">
+                      {category.name}
+                    </span>
+                    
+                    {/* Level Badge */}
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getLevelBadgeColor(level)}`}>
+                      Level {level}
+                    </span>
+                    
+                    {/* Products Count */}
+                    {category.productsCount > 0 && (
+                      <span className="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full font-medium">
+                        {category.productsCount} {category.productsCount === 1 ? 'product' : 'products'}
+                      </span>
+                    )}
+                    
+                    {/* Children Count */}
+                    {hasChildren && (
+                      <span className="px-2 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded-full font-medium">
+                        {category.children?.length} {category.children?.length === 1 ? 'subcategory' : 'subcategories'}
+                      </span>
+                    )}
+                    
+                    {/* Status */}
+                    {!category.isActive && (
+                      <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-full font-medium">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Description */}
+                  {category.description && (
+                    <p className="text-sm text-gray-600 line-clamp-1 mb-1">
+                      {category.description}
+                    </p>
                   )}
                   
-                  {/* View */}
-                  <Link
-                    to={`/categories/${category._id}`}
-                    className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="View Details"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Link>
-                  
-                  {/* Edit */}
-                  {canUpdate && (
-                    <Link
-                      to={`/categories/${category._id}/edit`}
-                      className="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
-                      title="Edit"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Link>
-                  )}
-                  
-                  {/* Delete */}
-                  {canDelete && !hasChildren && category.productsCount === 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCategoryToDelete(category);
-                        setShowDeleteModal(true);
-                      }}
-                      className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  {/* Principal and Portfolio */}
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center">
+                      <Layers className="w-3 h-3 mr-1" />
+                      {typeof category.principal === 'object' ? category.principal.name : 'Principal'}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {typeof category.portfolio === 'object' ? category.portfolio.name : 'Portfolio'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </motion.div>
-          </AnimatePresence>
+              
+              {/* Right Section: Action Buttons */}
+              <div className="flex items-center space-x-2 ml-4">
+                {/* Create Subcategory Button */}
+                {canCreate && (
+                  <Link
+                    to={`/categories/new?parent=${category._id}`}
+                    className="flex items-center px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                    title="Create Subcategory"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Sub
+                  </Link>
+                )}
+                
+                {/* View Button */}
+                <Link
+                  to={`/categories/${category._id}`}
+                  className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
+                  title="View Details"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Eye className="w-4 h-4 mr-1" />
+                  View
+                </Link>
+                
+                {/* Edit Button */}
+                {canUpdate && (
+                  <Link
+                    to={`/categories/${category._id}/edit`}
+                    className="flex items-center px-3 py-1.5 text-sm font-medium text-green-700 bg-green-100 hover:bg-green-200 rounded-lg transition-colors"
+                    title="Edit Category"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit
+                  </Link>
+                )}
+                
+                {/* Delete Button */}
+                {canDelete && !hasChildren && category.productsCount === 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCategoryToDelete(category);
+                      setShowDeleteModal(true);
+                    }}
+                    className="flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors"
+                    title="Delete Category"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
           
           {/* Render Children */}
           {isExpanded && hasChildren && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderCategoryTree(category.children!, level + 1)}
-            </motion.div>
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="ml-4 border-l-2 border-gray-200"
+              >
+                {renderCategoryTree(category.children!, level + 1)}
+              </motion.div>
+            </AnimatePresence>
           )}
         </div>
       );
@@ -403,19 +485,19 @@ const CategoriesList: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Category Management</h1>
           <p className="text-gray-600 mt-1">
-            Manage product categories and hierarchy
-            {categories.length > 0 && ` • ${categories.length} categories`}
-            {hasActiveFilters && ' (filtered)'}
+            Hierarchical category structure for products
+            {allCategories.length > 0 && ` • ${allCategories.length} total categories`}
+            {hasActiveFilters && ` • ${categories.length} showing`}
           </p>
         </div>
         
         {canCreate && (
           <Link
-            to={`/categories/new${selectedPrincipal && selectedPortfolio ? `?principal=${selectedPrincipal}&portfolio=${selectedPortfolio}` : ''}`}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+            to="/categories/new"
+            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Root Category
+            <Plus className="w-5 h-5 mr-2" />
+            Create Root Category
           </Link>
         )}
       </div>
@@ -423,13 +505,13 @@ const CategoriesList: React.FC = () => {
       {/* Search and Filters Bar */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="space-y-4">
-          {/* Search Bar */}
+          {/* Search and Controls */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search categories..."
+                placeholder="Search categories by name or description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -451,28 +533,24 @@ const CategoriesList: React.FC = () => {
               )}
             </button>
             
-            {viewMode === 'tree' && (
-              <>
-                <button
-                  onClick={expandAll}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
-                  title="Expand All"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-                
-                <button
-                  onClick={collapseAll}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
-                  title="Collapse All"
-                >
-                  <ChevronRightIcon className="w-4 h-4" />
-                </button>
-              </>
-            )}
+            <button
+              onClick={expandAll}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+              title="Expand All"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
             
             <button
-              onClick={fetchCategories}
+              onClick={collapseAll}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+              title="Collapse All"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            
+            <button
+              onClick={fetchAllCategories}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
               title="Refresh"
             >
@@ -480,17 +558,17 @@ const CategoriesList: React.FC = () => {
             </button>
           </div>
 
-          {/* Filters */}
+          {/* Filter Options */}
           {showFilters && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               className="border-t pt-4"
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Principal
+                    Filter by Principal
                   </label>
                   <select
                     value={selectedPrincipal}
@@ -508,7 +586,7 @@ const CategoriesList: React.FC = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Portfolio
+                    Filter by Portfolio
                   </label>
                   <select
                     value={selectedPortfolio}
@@ -523,34 +601,6 @@ const CategoriesList: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    View Mode
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setViewMode('tree')}
-                      className={`flex-1 px-3 py-2 rounded-lg border transition-colors ${
-                        viewMode === 'tree'
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      Tree View
-                    </button>
-                    <button
-                      onClick={() => setViewMode('flat')}
-                      className={`flex-1 px-3 py-2 rounded-lg border transition-colors ${
-                        viewMode === 'flat'
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      Flat View
-                    </button>
-                  </div>
-                </div>
               </div>
               
               {hasActiveFilters && (
@@ -560,7 +610,7 @@ const CategoriesList: React.FC = () => {
                     className="px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 flex items-center"
                   >
                     <X className="w-4 h-4 mr-2" />
-                    Clear Filters
+                    Clear All Filters
                   </button>
                 </div>
               )}
@@ -569,125 +619,54 @@ const CategoriesList: React.FC = () => {
         </div>
       </div>
 
-      {/* Categories List/Tree */}
-      <div className="bg-white rounded-lg shadow-sm">
+      {/* Categories Tree */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-500 mt-2">Loading categories...</p>
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="text-gray-500 mt-4">Loading categories...</p>
           </div>
         ) : categories.length === 0 ? (
-          <div className="p-8 text-center">
-            <FolderTree className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">
-              {hasActiveFilters ? 'No categories found matching filters' : 'No categories found'}
+          <div className="flex flex-col items-center justify-center py-12">
+            <FolderTree className="w-16 h-16 text-gray-300 mb-4" />
+            <p className="text-gray-500 text-lg font-medium">
+              {hasActiveFilters ? 'No categories found matching your filters' : 'No categories created yet'}
             </p>
-            <p className="text-gray-400 text-sm mt-2">
+            <p className="text-gray-400 text-sm mt-2 max-w-md text-center">
               {hasActiveFilters 
-                ? 'Try adjusting your filters or search term'
-                : 'Create your first category to get started'}
+                ? 'Try adjusting your filters or search term to see more results.'
+                : 'Get started by creating your first category to organize your products.'}
             </p>
             {canCreate && !hasActiveFilters && (
               <Link
                 to="/categories/new"
-                className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                className="mt-6 inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Create First Category
+                <Plus className="w-5 h-5 mr-2" />
+                Create Your First Category
               </Link>
             )}
           </div>
         ) : (
-          <div className="p-4">
-            {viewMode === 'tree' ? (
-              <div className="space-y-1">
-                {renderCategoryTree(categories)}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {categories.map((category, index) => (
-                  <motion.div
-                    key={category._id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 group"
-                  >
-                    <div className="flex items-center flex-1">
-                      <Folder className="w-5 h-5 text-blue-500 mr-3" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{category.name}</span>
-                          <span className="text-xs text-gray-400">Level {category.level || 0}</span>
-                          {category.productsCount > 0 && (
-                            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
-                              {category.productsCount} products
-                            </span>
-                          )}
-                        </div>
-                        {category.path && (
-                          <p className="text-sm text-gray-600 mt-1">{category.path}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-gray-400">
-                            {typeof category.principal === 'object' ? category.principal.name : 'Principal'} • 
-                            {typeof category.portfolio === 'object' ? category.portfolio.name : 'Portfolio'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {canCreate && (
-                        <Link
-                          to={`/categories/new?parent=${category._id}`}
-                          className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
-                          title="Add Subcategory"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Link>
-                      )}
-                      
-                      <Link
-                        to={`/categories/${category._id}`}
-                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Link>
-                      
-                      {canUpdate && (
-                        <Link
-                          to={`/categories/${category._id}/edit`}
-                          className="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                      )}
-                      
-                      {canDelete && !category.hasChildren && category.productsCount === 0 && (
-                        <button
-                          onClick={() => {
-                            setCategoryToDelete(category);
-                            setShowDeleteModal(true);
-                          }}
-                          className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
+          <div className="space-y-1">
+            {/* Category Tree Header */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                <FolderTree className="w-5 h-5 mr-2 text-gray-600" />
+                Category Hierarchy
+              </h3>
+              <span className="text-sm text-gray-500">
+                {categories.length} root {categories.length === 1 ? 'category' : 'categories'}
+              </span>
+            </div>
+            
+            {/* Render Tree */}
+            {renderCategoryTree(categories)}
           </div>
         )}
       </div>
 
-      {/* Delete Modal */}
+      {/* Delete Confirmation Modal */}
       {showDeleteModal && categoryToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <motion.div
@@ -695,9 +674,10 @@ const CategoriesList: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
           >
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Category</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Delete</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <strong>"{categoryToDelete.name}"</strong>? This action cannot be undone.
+              Are you sure you want to delete the category <strong>"{categoryToDelete.name}"</strong>? 
+              This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-4">
               <button
@@ -721,7 +701,7 @@ const CategoriesList: React.FC = () => {
                     Deleting...
                   </>
                 ) : (
-                  'Delete'
+                  'Delete Category'
                 )}
               </button>
             </div>

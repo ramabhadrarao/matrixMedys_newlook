@@ -9,8 +9,8 @@ export const getCategories = async (req, res) => {
     const { 
       principal, 
       portfolio, 
-      parent = 'root', // 'root' for top-level, or parent ID
-      flat = false // If true, return flat list instead of tree
+      parent = undefined, // Don't default to 'root'
+      flat = false 
     } = req.query;
     
     let query = {};
@@ -23,6 +23,7 @@ export const getCategories = async (req, res) => {
       query.portfolio = portfolio;
     }
     
+    // Handle parent filter
     if (parent === 'root') {
       query.parent = null;
     } else if (parent) {
@@ -30,16 +31,33 @@ export const getCategories = async (req, res) => {
     }
     
     const categories = await Category.find(query)
-      .populate('principal', 'name')
-      .populate('portfolio', 'name')
-      .populate('parent', 'name')
-      .sort({ sortOrder: 1, name: 1 });
+      .populate('principal', '_id name')
+      .populate('portfolio', '_id name')
+      .populate('parent', '_id name')
+      .populate('ancestors', '_id name')
+      .sort({ level: 1, sortOrder: 1, name: 1 })
+      .lean(); // Use lean for better performance
+    
+    // Ensure all fields are properly set
+    const processedCategories = categories.map(cat => ({
+      ...cat,
+      _id: cat._id.toString(),
+      parent: cat.parent ? (typeof cat.parent === 'object' ? cat.parent._id.toString() : cat.parent) : null,
+      level: cat.level || 0,
+      path: cat.path || '',
+      ancestors: cat.ancestors || [],
+      hasChildren: cat.hasChildren || false,
+      childrenCount: cat.childrenCount || 0,
+      productsCount: cat.productsCount || 0,
+      sortOrder: cat.sortOrder || 0,
+      isActive: cat.isActive !== false
+    }));
     
     if (flat) {
-      res.json({ categories });
+      res.json({ categories: processedCategories });
     } else {
       // Build tree structure
-      const tree = await buildCategoryTree(categories);
+      const tree = await buildCategoryTree(processedCategories);
       res.json({ categories: tree });
     }
   } catch (error) {
@@ -47,7 +65,6 @@ export const getCategories = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch categories' });
   }
 };
-
 // Helper function to build tree
 const buildCategoryTree = async (categories) => {
   const categoryMap = {};
