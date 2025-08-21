@@ -233,7 +233,54 @@ export const createProduct = async (req, res) => {
     res.status(500).json({ message: 'Failed to create product' });
   }
 };
-
+export const updateProductWithPhoto = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    // Handle photo upload
+    if (req.files && req.files.photo) {
+      const photoFile = req.files.photo[0];
+      product.photo = {
+        filename: photoFile.filename,
+        originalName: photoFile.originalname,
+        mimetype: photoFile.mimetype,
+        size: photoFile.size,
+        uploadedAt: new Date(),
+        uploadedBy: req.user._id
+      };
+    }
+    
+    // Update pricing fields
+    if (updates.mrp !== undefined) product.mrp = updates.mrp;
+    if (updates.dealerPrice !== undefined) product.dealerPrice = updates.dealerPrice;
+    if (updates.defaultDiscount) product.defaultDiscount = updates.defaultDiscount;
+    
+    // Update batch and expiry
+    if (updates.batchNo) product.batchNo = updates.batchNo;
+    if (updates.mfgDate) product.mfgDate = new Date(updates.mfgDate);
+    if (updates.expDate) product.expDate = new Date(updates.expDate);
+    
+    // Update other fields...
+    Object.assign(product, updates);
+    product.updatedBy = req.user._id;
+    
+    await product.save();
+    
+    res.json({
+      message: 'Product updated successfully',
+      product
+    });
+  } catch (error) {
+    console.error('Update product error:', error);
+    res.status(500).json({ message: 'Failed to update product' });
+  }
+};
 // Update product
 export const updateProduct = async (req, res) => {
   try {

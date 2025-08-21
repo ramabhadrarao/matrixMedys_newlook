@@ -20,6 +20,10 @@ import categoryRoutes from './routes/categories.js';
 import productRoutes from './routes/products.js';
 import dashboardRoutes from './routes/dashboard.js';
 import fileRoutes from './routes/files.js';
+// server/server.js - Add these routes
+import purchaseOrderRoutes from './routes/purchaseOrders.js';
+import invoiceReceivingRoutes from './routes/invoiceReceiving.js';
+import workflowRoutes from './routes/workflow.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,6 +87,10 @@ app.use('/api/principals', principalRoutes); // New principal routes
 // Add routes (after other routes)
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
+// Add after other routes
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/invoice-receiving', invoiceReceivingRoutes);
+app.use('/api/workflow', workflowRoutes);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

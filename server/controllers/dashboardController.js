@@ -1,4 +1,4 @@
-// server/controllers/dashboardController.js -  Enhanced with Principals
+// server/controllers/dashboardController.js - Complete with PO System
 import State from '../models/State.js';
 import User from '../models/User.js';
 import Hospital from '../models/Hospital.js';
@@ -10,6 +10,9 @@ import Category from '../models/Category.js';
 import Product from '../models/Product.js';
 import Permission from '../models/Permission.js';
 import UserPermission from '../models/UserPermission.js';
+import PurchaseOrder from '../models/PurchaseOrder.js';
+import InvoiceReceiving from '../models/InvoiceReceiving.js';
+import WorkflowStage from '../models/WorkflowStage.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -36,7 +39,7 @@ export const getDashboardStats = async (req, res) => {
     
     const dashboardCards = [];
     
-    // States Statistics
+    // ========== STATES STATISTICS ==========
     if (resourcePermissions.states && resourcePermissions.states.includes('view')) {
       try {
         const totalStates = await State.countDocuments();
@@ -76,7 +79,7 @@ export const getDashboardStats = async (req, res) => {
       }
     }
     
-    // Users Statistics
+    // ========== USERS STATISTICS ==========
     if (resourcePermissions.users && resourcePermissions.users.includes('view')) {
       try {
         const totalUsers = await User.countDocuments();
@@ -115,7 +118,7 @@ export const getDashboardStats = async (req, res) => {
       }
     }
     
-    // Hospitals Statistics
+    // ========== HOSPITALS STATISTICS ==========
     if (resourcePermissions.hospitals && resourcePermissions.hospitals.includes('view')) {
       try {
         const totalHospitals = await Hospital.countDocuments();
@@ -146,12 +149,8 @@ export const getDashboardStats = async (req, res) => {
               count: { $sum: 1 }
             }
           },
-          {
-            $sort: { count: -1 }
-          },
-          {
-            $limit: 5
-          }
+          { $sort: { count: -1 } },
+          { $limit: 5 }
         ]);
         
         dashboardCards.push({
@@ -208,7 +207,7 @@ export const getDashboardStats = async (req, res) => {
         
         const totalAttachments = doctorsWithAttachments[0]?.totalAttachments || 0;
         
-        // Get doctors by portfolio (updated from specialization)
+        // Get doctors by portfolio
         const doctorsByPortfolio = await Doctor.aggregate([
           { $unwind: '$portfolio' },
           {
@@ -226,12 +225,8 @@ export const getDashboardStats = async (req, res) => {
               count: { $sum: 1 }
             }
           },
-          {
-            $sort: { count: -1 }
-          },
-          {
-            $limit: 5
-          }
+          { $sort: { count: -1 } },
+          { $limit: 5 }
         ]);
         
         // Calculate total targets for current year
@@ -269,12 +264,8 @@ export const getDashboardStats = async (req, res) => {
               count: { $sum: 1 }
             }
           },
-          {
-            $sort: { count: -1 }
-          },
-          {
-            $limit: 5
-          }
+          { $sort: { count: -1 } },
+          { $limit: 5 }
         ]);
         
         dashboardCards.push({
@@ -381,12 +372,8 @@ export const getDashboardStats = async (req, res) => {
               totalUsage: { $add: [{ $size: '$doctors' }, { $size: '$principals' }] }
             }
           },
-          {
-            $sort: { totalUsage: -1 }
-          },
-          {
-            $limit: 5
-          }
+          { $sort: { totalUsage: -1 } },
+          { $limit: 5 }
         ]);
         
         dashboardCards.push({
@@ -501,12 +488,8 @@ export const getDashboardStats = async (req, res) => {
               count: { $sum: 1 }
             }
           },
-          {
-            $sort: { count: -1 }
-          },
-          {
-            $limit: 5
-          }
+          { $sort: { count: -1 } },
+          { $limit: 5 }
         ]);
         
         dashboardCards.push({
@@ -535,7 +518,8 @@ export const getDashboardStats = async (req, res) => {
         console.error('Error fetching principals stats:', error);
       }
     }
-     // ========== CATEGORIES STATISTICS ==========
+    
+    // ========== CATEGORIES STATISTICS ==========
     if (resourcePermissions.categories && resourcePermissions.categories.includes('view')) {
       try {
         const totalCategories = await Category.countDocuments();
@@ -706,6 +690,24 @@ export const getDashboardStats = async (req, res) => {
           }
         ]);
         
+        // Get products with pricing info
+        const pricingStats = await Product.aggregate([
+          {
+            $group: {
+              _id: null,
+              avgMRP: { $avg: '$mrp' },
+              avgDealerPrice: { $avg: '$dealerPrice' },
+              minMRP: { $min: '$mrp' },
+              maxMRP: { $max: '$mrp' },
+              productsWithDiscount: {
+                $sum: {
+                  $cond: [{ $gt: ['$defaultDiscount.value', 0] }, 1, 0]
+                }
+              }
+            }
+          }
+        ]);
+        
         dashboardCards.push({
           id: 'products',
           title: 'Products',
@@ -721,7 +723,14 @@ export const getDashboardStats = async (req, res) => {
             totalDocuments: totalDocuments[0]?.totalDocuments || 0,
             gstBreakdown: productsByGST,
             topCategories: productsByCategory,
-            unitBreakdown: productsByUnit
+            unitBreakdown: productsByUnit,
+            avgMRP: pricingStats[0]?.avgMRP || 0,
+            avgDealerPrice: pricingStats[0]?.avgDealerPrice || 0,
+            priceRange: {
+              min: pricingStats[0]?.minMRP || 0,
+              max: pricingStats[0]?.maxMRP || 0
+            },
+            withDiscount: pricingStats[0]?.productsWithDiscount || 0
           },
           actions: resourcePermissions.products,
           route: '/products',
@@ -731,13 +740,475 @@ export const getDashboardStats = async (req, res) => {
         console.error('Error fetching products stats:', error);
       }
     }
-    // System Overview
+    
+    // ========== PURCHASE ORDERS STATISTICS ==========
+    if (resourcePermissions.purchase_orders && resourcePermissions.purchase_orders.includes('view')) {
+      try {
+        const totalPOs = await PurchaseOrder.countDocuments();
+        
+        // Status breakdown
+        const statusBreakdown = await PurchaseOrder.aggregate([
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 },
+              totalValue: { $sum: '$grandTotal' }
+            }
+          }
+        ]);
+        
+        // Convert to object for easy access
+        const statusMap = {};
+        let totalPOValue = 0;
+        statusBreakdown.forEach(item => {
+          statusMap[item._id] = {
+            count: item.count,
+            value: item.totalValue
+          };
+          totalPOValue += item.totalValue;
+        });
+        
+        // Get current month POs
+        const currentMonth = new Date();
+        currentMonth.setDate(1);
+        currentMonth.setHours(0, 0, 0, 0);
+        
+        const currentMonthPOs = await PurchaseOrder.countDocuments({
+          createdAt: { $gte: currentMonth }
+        });
+        
+        const currentMonthValue = await PurchaseOrder.aggregate([
+          {
+            $match: {
+              createdAt: { $gte: currentMonth }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalValue: { $sum: '$grandTotal' }
+            }
+          }
+        ]);
+        
+        // Pending approvals count
+        const pendingApprovals = await PurchaseOrder.countDocuments({
+          status: { $in: ['pending_approval'] }
+        });
+        
+        // Get POs by principal
+        const posByPrincipal = await PurchaseOrder.aggregate([
+          {
+            $lookup: {
+              from: 'principals',
+              localField: 'principal',
+              foreignField: '_id',
+              as: 'principalInfo'
+            }
+          },
+          { $unwind: '$principalInfo' },
+          {
+            $group: {
+              _id: '$principalInfo.name',
+              count: { $sum: 1 },
+              totalValue: { $sum: '$grandTotal' }
+            }
+          },
+          { $sort: { totalValue: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Receiving statistics
+        const receivingStats = await PurchaseOrder.aggregate([
+          {
+            $group: {
+              _id: null,
+              fullyReceived: {
+                $sum: { $cond: ['$isFullyReceived', 1, 0] }
+              },
+              partiallyReceived: {
+                $sum: { $cond: [{ $eq: ['$status', 'partial_received'] }, 1, 0] }
+              },
+              totalBacklog: { $sum: '$totalBacklogQty' }
+            }
+          }
+        ]);
+        
+        // Average processing time (from creation to approval)
+        const processingTimeStats = await PurchaseOrder.aggregate([
+          {
+            $match: {
+              approvedDate: { $exists: true }
+            }
+          },
+          {
+            $project: {
+              processingTime: {
+                $subtract: ['$approvedDate', '$createdAt']
+              }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              avgProcessingTime: { $avg: '$processingTime' }
+            }
+          }
+        ]);
+        
+        const avgProcessingHours = processingTimeStats[0] 
+          ? Math.round(processingTimeStats[0].avgProcessingTime / (1000 * 60 * 60))
+          : 0;
+        
+        dashboardCards.push({
+          id: 'purchaseOrders',
+          title: 'Purchase Orders',
+          resource: 'purchase_orders',
+          icon: 'ShoppingCart',
+          color: 'pink',
+          stats: {
+            total: totalPOs,
+            draft: statusMap.draft?.count || 0,
+            pending: statusMap.pending_approval?.count || 0,
+            approved: statusMap.approved?.count || 0,
+            ordered: statusMap.ordered?.count || 0,
+            received: (statusMap.received?.count || 0) + (statusMap.partial_received?.count || 0),
+            completed: statusMap.completed?.count || 0,
+            cancelled: (statusMap.cancelled?.count || 0) + (statusMap.rejected?.count || 0),
+            currentMonthPOs,
+            currentMonthValue: currentMonthValue[0]?.totalValue || 0,
+            totalValue: totalPOValue,
+            pendingApprovals,
+            fullyReceived: receivingStats[0]?.fullyReceived || 0,
+            partiallyReceived: receivingStats[0]?.partiallyReceived || 0,
+            totalBacklog: receivingStats[0]?.totalBacklog || 0,
+            avgProcessingHours,
+            topPrincipals: posByPrincipal
+          },
+          actions: resourcePermissions.purchase_orders,
+          route: '/purchase-orders',
+          description: 'Purchase order management'
+        });
+      } catch (error) {
+        console.error('Error fetching purchase orders stats:', error);
+      }
+    }
+    
+    // ========== INVOICE RECEIVING STATISTICS ==========
+    if (resourcePermissions.po_receiving && resourcePermissions.po_receiving.includes('receive')) {
+      try {
+        const totalInvoices = await InvoiceReceiving.countDocuments();
+        
+        // Status breakdown
+        const statusBreakdown = await InvoiceReceiving.aggregate([
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+        
+        const statusMap = {};
+        statusBreakdown.forEach(item => {
+          statusMap[item._id] = item.count;
+        });
+        
+        // QC Status breakdown
+        const qcStatusBreakdown = await InvoiceReceiving.aggregate([
+          {
+            $group: {
+              _id: '$qcStatus',
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+        
+        const qcStatusMap = {};
+        qcStatusBreakdown.forEach(item => {
+          qcStatusMap[item._id] = item.count;
+        });
+        
+        // Current month receivings
+        const currentMonth = new Date();
+        currentMonth.setDate(1);
+        currentMonth.setHours(0, 0, 0, 0);
+        
+        const currentMonthReceivings = await InvoiceReceiving.countDocuments({
+          createdAt: { $gte: currentMonth }
+        });
+        
+        // Total invoice value
+        const totalInvoiceValue = await InvoiceReceiving.aggregate([
+          {
+            $group: {
+              _id: null,
+              totalValue: { $sum: '$invoiceAmount' }
+            }
+          }
+        ]);
+        
+        // Average QC turnaround time
+        const qcTurnaround = await InvoiceReceiving.aggregate([
+          {
+            $match: {
+              qcDate: { $exists: true }
+            }
+          },
+          {
+            $project: {
+              turnaround: {
+                $subtract: ['$qcDate', '$receivedDate']
+              }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              avgTurnaround: { $avg: '$turnaround' }
+            }
+          }
+        ]);
+        
+        const avgQCHours = qcTurnaround[0] 
+          ? Math.round(qcTurnaround[0].avgTurnaround / (1000 * 60 * 60))
+          : 0;
+        
+        // Damaged/Rejected products count
+        const damageStats = await InvoiceReceiving.aggregate([
+          { $unwind: '$products' },
+          {
+            $group: {
+              _id: '$products.status',
+              count: { $sum: 1 },
+              quantity: { $sum: '$products.receivedQty' }
+            }
+          }
+        ]);
+        
+        const damageMap = {};
+        damageStats.forEach(item => {
+          damageMap[item._id] = {
+            count: item.count,
+            quantity: item.quantity
+          };
+        });
+        
+        dashboardCards.push({
+          id: 'invoiceReceiving',
+          title: 'Invoice & Receiving',
+          resource: 'po_receiving',
+          icon: 'FileText',
+          color: 'teal',
+          stats: {
+            total: totalInvoices,
+            draft: statusMap.draft || 0,
+            submitted: statusMap.submitted || 0,
+            qcPending: statusMap.qc_pending || 0,
+            completed: statusMap.completed || 0,
+            rejected: statusMap.rejected || 0,
+            currentMonthReceivings,
+            totalInvoiceValue: totalInvoiceValue[0]?.totalValue || 0,
+            qcPassed: qcStatusMap.passed || 0,
+            qcFailed: qcStatusMap.failed || 0,
+            qcPartialPass: qcStatusMap.partial_pass || 0,
+            avgQCHours,
+            damagedProducts: damageMap.damaged?.quantity || 0,
+            rejectedProducts: damageMap.rejected?.quantity || 0
+          },
+          actions: resourcePermissions.po_receiving,
+          route: '/invoice-receiving',
+          description: 'Invoice and product receiving'
+        });
+      } catch (error) {
+        console.error('Error fetching invoice receiving stats:', error);
+      }
+    }
+    
+    // ========== WORKFLOW STATISTICS ==========
+    if (resourcePermissions.workflow && resourcePermissions.workflow.includes('view')) {
+      try {
+        const totalStages = await WorkflowStage.countDocuments();
+        const activeStages = await WorkflowStage.countDocuments({ isActive: true });
+        
+        // Get POs by current stage
+        const posByStage = await PurchaseOrder.aggregate([
+          {
+            $lookup: {
+              from: 'workflowstages',
+              localField: 'currentStage',
+              foreignField: '_id',
+              as: 'stageInfo'
+            }
+          },
+          { $unwind: '$stageInfo' },
+          {
+            $group: {
+              _id: '$stageInfo.name',
+              code: { $first: '$stageInfo.code' },
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } }
+        ]);
+        
+        // Workflow bottlenecks (stages with most POs waiting)
+        const bottlenecks = posByStage
+          .filter(stage => ['PENDING_APPROVAL', 'APPROVED_L1', 'QC_PENDING'].includes(stage.code))
+          .slice(0, 3);
+        
+        // Average time spent in each stage
+        const stageTimeAnalysis = await PurchaseOrder.aggregate([
+          { $unwind: '$workflowHistory' },
+          {
+            $group: {
+              _id: '$workflowHistory.stage',
+              avgTime: {
+                $avg: {
+                  $subtract: [
+                    { $ifNull: ['$workflowHistory.actionDate', new Date()] },
+                    '$workflowHistory.actionDate'
+                  ]
+                }
+              },
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $lookup: {
+              from: 'workflowstages',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'stageInfo'
+            }
+          },
+          { $unwind: '$stageInfo' },
+          {
+            $project: {
+              stageName: '$stageInfo.name',
+              avgTimeHours: { $divide: ['$avgTime', 3600000] },
+              count: 1
+            }
+          },
+          { $sort: { avgTimeHours: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        dashboardCards.push({
+          id: 'workflow',
+          title: 'Workflow Management',
+          resource: 'workflow',
+          icon: 'GitBranch',
+          color: 'amber',
+          stats: {
+            totalStages,
+            activeStages,
+            inactiveStages: totalStages - activeStages,
+            posByStage,
+            bottlenecks,
+            stageTimeAnalysis
+          },
+          actions: resourcePermissions.workflow,
+          route: '/workflow',
+          description: 'Workflow stages and transitions'
+        });
+      } catch (error) {
+        console.error('Error fetching workflow stats:', error);
+      }
+    }
+    
+    // ========== SYSTEM OVERVIEW ==========
     const systemStats = {
       totalPermissions: await Permission.countDocuments(),
       totalResources: await Permission.distinct('resource').then(resources => resources.length),
       userPermissionsCount: permissions.length,
-      accessibleResources: Object.keys(resourcePermissions).length
+      accessibleResources: Object.keys(resourcePermissions).length,
+      
+      // Overall business metrics
+      businessMetrics: {
+        totalBusinessValue: 0,
+        pendingApprovals: 0,
+        criticalAlerts: 0,
+        complianceScore: 0
+      }
     };
+    
+    // Calculate overall business metrics
+    try {
+      // Total business value (sum of all PO values)
+      const businessValue = await PurchaseOrder.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalValue: { $sum: '$grandTotal' }
+          }
+        }
+      ]);
+      systemStats.businessMetrics.totalBusinessValue = businessValue[0]?.totalValue || 0;
+      
+      // Total pending approvals across system
+      systemStats.businessMetrics.pendingApprovals = await PurchaseOrder.countDocuments({
+        status: { $in: ['pending_approval', 'qc_pending'] }
+      });
+      
+      // Critical alerts (expired documents + QC failures + backlogs)
+      const expiredDocs = await Principal.aggregate([
+        { $unwind: '$documents' },
+        {
+          $match: {
+            'documents.hasValidity': true,
+            'documents.endDate': { $lt: new Date() }
+          }
+        },
+        { $count: 'total' }
+      ]);
+      
+      const qcFailures = await InvoiceReceiving.countDocuments({ qcStatus: 'failed' });
+      const criticalBacklogs = await PurchaseOrder.countDocuments({
+        totalBacklogQty: { $gt: 0 },
+        status: { $ne: 'completed' }
+      });
+      
+      systemStats.businessMetrics.criticalAlerts = 
+        (expiredDocs[0]?.total || 0) + qcFailures + criticalBacklogs;
+      
+      // Compliance score (percentage of documents valid and QC passed)
+      const totalDocsWithValidity = await Principal.aggregate([
+        { $unwind: '$documents' },
+        { $match: { 'documents.hasValidity': true } },
+        { $count: 'total' }
+      ]);
+      
+      const validDocs = await Principal.aggregate([
+        { $unwind: '$documents' },
+        {
+          $match: {
+            'documents.hasValidity': true,
+            'documents.endDate': { $gte: new Date() }
+          }
+        },
+        { $count: 'total' }
+      ]);
+      
+      const totalQC = await InvoiceReceiving.countDocuments({
+        qcStatus: { $exists: true, $ne: 'pending' }
+      });
+      
+      const passedQC = await InvoiceReceiving.countDocuments({
+        qcStatus: { $in: ['passed', 'partial_pass'] }
+      });
+      
+      const docCompliance = totalDocsWithValidity[0]?.total > 0
+        ? (validDocs[0]?.total || 0) / totalDocsWithValidity[0].total * 100
+        : 100;
+      
+      const qcCompliance = totalQC > 0 ? (passedQC / totalQC) * 100 : 100;
+      
+      systemStats.businessMetrics.complianceScore = Math.round((docCompliance + qcCompliance) / 2);
+      
+    } catch (error) {
+      console.error('Error calculating business metrics:', error);
+    }
     
     res.json({
       cards: dashboardCards,
@@ -841,7 +1312,7 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // ========== RECENT DOCTORS ==========
+    // Recent Doctors
     if (viewableResources.includes('doctors')) {
       const recentDoctors = await Doctor.find()
         .populate('createdBy', 'name')
@@ -867,7 +1338,7 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // ========== RECENT PORTFOLIOS ==========
+    // Recent Portfolios
     if (viewableResources.includes('portfolios')) {
       const recentPortfolios = await Portfolio.find()
         .populate('createdBy', 'name')
@@ -891,7 +1362,7 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // ========== RECENT PRINCIPALS ==========
+    // Recent Principals
     if (viewableResources.includes('principals')) {
       const recentPrincipals = await Principal.find()
         .populate('createdBy', 'name')
@@ -916,7 +1387,8 @@ export const getRecentActivity = async (req, res) => {
         });
       });
     }
-    // ========== RECENT CATEGORIES ==========
+    
+    // Recent Categories
     if (viewableResources.includes('categories')) {
       const recentCategories = await Category.find()
         .populate('createdBy', 'name')
@@ -942,7 +1414,7 @@ export const getRecentActivity = async (req, res) => {
       });
     }
     
-    // ========== RECENT PRODUCTS ==========
+    // Recent Products
     if (viewableResources.includes('products')) {
       const recentProducts = await Product.find()
         .populate('createdBy', 'name')
@@ -966,6 +1438,120 @@ export const getRecentActivity = async (req, res) => {
         });
       });
     }
+    
+    // ========== PURCHASE ORDER ACTIVITIES ==========
+    if (viewableResources.includes('purchase_orders')) {
+      const recentPOs = await PurchaseOrder.find()
+        .populate('createdBy', 'name')
+        .populate('updatedBy', 'name')
+        .populate('principal', 'name')
+        .populate('currentStage', 'name')
+        .sort({ updatedAt: -1 })
+        .limit(5)
+        .lean();
+      
+      recentPOs.forEach(po => {
+        activities.push({
+          id: po._id,
+          type: 'purchase_order',
+          action: po.createdAt.getTime() === po.updatedAt.getTime() ? 'created' : 'updated',
+          title: po.poNumber,
+          description: `PO ${po.poNumber} - ${po.principal?.name || 'Unknown'} (${po.currentStage?.name || po.status})`,
+          user: po.updatedBy || po.createdBy,
+          timestamp: po.updatedAt,
+          resource: 'purchase_orders',
+          icon: 'ShoppingCart',
+          metadata: {
+            status: po.status,
+            value: po.grandTotal,
+            stage: po.currentStage?.name
+          }
+        });
+      });
+    }
+    
+    // ========== INVOICE RECEIVING ACTIVITIES ==========
+    if (viewableResources.includes('po_receiving')) {
+      const recentReceivings = await InvoiceReceiving.find()
+        .populate('createdBy', 'name')
+        .populate('receivedBy', 'name')
+        .populate('purchaseOrder', 'poNumber')
+        .sort({ updatedAt: -1 })
+        .limit(5)
+        .lean();
+      
+      recentReceivings.forEach(receiving => {
+        activities.push({
+          id: receiving._id,
+          type: 'invoice_receiving',
+          action: receiving.status === 'completed' ? 'completed' : 'received',
+          title: receiving.invoiceNumber,
+          description: `Invoice ${receiving.invoiceNumber} for PO ${receiving.purchaseOrder?.poNumber || 'Unknown'}`,
+          user: receiving.receivedBy || receiving.createdBy,
+          timestamp: receiving.updatedAt,
+          resource: 'invoice_receiving',
+          icon: 'FileText',
+          metadata: {
+            status: receiving.status,
+            qcStatus: receiving.qcStatus,
+            invoiceAmount: receiving.invoiceAmount
+          }
+        });
+      });
+    }
+    
+    // ========== WORKFLOW ACTIVITIES ==========
+    if (viewableResources.includes('purchase_orders')) {
+      // Get recent workflow transitions
+      const recentWorkflows = await PurchaseOrder.aggregate([
+        { $unwind: '$workflowHistory' },
+        { $sort: { 'workflowHistory.actionDate': -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'workflowHistory.actionBy',
+            foreignField: '_id',
+            as: 'actionUser'
+          }
+        },
+        { $unwind: '$actionUser' },
+        {
+          $lookup: {
+            from: 'workflowstages',
+            localField: 'workflowHistory.stage',
+            foreignField: '_id',
+            as: 'stage'
+          }
+        },
+        { $unwind: '$stage' },
+        {
+          $project: {
+            poNumber: 1,
+            action: '$workflowHistory.action',
+            stage: '$stage.name',
+            user: '$actionUser',
+            timestamp: '$workflowHistory.actionDate',
+            remarks: '$workflowHistory.remarks'
+          }
+        }
+      ]);
+      
+      recentWorkflows.forEach(workflow => {
+        activities.push({
+          id: workflow._id,
+          type: 'workflow',
+          action: workflow.action,
+          title: `${workflow.poNumber} - ${workflow.action}`,
+          description: workflow.remarks || `PO ${workflow.action} at ${workflow.stage}`,
+          user: workflow.user,
+          timestamp: workflow.timestamp,
+          resource: 'workflow',
+          icon: 'GitBranch'
+        });
+      });
+    }
+    
     // Sort all activities by timestamp and limit
     const sortedActivities = activities
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
@@ -983,4 +1569,157 @@ export const getRecentActivity = async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
+};
+
+// New endpoint for PO-specific dashboard metrics
+export const getPODashboardMetrics = async (req, res) => {
+  try {
+    const { dateRange = '30d', principalId, portfolioId } = req.query;
+    
+    // Calculate date range
+    let startDate = new Date();
+    switch (dateRange) {
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '90d':
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      case 'ytd':
+        startDate = new Date(new Date().getFullYear(), 0, 1);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 30);
+    }
+    
+    let matchQuery = {
+      createdAt: { $gte: startDate }
+    };
+    
+    if (principalId) matchQuery.principal = principalId;
+    
+    // Purchase Order Trends
+    const poTrends = await PurchaseOrder.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' }
+          },
+          count: { $sum: 1 },
+          totalValue: { $sum: '$grandTotal' }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
+    ]);
+    
+    // Top Products Ordered
+    const topProducts = await PurchaseOrder.aggregate([
+      { $match: matchQuery },
+      { $unwind: '$products' },
+      {
+        $group: {
+          _id: '$products.product',
+          totalQuantity: { $sum: '$products.quantity' },
+          totalValue: { $sum: '$products.totalCost' },
+          orderCount: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      { $unwind: '$productInfo' },
+      {
+        $project: {
+          productName: '$productInfo.name',
+          productCode: '$productInfo.code',
+          totalQuantity: 1,
+          totalValue: 1,
+          orderCount: 1
+        }
+      },
+      { $sort: { totalValue: -1 } },
+      { $limit: 10 }
+    ]);
+    
+    // Supplier Performance
+    const supplierPerformance = await PurchaseOrder.aggregate([
+      { $match: { ...matchQuery, status: { $in: ['received', 'completed'] } } },
+      {
+        $lookup: {
+          from: 'principals',
+          localField: 'principal',
+          foreignField: '_id',
+          as: 'principalInfo'
+        }
+      },
+      { $unwind: '$principalInfo' },
+      {
+        $group: {
+          _id: '$principal',
+          principalName: { $first: '$principalInfo.name' },
+          totalOrders: { $sum: 1 },
+          totalValue: { $sum: '$grandTotal' },
+          fullyReceived: {
+            $sum: { $cond: ['$isFullyReceived', 1, 0] }
+          },
+          avgDeliveryTime: {
+            $avg: {
+              $subtract: [
+                { $ifNull: ['$receivedDate', new Date()] },
+                '$orderedDate'
+              ]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          principalName: 1,
+          totalOrders: 1,
+          totalValue: 1,
+          fulfillmentRate: {
+            $multiply: [
+              { $divide: ['$fullyReceived', '$totalOrders'] },
+              100
+            ]
+          },
+          avgDeliveryDays: {
+            $divide: ['$avgDeliveryTime', 86400000]
+          }
+        }
+      },
+      { $sort: { totalValue: -1 } }
+    ]);
+    
+    res.json({
+      dateRange,
+      poTrends,
+      topProducts,
+      supplierPerformance
+    });
+    
+  } catch (error) {
+    console.error('PO dashboard metrics error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch PO dashboard metrics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+export default {
+  getDashboardStats,
+  getRecentActivity,
+  getPODashboardMetrics
 };
