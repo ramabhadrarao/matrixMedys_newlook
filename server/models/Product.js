@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-
+// photo of product , batch no, mfg date, exp date, price(MRP), dp (dealer price) and default discount fields are not included in this schema as per the requirements
 const documentSchema = new mongoose.Schema({
   name: {
     type: String,
