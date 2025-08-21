@@ -34,34 +34,8 @@ const workflowTransitionSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Index for performance
+workflowTransitionSchema.index({ fromStage: 1, toStage: 1 });
+workflowTransitionSchema.index({ action: 1 });
+
 export default mongoose.model('WorkflowTransition', workflowTransitionSchema);
-
-// server/models/StagePermission.js
-import mongoose from 'mongoose';
-
-const stagePermissionSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  stageId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'WorkflowStage',
-    required: true
-  },
-  permissions: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Permission'
-  }],
-  expiryDate: Date,
-  assignedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }
-}, { timestamps: true });
-
-stagePermissionSchema.index({ userId: 1, stageId: 1 }, { unique: true });
-
-export default mongoose.model('StagePermission', stagePermissionSchema);
