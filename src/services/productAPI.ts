@@ -1,6 +1,8 @@
-import api, { handleApiError } from './api';
+// src/services/productAPI.ts - Updated with new fields
+import api from './api';
 import { useAuthStore } from '../store/authStore';
 
+// Interfaces
 export interface ProductDocument {
   _id: string;
   name: string;
@@ -33,8 +35,37 @@ export interface Product {
     _id: string;
     name: string;
   };
-  categoryPath: string;
-  categoryAncestors: Array<{
+  
+  // NEW FIELDS
+  photo?: {
+    filename: string | null;
+    originalName: string | null;
+    mimetype: string | null;
+    size: number | null;
+    uploadedAt: string | null;
+    uploadedBy: {
+      _id: string;
+      name: string;
+    } | null;
+  };
+  batchNo?: string | null;
+  mfgDate?: string | null;
+  expDate?: string | null;
+  mrp: number;
+  dealerPrice: number;
+  defaultDiscount?: {
+    type: 'percentage' | 'amount';
+    value: number;
+  };
+  
+  // Computed fields (virtuals from backend)
+  effectivePrice?: number;
+  isExpired?: boolean;
+  daysUntilExpiry?: number | null;
+  
+  // Existing fields
+  categoryPath?: string;
+  categoryAncestors?: Array<{
     _id: string;
     name: string;
   }>;
@@ -66,6 +97,20 @@ export interface ProductFormData {
   name: string;
   code: string;
   category: string;
+  
+  // NEW FIELDS
+  photo?: File;
+  batchNo?: string;
+  mfgDate?: string;
+  expDate?: string;
+  mrp: number;
+  dealerPrice: number;
+  defaultDiscount?: {
+    type: 'percentage' | 'amount';
+    value: number;
+  };
+  
+  // Existing fields
   gstPercentage: number;
   specification?: string;
   remarks?: string;
@@ -82,17 +127,25 @@ export interface ProductFilters {
   category?: string;
   principal?: string;
   portfolio?: string;
-  minGst?: number;
-  maxGst?: number;
-  unit?: string;
-  isActive?: boolean;
   includeSubcategories?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedProductResponse {
+  products: Product[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
 }
 
 // Helper function for file uploads with progress
 const createFormDataRequest = async (
   url: string,
-  data: ProductFormData | FormData,
+  data: FormData | ProductFormData,
   method: 'POST' | 'PUT' = 'POST',
   onProgress?: (progress: number) => void
 ) => {
@@ -115,9 +168,9 @@ const createFormDataRequest = async (
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response = JSON.parse(xhr.responseText);
-          resolve({ data: response });
+          resolve(response);
         } catch (e) {
-          resolve({ data: xhr.responseText });
+          resolve(xhr.responseText);
         }
       } else {
         try {
@@ -154,10 +207,14 @@ const createFormDataRequest = async (
       requestData = data;
     } else {
       requestData = new FormData();
+      
+      // Add all fields to FormData
       Object.keys(data).forEach(key => {
         const value = (data as any)[key];
         if (value !== undefined && value !== null) {
-          if (key === 'documents' && Array.isArray(value)) {
+          if (key === 'photo' && value instanceof File) {
+            requestData.append('photo', value);
+          } else if (key === 'documents' && Array.isArray(value)) {
             value.forEach((file: File) => {
               requestData.append('documents', file);
             });
@@ -165,6 +222,8 @@ const createFormDataRequest = async (
             value.forEach((name: string) => {
               requestData.append('documentNames', name);
             });
+          } else if (key === 'defaultDiscount' && typeof value === 'object') {
+            requestData.append('defaultDiscount', JSON.stringify(value));
           } else {
             requestData.append(key, value.toString());
           }
@@ -176,81 +235,15 @@ const createFormDataRequest = async (
   });
 };
 
-// Helper functions for file operations
-const downloadFileWithAuth = async (filename: string, originalName?: string) => {
-  try {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const token = useAuthStore.getState().accessToken;
-
-    const response = await fetch(`${API_BASE_URL}/files/download/${filename}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = originalName || filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Download error:', error);
-    throw error;
-  }
-};
-
-const viewFileWithAuth = (filename: string) => {
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  const token = useAuthStore.getState().accessToken;
-
-  fetch(`${API_BASE_URL}/files/view/${filename}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.blob();
-    })
-    .then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-    })
-    .catch(error => {
-      console.error('View file error:', error);
-      throw error;
-    });
-};
-
+// Product API Service
 export const productAPI = {
-  // Get products with filters
-  getProducts: async (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    category?: string;
-    principal?: string;
-    portfolio?: string;
-    includeSubcategories?: boolean;
-  }) => {
+  // Get all products
+  getProducts: async (filters?: ProductFilters): Promise<PaginatedProductResponse> => {
     try {
-      console.log('Fetching products with params:', params);
-      const response = await api.get('/products', { params });
-      console.log('Products API response:', response.data);
-      return response;
+      console.log('Fetching products with filters:', filters);
+      const response = await api.get('/products', { params: filters });
+      console.log('Products response:', response.data);
+      return response.data;
     } catch (error) {
       console.error('Error fetching products:', error);
       throw error;
@@ -258,45 +251,37 @@ export const productAPI = {
   },
 
   // Get single product
-  getProduct: async (id: string) => {
+  getProduct: async (id: string): Promise<{ product: Product; breadcrumb: string }> => {
     try {
-      console.log('Fetching product with ID:', id);
+      console.log('Fetching product:', id);
       const response = await api.get(`/products/${id}`);
-      console.log('Product API response:', response.data);
-      return response;
+      console.log('Product response:', response.data);
+      return response.data;
     } catch (error) {
       console.error('Error fetching product:', error);
       throw error;
     }
   },
 
-  // Get products by category
-  getProductsByCategory: async (categoryId: string, includeSubcategories = true) => {
-    try {
-      console.log('Fetching products for category:', categoryId);
-      const response = await api.get(`/products/category/${categoryId}`, {
-        params: { includeSubcategories }
-      });
-      console.log('Products by category response:', response.data);
-      return response;
-    } catch (error) {
-      console.error('Error fetching products by category:', error);
-      throw error;
-    }
-  },
-
   // Create product
-  createProduct: async (data: ProductFormData, onProgress?: (progress: number) => void) => {
+  createProduct: async (
+    data: ProductFormData,
+    onProgress?: (progress: number) => void
+  ): Promise<{ message: string; product: Product }> => {
     try {
-      console.log('Creating product with data:', data);
-
-      if (data.documents && data.documents.length > 0) {
-        return await createFormDataRequest('/products', data, 'POST', onProgress);
+      console.log('Creating product:', data);
+      
+      if (data.photo || (data.documents && data.documents.length > 0)) {
+        // Use FormData for file upload
+        const response = await createFormDataRequest('/products', data, 'POST', onProgress);
+        console.log('Create product response:', response);
+        return response;
       } else {
-        const { documents, documentNames, ...productData } = data;
+        // Regular JSON request
+        const { photo, documents, ...productData } = data;
         const response = await api.post('/products', productData);
         console.log('Create product response:', response.data);
-        return response;
+        return response.data;
       }
     } catch (error) {
       console.error('Error creating product:', error);
@@ -305,17 +290,25 @@ export const productAPI = {
   },
 
   // Update product
-  updateProduct: async (id: string, data: ProductFormData, onProgress?: (progress: number) => void) => {
+  updateProduct: async (
+    id: string,
+    data: Partial<ProductFormData>,
+    onProgress?: (progress: number) => void
+  ): Promise<{ message: string; product: Product }> => {
     try {
-      console.log('Updating product:', id, 'with data:', data);
-
-      if (data.documents && data.documents.length > 0) {
-        return await createFormDataRequest(`/products/${id}`, data, 'PUT', onProgress);
+      console.log('Updating product:', id, data);
+      
+      if (data.photo || (data.documents && data.documents.length > 0)) {
+        // Use FormData for file upload
+        const response = await createFormDataRequest(`/products/${id}`, data as ProductFormData, 'PUT', onProgress);
+        console.log('Update product response:', response);
+        return response;
       } else {
-        const { documents, documentNames, ...productData } = data;
+        // Regular JSON request
+        const { photo, documents, ...productData } = data;
         const response = await api.put(`/products/${id}`, productData);
         console.log('Update product response:', response.data);
-        return response;
+        return response.data;
       }
     } catch (error) {
       console.error('Error updating product:', error);
@@ -323,13 +316,52 @@ export const productAPI = {
     }
   },
 
-  // Delete product
-  deleteProduct: async (id: string) => {
+  // Update product with photo (specialized method)
+  updateProductWithPhoto: async (
+    id: string,
+    data: ProductFormData,
+    onProgress?: (progress: number) => void
+  ): Promise<{ message: string; product: Product }> => {
     try {
-      console.log('Deleting product with ID:', id);
+      console.log('Updating product with photo:', id, data);
+      
+      const formData = new FormData();
+      
+      // Add all fields to FormData
+      Object.keys(data).forEach(key => {
+        const value = (data as any)[key];
+        if (value !== undefined && value !== null) {
+          if (key === 'photo' && value instanceof File) {
+            formData.append('photo', value);
+          } else if (key === 'documents' && Array.isArray(value)) {
+            value.forEach((file: File) => {
+              formData.append('documents', file);
+            });
+          } else if (key === 'defaultDiscount' && typeof value === 'object') {
+            formData.append('defaultDiscountType', value.type);
+            formData.append('defaultDiscountValue', value.value.toString());
+          } else {
+            formData.append(key, value.toString());
+          }
+        }
+      });
+      
+      const response = await createFormDataRequest(`/products/${id}/photo`, formData, 'PUT', onProgress);
+      console.log('Update product with photo response:', response);
+      return response;
+    } catch (error) {
+      console.error('Error updating product with photo:', error);
+      throw error;
+    }
+  },
+
+  // Delete product
+  deleteProduct: async (id: string): Promise<{ message: string }> => {
+    try {
+      console.log('Deleting product:', id);
       const response = await api.delete(`/products/${id}`);
       console.log('Delete product response:', response.data);
-      return response;
+      return response.data;
     } catch (error) {
       console.error('Error deleting product:', error);
       throw error;
@@ -337,97 +369,142 @@ export const productAPI = {
   },
 
   // Add document to product
-  addDocument: async (productId: string, file: File, name?: string, onProgress?: (progress: number) => void) => {
+  addProductDocument: async (
+    id: string,
+    file: File,
+    name?: string,
+    onProgress?: (progress: number) => void
+  ): Promise<{ message: string; document: ProductDocument }> => {
     try {
-      console.log('Adding document to product:', productId);
-
+      console.log('Adding document to product:', id);
+      
       const formData = new FormData();
       formData.append('document', file);
       if (name) {
         formData.append('name', name);
       }
-
-      return await createFormDataRequest(`/products/${productId}/documents`, formData, 'POST', onProgress);
+      
+      const response = await createFormDataRequest(`/products/${id}/documents`, formData, 'POST', onProgress);
+      console.log('Add document response:', response);
+      return response;
     } catch (error) {
-      console.error('Error adding document:', error);
+      console.error('Error adding product document:', error);
       throw error;
     }
   },
 
-  // Delete document from product
-  deleteDocument: async (productId: string, documentId: string) => {
+  // Delete product document
+  deleteProductDocument: async (productId: string, documentId: string): Promise<{ message: string }> => {
     try {
-      console.log('Deleting document:', documentId, 'from product:', productId);
+      console.log('Deleting product document:', productId, documentId);
       const response = await api.delete(`/products/${productId}/documents/${documentId}`);
       console.log('Delete document response:', response.data);
-      return response;
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      throw error;
-    }
-  },
-
-  // File operations
-  viewFile: (filename: string) => {
-    try {
-      viewFileWithAuth(filename);
-    } catch (error) {
-      console.error('Error viewing file:', error);
-      handleApiError(error);
-    }
-  },
-
-  downloadFile: async (filename: string, originalName?: string) => {
-    try {
-      await downloadFileWithAuth(filename, originalName);
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      handleApiError(error);
-    }
-  },
-
-  // Advanced search
-  searchProducts: async (filters: ProductFilters, page = 1, limit = 10) => {
-    try {
-      const params = {
-        page,
-        limit,
-        ...filters
-      };
-      const response = await api.get('/products', { params });
       return response.data;
     } catch (error) {
-      console.error('Error searching products:', error);
+      console.error('Error deleting product document:', error);
       throw error;
     }
   },
 
-  // Export products (for future implementation)
-  exportProducts: async (filters: ProductFilters, format: 'csv' | 'excel' | 'pdf' = 'excel') => {
+  // Get products by category
+  getProductsByCategory: async (categoryId: string, includeSubcategories: boolean = true): Promise<{ products: Product[] }> => {
     try {
-      const params = {
-        ...filters,
-        format
-      };
-      const response = await api.get('/products/export', {
-        params,
-        responseType: 'blob'
+      console.log('Fetching products by category:', categoryId);
+      const response = await api.get(`/products/category/${categoryId}`, {
+        params: { includeSubcategories }
       });
-
-      const blob = new Blob([response.data]);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `products-${Date.now()}.${format === 'excel' ? 'xlsx' : format}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      return response;
+      console.log('Products by category response:', response.data);
+      return response.data;
     } catch (error) {
-      console.error('Error exporting products:', error);
+      console.error('Error fetching products by category:', error);
       throw error;
     }
+  },
+
+  // Get products for PO (with pricing info)
+  getProductsForPO: async (principalId: string, portfolioId?: string): Promise<{ products: Product[] }> => {
+    try {
+      const params: any = {
+        principal: principalId,
+        limit: 1000 // Get all products for selection
+      };
+      
+      if (portfolioId) {
+        params.portfolio = portfolioId;
+      }
+      
+      console.log('Fetching products for PO:', params);
+      const response = await api.get('/products', { params });
+      console.log('Products for PO response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching products for PO:', error);
+      throw error;
+    }
+  },
+
+  // Calculate product price with discount
+  calculatePrice: (
+    product: Product,
+    quantity: number,
+    customDiscount?: { type: 'percentage' | 'amount'; value: number }
+  ): number => {
+    let basePrice = product.dealerPrice * quantity;
+    
+    // Apply custom discount if provided, otherwise use default
+    const discount = customDiscount || product.defaultDiscount;
+    
+    if (discount && discount.value > 0) {
+      if (discount.type === 'percentage') {
+        basePrice -= (basePrice * discount.value / 100);
+      } else {
+        basePrice -= discount.value;
+      }
+    }
+    
+    return basePrice;
+  },
+
+  // Check stock validity
+  checkStockValidity: (product: Product): {
+    isValid: boolean;
+    warnings: string[];
+    errors: string[];
+  } => {
+    const result = {
+      isValid: true,
+      warnings: [] as string[],
+      errors: [] as string[]
+    };
+    
+    // Check if expired
+    if (product.isExpired) {
+      result.errors.push('Product has expired');
+      result.isValid = false;
+    }
+    
+    // Check if expiring soon (within 30 days)
+    if (product.daysUntilExpiry !== null && product.daysUntilExpiry <= 30 && product.daysUntilExpiry > 0) {
+      result.warnings.push(`Product expiring in ${product.daysUntilExpiry} days`);
+    }
+    
+    // Check if batch number is missing when dates are present
+    if ((product.mfgDate || product.expDate) && !product.batchNo) {
+      result.warnings.push('Batch number is missing for product with manufacturing/expiry date');
+    }
+    
+    return result;
+  },
+
+  // Format price for display
+  formatPrice: (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
   }
 };
+
+export default productAPI;
