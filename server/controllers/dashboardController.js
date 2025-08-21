@@ -1,4 +1,4 @@
-// server/controllers/dashboardController.js - Enhanced with Principals
+// server/controllers/dashboardController.js -  Enhanced with Principals
 import State from '../models/State.js';
 import User from '../models/User.js';
 import Hospital from '../models/Hospital.js';
