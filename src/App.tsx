@@ -48,7 +48,16 @@ import ProductsList from './components/Products/ProductsList';
 import ProductForm from './components/Products/ProductForm';
 import CategoryDetails from './components/Categories/CategoryDetails';
 import ProductDetails from './components/Products/ProductDetails';
-// Settings Components
+
+// Purchase Order Components
+import { PurchaseOrdersList, PurchaseOrderForm, PurchaseOrderDetails } from './components/PurchaseOrders';
+
+// Import Invoice Receiving components
+import { InvoiceReceivingList, InvoiceReceivingForm, InvoiceReceivingDetails } from './components/InvoiceReceiving';
+
+// Import Workflow components
+import { WorkflowStagesList, WorkflowStageForm, UserAssignmentModal } from './components/Workflow';
+
 import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
 import ProfileInformation from './components/Settings/ProfileInformation';
@@ -184,6 +193,25 @@ function App() {
           <Route path="products/new" element={<ProductForm />} />
           <Route path="products/:id" element={<ProductDetails />} /> {/* Update this */}
           <Route path="products/:id/edit" element={<ProductForm />} />
+          
+          {/* Purchase Order Routes */}
+          <Route path="purchase-orders" element={<PurchaseOrdersList />} />
+          <Route path="purchase-orders/new" element={<PurchaseOrderForm />} />
+          <Route path="purchase-orders/:id" element={<PurchaseOrderDetails />} />
+          <Route path="purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
+          
+          {/* Invoice Receiving Routes */}
+          <Route path="invoice-receiving" element={<InvoiceReceivingList />} />
+          <Route path="invoice-receiving/new" element={<InvoiceReceivingForm />} />
+          <Route path="invoice-receiving/:id" element={<InvoiceReceivingDetails />} />
+          <Route path="invoice-receiving/:id/edit" element={<InvoiceReceivingForm />} />
+          
+          {/* Workflow Routes */}
+          <Route path="workflow/stages" element={<WorkflowStagesList />} />
+          <Route path="workflow/stages/new" element={<WorkflowStageForm />} />
+          <Route path="workflow/stages/:id/edit" element={<WorkflowStageForm />} />
+          <Route path="workflow/stages/:id/permissions" element={<UserAssignmentModal isOpen={true} onClose={() => {}} stageId="" stageName="" />} />
+          
             {/* States Routes - Moved to Settings/Masters */}
             <Route path="states" element={<StatesList />} />
             <Route path="states/new" element={<StateForm />} />

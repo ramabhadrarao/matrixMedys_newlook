@@ -12,7 +12,10 @@ import {
   LogOut,
   ChevronRight,
   FolderTree,
-  Package
+  Package,
+  ShoppingCart,
+  Truck,
+  GitBranch
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -69,6 +72,24 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   icon: Package,
   permission: { resource: 'products', action: 'view' },
 },
+    {
+      path: '/purchase-orders',
+      name: 'Purchase Orders',
+      icon: ShoppingCart,
+      permission: { resource: 'purchase_orders', action: 'view' },
+    },
+    {
+      path: '/invoice-receiving',
+      name: 'Invoice Receiving',
+      icon: Truck,
+      permission: { resource: 'invoice_receiving', action: 'view' },
+    },
+    {
+      path: '/workflow/stages',
+      name: 'Workflow',
+      icon: GitBranch,
+      permission: { resource: 'workflow', action: 'view' },
+    },
     {
       path: '/users',
       name: 'Users',

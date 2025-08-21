@@ -44,6 +44,8 @@ const ProductForm: React.FC = () => {
   const [existingDocuments, setExistingDocuments] = useState<any[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteDocumentLoading, setDeleteDocumentLoading] = useState<string>('');
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   
   const {
     register,
@@ -121,7 +123,7 @@ const ProductForm: React.FC = () => {
     try {
       setInitialLoading(true);
       const response = await productAPI.getProduct(productId);
-      const product = response.data.product;
+      const product = response.product;
       
       setValue('name', product.name);
       setValue('code', product.code);
@@ -133,6 +135,12 @@ const ProductForm: React.FC = () => {
       setValue('hsnCode', product.hsnCode);
       setValue('barcode', product.barcode);
       setValue('isActive', product.isActive);
+      
+      // Load existing photo if available
+      if (product.photo && product.photo.filename) {
+        const photoUrl = `${import.meta.env.VITE_API_URL}/uploads/products/${product.photo.filename}`;
+        setPhotoPreview(photoUrl);
+      }
       
       setSelectedPrincipal(product.principal._id);
       setSelectedPortfolio(product.portfolio._id);
@@ -534,6 +542,184 @@ const ProductForm: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter any remarks"
                 />
+              </div>
+
+              {/* New Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product Photo
+                </label>
+                {photoPreview ? (
+                  <div className="relative">
+                    <img
+                      src={photoPreview}
+                      alt="Product preview"
+                      className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPhoto(null);
+                        setPhotoPreview(null);
+                        setValue('photo', undefined);
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          // Validate file size (10MB)
+                          if (file.size > 10 * 1024 * 1024) {
+                            toast.error('File size must be less than 10MB');
+                            return;
+                          }
+                          
+                          // Validate file type
+                          if (!file.type.startsWith('image/')) {
+                            toast.error('Please select an image file');
+                            return;
+                          }
+                          
+                          setSelectedPhoto(file);
+                          setValue('photo', file);
+                          
+                          // Create preview
+                          const reader = new FileReader();
+                          reader.onload = (e) => {
+                            setPhotoPreview(e.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="photo-upload"
+                    />
+                    <label
+                      htmlFor="photo-upload"
+                      className="cursor-pointer flex flex-col items-center"
+                    >
+                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                      <span className="text-sm text-gray-600">
+                        Click to upload product photo
+                      </span>
+                      <span className="text-xs text-gray-400 mt-1">
+                        PNG, JPG, JPEG up to 10MB
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Batch Number
+                </label>
+                <input
+                  {...register('batchNo')}
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter batch number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Manufacturing Date
+                </label>
+                <input
+                  {...register('mfgDate')}
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Expiry Date
+                </label>
+                <input
+                  {...register('expDate')}
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  MRP (₹)
+                </label>
+                <input
+                  {...register('mrp', {
+                    valueAsNumber: true,
+                    min: {
+                      value: 0,
+                      message: 'MRP must be 0 or greater',
+                    },
+                  })}
+                  type="number"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+                {errors.mrp && (
+                  <p className="mt-1 text-sm text-red-600">{errors.mrp.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Dealer Price (₹)
+                </label>
+                <input
+                  {...register('dealerPrice', {
+                    valueAsNumber: true,
+                    min: {
+                      value: 0,
+                      message: 'Dealer price must be 0 or greater',
+                    },
+                  })}
+                  type="number"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+                {errors.dealerPrice && (
+                  <p className="mt-1 text-sm text-red-600">{errors.dealerPrice.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Default Discount (%)
+                </label>
+                <input
+                  {...register('defaultDiscount', {
+                    valueAsNumber: true,
+                    min: {
+                      value: 0,
+                      message: 'Discount must be 0 or greater',
+                    },
+                    max: {
+                      value: 100,
+                      message: 'Discount must be 100 or less',
+                    },
+                  })}
+                  type="number"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+                {errors.defaultDiscount && (
+                  <p className="mt-1 text-sm text-red-600">{errors.defaultDiscount.message}</p>
+                )}
               </div>
             </div>
           </div>

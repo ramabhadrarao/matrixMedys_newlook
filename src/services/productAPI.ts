@@ -367,6 +367,48 @@ export const productAPI = {
     }
   },
 
+  // Alias for addProductDocument to match component expectations
+  addDocument: async (
+    id: string,
+    file: File,
+    name?: string,
+    onProgress?: (progress: number) => void
+  ): Promise<{ message: string; document: ProductDocument }> => {
+    return productAPI.addProductDocument(id, file, name, onProgress);
+  },
+
+  // Download file function
+  downloadFile: async (filename: string, originalName?: string) => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const token = useAuthStore.getState().accessToken;
+      
+      const response = await fetch(`${API_BASE_URL}/files/download/${filename}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = originalName || filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      throw error;
+    }
+  },
+
   // Get products by category
   getProductsByCategory: async (categoryId: string, includeSubcategories: boolean = true): Promise<{ products: Product[] }> => {
     try {

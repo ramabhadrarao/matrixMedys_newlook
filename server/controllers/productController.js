@@ -26,7 +26,11 @@ export const getProducts = async (req, res) => {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { code: { $regex: search, $options: 'i' } },
-        { specification: { $regex: search, $options: 'i' } }
+        { specification: { $regex: search, $options: 'i' } },
+        { batchNo: { $regex: search, $options: 'i' } },
+        { hsnCode: { $regex: search, $options: 'i' } },
+        { barcode: { $regex: search, $options: 'i' } },
+        { remarks: { $regex: search, $options: 'i' } }
       ];
     }
     
@@ -127,18 +131,27 @@ export const createProduct = async (req, res) => {
       remarks,
       unit,
       hsnCode,
-      barcode
+      barcode,
+      // New fields
+      batchNo,
+      mfgDate,
+      expDate,
+      mrp,
+      dealerPrice,
+      defaultDiscount
     } = req.body;
     
     // Validate required fields
-    if (!name || !code || !category || gstPercentage === undefined) {
+    if (!name || !code || !category || gstPercentage === undefined || mrp === undefined || dealerPrice === undefined) {
       return res.status(400).json({ 
         message: 'Missing required fields',
         errors: [
           !name && { param: 'name', msg: 'Name is required' },
           !code && { param: 'code', msg: 'Code is required' },
           !category && { param: 'category', msg: 'Category is required' },
-          gstPercentage === undefined && { param: 'gstPercentage', msg: 'GST percentage is required' }
+          gstPercentage === undefined && { param: 'gstPercentage', msg: 'GST percentage is required' },
+          mrp === undefined && { param: 'mrp', msg: 'MRP is required' },
+          dealerPrice === undefined && { param: 'dealerPrice', msg: 'Dealer price is required' }
         ].filter(Boolean)
       });
     }
@@ -178,10 +191,33 @@ export const createProduct = async (req, res) => {
       unit: unit || 'PCS',
       hsnCode,
       barcode,
+      // New fields
+      batchNo: batchNo || null,
+      mfgDate: mfgDate ? new Date(mfgDate) : null,
+      expDate: expDate ? new Date(expDate) : null,
+      mrp: parseFloat(mrp) || 0,
+      dealerPrice: parseFloat(dealerPrice) || 0,
+      defaultDiscount: defaultDiscount ? {
+        type: defaultDiscount.type || 'percentage',
+        value: parseFloat(defaultDiscount.value) || 0
+      } : { type: 'percentage', value: 0 },
       createdBy: req.user._id,
       documents: []
     };
     
+    // Handle photo upload
+    if (req.files && req.files.photo) {
+      const photoFile = req.files.photo[0];
+      productData.photo = {
+        filename: photoFile.filename,
+        originalName: photoFile.originalname,
+        mimetype: photoFile.mimetype,
+        size: photoFile.size,
+        uploadedAt: new Date(),
+        uploadedBy: req.user._id
+      };
+    }
+
     // Handle file uploads
     if (req.files && req.files.documents) {
       const documentFiles = Array.isArray(req.files.documents) 
@@ -295,7 +331,14 @@ export const updateProduct = async (req, res) => {
       unit,
       hsnCode,
       barcode,
-      isActive
+      isActive,
+      // New fields
+      batchNo,
+      mfgDate,
+      expDate,
+      mrp,
+      dealerPrice,
+      defaultDiscount
     } = req.body;
     
     const product = await Product.findById(id);
@@ -341,6 +384,20 @@ export const updateProduct = async (req, res) => {
     product.hsnCode = hsnCode;
     product.barcode = barcode;
     product.isActive = isActive;
+    
+    // Update new fields
+    if (batchNo !== undefined) product.batchNo = batchNo;
+    if (mfgDate !== undefined) product.mfgDate = mfgDate ? new Date(mfgDate) : null;
+    if (expDate !== undefined) product.expDate = expDate ? new Date(expDate) : null;
+    if (mrp !== undefined) product.mrp = parseFloat(mrp);
+    if (dealerPrice !== undefined) product.dealerPrice = parseFloat(dealerPrice);
+    if (defaultDiscount !== undefined) {
+      product.defaultDiscount = defaultDiscount ? {
+        type: defaultDiscount.type || 'percentage',
+        value: parseFloat(defaultDiscount.value) || 0
+      } : { type: 'percentage', value: 0 };
+    }
+    
     product.updatedBy = req.user._id;
     
     // Handle new file uploads

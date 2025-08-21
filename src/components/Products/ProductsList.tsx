@@ -49,10 +49,19 @@ const ProductsList: React.FC = () => {
   const canCreate = hasPermission('products', 'create');
   const canUpdate = hasPermission('products', 'update');
   const canDelete = hasPermission('products', 'delete');
+  
+  console.log('Permissions:', { canCreate, canUpdate, canDelete });
+  console.log('Auth state:', {
+    isAuthenticated: useAuthStore.getState().isAuthenticated,
+    user: useAuthStore.getState().user,
+    hasAccessToken: !!useAuthStore.getState().accessToken,
+    hasRefreshToken: !!useAuthStore.getState().refreshToken
+  });
 
   useEffect(() => {
     fetchPrincipals();
     fetchPortfolios();
+    fetchProducts(); // Load all products initially
   }, []);
 
   useEffect(() => {
@@ -62,8 +71,15 @@ const ProductsList: React.FC = () => {
   }, [selectedPrincipal, selectedPortfolio]);
 
   useEffect(() => {
+    // Fetch products when filters change or when navigating pages
     fetchProducts();
   }, [currentPage, searchTerm, selectedCategory, selectedPrincipal, selectedPortfolio]);
+
+  // Debug: Track products state changes
+  useEffect(() => {
+    console.log('ProductsList: Products state updated:', products);
+    console.log('ProductsList: Products length:', products.length);
+  }, [products]);
 
   const fetchPrincipals = async () => {
     try {
@@ -99,26 +115,48 @@ const ProductsList: React.FC = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params = {
+      const params: any = {
         page: currentPage,
         limit: 10,
-        ...(searchTerm && { search: searchTerm.trim() }),
-        ...(selectedCategory && { category: selectedCategory }),
-        ...(selectedPrincipal && { principal: selectedPrincipal }),
-        ...(selectedPortfolio && { portfolio: selectedPortfolio }),
       };
       
-      const response = await productAPI.getProducts(params);
+      // Only add filters if they have values
+      if (searchTerm && searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+      if (selectedCategory) {
+        params.category = selectedCategory;
+      }
+      if (selectedPrincipal) {
+        params.principal = selectedPrincipal;
+      }
+      if (selectedPortfolio) {
+        params.portfolio = selectedPortfolio;
+      }
       
-      if (response.data) {
-        setProducts(response.data.products || []);
-        if (response.data.pagination) {
-          setTotalPages(response.data.pagination.pages || 1);
-          setTotalProducts(response.data.pagination.total || 0);
+      console.log('ProductsList: Fetching products with params:', params);
+      const response = await productAPI.getProducts(params);
+      console.log('ProductsList: Full API response:', response);
+      console.log('ProductsList: Products array:', response.products);
+      console.log('ProductsList: First product:', response.products?.[0]);
+      console.log('ProductsList: Product IDs:', response.products?.map(p => p._id));
+      
+      if (response) {
+        const productsArray = response.products || [];
+        console.log('ProductsList: Setting products to:', productsArray);
+        setProducts(productsArray);
+        if (response.pagination) {
+          setTotalPages(response.pagination.pages || 1);
+          setTotalProducts(response.pagination.total || 0);
         }
       }
     } catch (error) {
       console.error('Error fetching products:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       handleApiError(error);
       setProducts([]);
     } finally {
@@ -193,7 +231,7 @@ const ProductsList: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search products by name, code, or specification..."
+                  placeholder="Search products by name, code, specification, batch, HSN, barcode, or remarks..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -323,6 +361,12 @@ const ProductsList: React.FC = () => {
                       GST & Unit
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Pricing
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Batch Info
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Documents
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -344,15 +388,29 @@ const ProductsList: React.FC = () => {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center">
-                          <div className="w-10 h-10 bg-violet-500 rounded-lg flex items-center justify-center mr-3">
-                            <Package className="w-5 h-5 text-white" />
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3 overflow-hidden">
+                            {product.photo && product.photo.filename ? (
+                              <img
+                                src={`${import.meta.env.VITE_API_URL}/uploads/products/${product.photo.filename}`}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <div className={`w-full h-full bg-violet-500 rounded-lg flex items-center justify-center ${product.photo && product.photo.filename ? 'hidden' : ''}`}>
+                              <Package className="w-5 h-5 text-white" />
+                            </div>
                           </div>
                           <div>
                             <div className="text-sm font-medium text-gray-900">{product.name}</div>
                             <div className="text-sm text-gray-500">Code: {product.code}</div>
                             {product.barcode && (
                               <div className="flex items-center text-xs text-gray-400 mt-1">
-                                <BarCode className="w-3 h-3 mr-1" />
+                                <Barcode className="w-3 h-3 mr-1" />
                                 {product.barcode}
                               </div>
                             )}
@@ -377,6 +435,50 @@ const ProductsList: React.FC = () => {
                           {product.hsnCode && (
                             <div className="text-xs text-gray-400">
                               HSN: {product.hsnCode}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-1">
+                          {product.mrp && (
+                            <div className="text-sm text-gray-900">
+                              MRP: ₹{product.mrp.toFixed(2)}
+                            </div>
+                          )}
+                          {product.dealerPrice && (
+                            <div className="text-sm text-gray-600">
+                              Dealer: ₹{product.dealerPrice.toFixed(2)}
+                            </div>
+                          )}
+                          {product.defaultDiscount && (
+                            <div className="text-xs text-green-600">
+                              Discount: {product.defaultDiscount.value}{product.defaultDiscount.type === 'percentage' ? '%' : '₹'}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-1">
+                          {product.batchNo && (
+                            <div className="text-sm text-gray-900">
+                              Batch: {product.batchNo}
+                            </div>
+                          )}
+                          {product.mfgDate && (
+                            <div className="text-xs text-gray-500">
+                              Mfg: {new Date(product.mfgDate).toLocaleDateString()}
+                            </div>
+                          )}
+                          {product.expDate && (
+                            <div className={`text-xs ${
+                              new Date(product.expDate) < new Date() 
+                                ? 'text-red-600' 
+                                : new Date(product.expDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                                ? 'text-yellow-600'
+                                : 'text-gray-500'
+                            }`}>
+                              Exp: {new Date(product.expDate).toLocaleDateString()}
                             </div>
                           )}
                         </div>
@@ -462,8 +564,22 @@ const ProductsList: React.FC = () => {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-3 flex-1">
-                      <div className="w-12 h-12 bg-violet-500 rounded-lg flex items-center justify-center">
-                        <Package className="w-6 h-6 text-white" />
+                      <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden">
+                        {product.photo && product.photo.filename ? (
+                          <img
+                            src={`${import.meta.env.VITE_API_URL}/uploads/products/${product.photo.filename}`}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`w-full h-full bg-violet-500 rounded-lg flex items-center justify-center ${product.photo && product.photo.filename ? 'hidden' : ''}`}>
+                          <Package className="w-6 h-6 text-white" />
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-medium text-gray-900">{product.name}</h3>
@@ -486,6 +602,57 @@ const ProductsList: React.FC = () => {
                               {product.documents.length} document(s)
                             </div>
                           )}
+                          
+                          {/* Pricing Information */}
+                          {(product.mrp || product.dealerPrice) && (
+                            <div className="space-y-1">
+                              {product.mrp && (
+                                <div className="text-sm text-gray-900">
+                                  MRP: ₹{product.mrp.toFixed(2)}
+                                </div>
+                              )}
+                              {product.dealerPrice && (
+                                <div className="text-sm text-gray-600">
+                                  Dealer Price: ₹{product.dealerPrice.toFixed(2)}
+                                </div>
+                              )}
+                              {product.defaultDiscount && (
+                                <div className="text-sm text-green-600">
+                                  Default Discount: {product.defaultDiscount.value}{product.defaultDiscount.type === 'percentage' ? '%' : '₹'}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Batch Information */}
+                          {(product.batchNo || product.mfgDate || product.expDate) && (
+                            <div className="space-y-1">
+                              {product.batchNo && (
+                                <div className="text-sm text-gray-600">
+                                  Batch: {product.batchNo}
+                                </div>
+                              )}
+                              {product.mfgDate && (
+                                <div className="text-sm text-gray-600">
+                                  Mfg Date: {new Date(product.mfgDate).toLocaleDateString()}
+                                </div>
+                              )}
+                              {product.expDate && (
+                                <div className={`text-sm ${
+                                  new Date(product.expDate) < new Date() 
+                                    ? 'text-red-600' 
+                                    : new Date(product.expDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                                    ? 'text-yellow-600'
+                                    : 'text-gray-600'
+                                }`}>
+                                  Exp Date: {new Date(product.expDate).toLocaleDateString()}
+                                  {new Date(product.expDate) < new Date() && ' (Expired)'}
+                                  {new Date(product.expDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && 
+                                   new Date(product.expDate) >= new Date() && ' (Expiring Soon)'}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         
                         <div className="mt-3 flex items-center space-x-4">
@@ -505,6 +672,7 @@ const ProductsList: React.FC = () => {
                         to={`/products/${product._id}`}
                         className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50"
                         title="View Details"
+                        onClick={() => console.log('Navigating to product details:', product._id)}
                       >
                         <Eye className="w-4 h-4" />
                       </Link>
@@ -513,6 +681,7 @@ const ProductsList: React.FC = () => {
                         <Link
                           to={`/products/${product._id}/edit`}
                           className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50"
+                          onClick={() => console.log('Navigating to product edit:', product._id)}
                         >
                           <Edit className="w-4 h-4" />
                         </Link>
@@ -521,6 +690,7 @@ const ProductsList: React.FC = () => {
                       {canDelete && (
                         <button
                           onClick={() => {
+                            console.log('Delete button clicked for product:', product._id);
                             setProductToDelete(product);
                             setShowDeleteModal(true);
                           }}

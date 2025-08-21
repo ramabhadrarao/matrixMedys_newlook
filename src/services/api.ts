@@ -532,4 +532,7 @@ export const checkApiHealth = async () => {
   }
 };
 
+// Re-export productAPI as productsAPI for compatibility
+export { productAPI as productsAPI } from './productAPI';
+
 export default api;

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend API Test</title>
+</head>
+<body>
+    <h1>Frontend API Test</h1>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="testProducts()">Test Products</button>
+    <div id="results"></div>
+
+    <script>
+        let token = null;
+        
+        async function testLogin() {
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@matrixmedys.com',
+                        password: 'Admin@123'
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.tokens) {
+                    token = data.tokens.accessToken;
+                    document.getElementById('results').innerHTML = '<p style="color: green;">Login successful! Token: ' + token.substring(0, 20) + '...</p>';
+                } else {
+                    document.getElementById('results').innerHTML = '<p style="color: red;">Login failed: ' + data.message + '</p>';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                document.getElementById('results').innerHTML = '<p style="color: red;">Login error: ' + error.message + '</p>';
+            }
+        }
+        
+        async function testProducts() {
+            if (!token) {
+                document.getElementById('results').innerHTML = '<p style="color: red;">Please login first</p>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/products', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('Products response:', data);
+                
+                if (data.products) {
+                    let html = '<h3>Products found: ' + data.products.length + '</h3><ul>';
+                    data.products.forEach(product => {
+                        html += '<li>' + product.name + ' (ID: ' + product._id + ')</li>';
+                    });
+                    html += '</ul>';
+                    document.getElementById('results').innerHTML = html;
+                } else {
+                    document.getElementById('results').innerHTML = '<p style="color: red;">Products fetch failed: ' + data.message + '</p>';
+                }
+            } catch (error) {
+                console.error('Products error:', error);
+                document.getElementById('results').innerHTML = '<p style="color: red;">Products error: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

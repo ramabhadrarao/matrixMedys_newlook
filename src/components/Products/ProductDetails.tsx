@@ -50,8 +50,8 @@ const ProductDetails: React.FC = () => {
     try {
       setLoading(true);
       const response = await productAPI.getProduct(id!);
-      setProduct(response.data.product);
-      setBreadcrumb(response.data.breadcrumb || '');
+      setProduct(response.product);
+      setBreadcrumb(response.breadcrumb || '');
     } catch (error) {
       handleApiError(error);
       navigate('/products');
@@ -230,6 +230,24 @@ const ProductDetails: React.FC = () => {
         </div>
       </div>
 
+      {/* Product Photo */}
+      {product.photo && product.photo.filename && (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Photo</h2>
+          <div className="flex justify-center">
+            <img 
+              src={`${import.meta.env.VITE_API_URL}/uploads/products/${product.photo.filename}`} 
+              alt={product.name}
+              className="max-w-md max-h-64 object-contain rounded-lg border border-gray-200"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Product Information */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Information</h2>
@@ -279,7 +297,7 @@ const ProductDetails: React.FC = () => {
           {product.barcode && (
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                <BarCode className="w-4 h-4 mr-1" />
+                <Barcode className="w-4 h-4 mr-1" />
                 Barcode
               </h3>
               <p className="text-gray-900">{product.barcode}</p>
@@ -290,6 +308,59 @@ const ProductDetails: React.FC = () => {
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">SKU</h3>
               <p className="text-gray-900">{product.sku}</p>
+            </div>
+          )}
+          
+          {product.mrp && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">MRP</h3>
+              <p className="text-gray-900">₹{product.mrp.toFixed(2)}</p>
+            </div>
+          )}
+          
+          {product.dealerPrice && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Dealer Price</h3>
+              <p className="text-gray-900">₹{product.dealerPrice.toFixed(2)}</p>
+            </div>
+          )}
+          
+          {product.defaultDiscount && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Default Discount</h3>
+              <p className="text-green-600 font-medium">{product.defaultDiscount.value}{product.defaultDiscount.type === 'percentage' ? '%' : '₹'}</p>
+            </div>
+          )}
+          
+          {product.batchNo && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Batch Number</h3>
+              <p className="text-gray-900">{product.batchNo}</p>
+            </div>
+          )}
+          
+          {product.mfgDate && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Manufacturing Date</h3>
+              <p className="text-gray-900">{new Date(product.mfgDate).toLocaleDateString()}</p>
+            </div>
+          )}
+          
+          {product.expDate && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Expiry Date</h3>
+              <p className={`font-medium ${
+                new Date(product.expDate) < new Date() 
+                  ? 'text-red-600' 
+                  : new Date(product.expDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                  ? 'text-yellow-600'
+                  : 'text-gray-900'
+              }`}>
+                {new Date(product.expDate).toLocaleDateString()}
+                {new Date(product.expDate) < new Date() && ' (Expired)'}
+                {new Date(product.expDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && 
+                 new Date(product.expDate) >= new Date() && ' (Expiring Soon)'}
+              </p>
             </div>
           )}
         </div>

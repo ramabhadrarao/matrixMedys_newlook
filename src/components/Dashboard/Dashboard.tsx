@@ -122,13 +122,20 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const formatNumber = (num: number) => {
+  const formatNumber = (num: number | undefined | null) => {
+    if (num === undefined || num === null || isNaN(num)) {
+      return '0';
+    }
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';
     } else if (num >= 1000) {
       return (num / 1000).toFixed(1) + 'K';
     }
     return num.toLocaleString();
+  };
+
+  const getSafeStatValue = (stats: any, key: string, defaultValue: number | string = 0) => {
+    return stats && stats[key] !== undefined && stats[key] !== null ? stats[key] : defaultValue;
   };
 
   const getColorClasses = (color: string) => {
@@ -200,17 +207,17 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Active:</span>
-                <span className="font-medium text-green-600">{card.stats.active}</span>
+                <span className="font-medium text-green-600">{getSafeStatValue(card.stats, 'active')}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Inactive:</span>
-                <span className="font-medium text-red-600">{card.stats.inactive}</span>
+                <span className="font-medium text-red-600">{getSafeStatValue(card.stats, 'inactive')}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Recent:</span>
                 <span className="font-medium text-blue-600 flex items-center">
-                  {card.stats.recent}
-                  {card.stats.recent > 0 && <ArrowUpRight className="w-3 h-3 ml-1" />}
+                  {getSafeStatValue(card.stats, 'recent')}
+                  {getSafeStatValue(card.stats, 'recent') > 0 && <ArrowUpRight className="w-3 h-3 ml-1" />}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -311,23 +318,25 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Active:</span>
-                <span className="font-medium text-green-600">{card.stats.active}</span>
+                <span className="font-medium text-green-600">{getSafeStatValue(card.stats, 'active')}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Inactive:</span>
-                <span className="font-medium text-red-600">{card.stats.inactive}</span>
+                <span className="font-medium text-red-600">{getSafeStatValue(card.stats, 'inactive')}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Recent:</span>
                 <span className="font-medium text-blue-600 flex items-center">
-                  {card.stats.recent}
-                  {card.stats.recent > 0 && <ArrowUpRight className="w-3 h-3 ml-1" />}
+                  {getSafeStatValue(card.stats, 'recent')}
+                  {getSafeStatValue(card.stats, 'recent') > 0 && <ArrowUpRight className="w-3 h-3 ml-1" />}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Growth:</span>
-                <span className="font-medium text-gray-900">
-                  {card.stats.recent > 0 ? '+' : ''}{card.stats.recent}
+                <span className="text-gray-600">Recent Change:</span>
+                <span className={`font-medium flex items-center ${
+                  getSafeStatValue(card.stats, 'recent') > 0 ? 'text-green-600' : 'text-gray-600'
+                }`}>
+                  {getSafeStatValue(card.stats, 'recent') > 0 ? '+' : ''}{getSafeStatValue(card.stats, 'recent')}
                 </span>
               </div>
             </div>
@@ -417,7 +426,7 @@ const Dashboard: React.FC = () => {
                   <div className="text-right">
                     <div className="text-xs text-gray-500">Total</div>
                     <div className={`text-2xl font-bold ${colors.text}`}>
-                      {formatNumber(card.stats.total)}
+                      {formatNumber(getSafeStatValue(card.stats, 'total'))}
                     </div>
                   </div>
                 </div>

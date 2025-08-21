@@ -1,0 +1,388 @@
+PURCHASE ORDER 
+_---------------
+
+(Accessible only by the assigned user)
+
+1. Principle
+
+Dropdown selection from the Principles list (e.g., BIORAD, KLS Martin).
+
+2. PO Number
+
+Auto-generated format → MM-<PrincipleCode>-<ddmmyy>/<serialNo>
+
+MM → Matryx Medisys
+
+PrincipleCode → First 3 characters of the selected Principle (e.g., BIO for BIORAD)
+
+ddmmyy → Current date
+
+serialNo → Sequential number starting from 001 for each principle
+
+Example: MM-BIO-250324/001
+
+3. PO Date
+
+Auto-filled with the current date.
+
+
+Bill To (Billing Details)--(select drop down  branch/ warehouse ): 
+------------------------
+
+Bill To: MATRYX MEDISYS PRIVATE LIMITED (default for all POs)
+
+
+Address
+
+GSTIN
+
+Drug License (DL No)
+
+Phone Number
+
+
+Ship To (Shipping Details): (select drop down branch/ warehouse ): 
+------------------------------
+
+Ship To: Name of branch/warehouse
+
+
+
+GSTIN
+
+Drug License (DL No)
+
+Phone Number
+
+
+Address
+
+
+Product List Table
+-------------------
+
+(Products filtered by the selected Principle and category ->)-- select2 list( search & dropdown)- 
+
+All products linked to the selected Principle → Portfolio → Category → Subcategory will be displayed.
+
+The user can filter products by Product Code or Product Name.
+
+The user selects products and enters the required order quantity.
+
+Table Fields:
+
+s.no (auto gen) -- product code & product name -- description(specifications) --unit price -- qty (entered) -- foc ( optional) - discount % / discount Rs(optional editable)
+1		xyz					xyz				2000	2		0	
+2		abc					abc				1000	5		1
+
+
+
+S. No → Auto-generated serial number
+
+Product Code → From the Product table
+
+Description → Product name/details
+
+Qty → Quantity ordered (entered by user)
+
+Additional Fields (per selected product):
+5. FOC → Free of Cost units (optional)
+6. Unit Price → Price per unit (fetched from table, but editable)
+7. Discount → Per item discount (can be % or ₹)
+8. Total Cost → Formula: ((Qty – FOC) × Unit Price) – Discount
+
+
+Discount and Tax Section (Optional)
+-----------------------------------
+
+Intra-State GST (CGST + SGST)-- 
+
+Checkbox → If selected, apply CGST + SGST to the final bill.
+
+Additional Discount
+
+Discount applied to the final bill (not per product).
+
+Can be either % or ₹ (used for bulk/negotiation discounts).
+
+Shipping/Additional Charges
+
+Example: Extra delivery costs.
+
+Can be entered as % or ₹.
+
+GST Rate (%)
+
+If additional GST needs to be applied.
+
+
+
+Grand Total Section
+---------------------
+
+Sub Total
+
+- Displays the sum of all product amounts before discounts and charges.
+
+Product-Level Discount
+
+- Total discount applied across all products in the table.
+
+Additional Discount (Optional)
+
+ - If added in the Discount and Tax section, it will be displayed here as an amount.
+
+ - Displayed regardless of whether Intra-State (CGST + SGST) is checked or not.
+
+IGST
+
+- GST percentage applied.
+
+- Default value: 5%.
+
+Shipping Charges (Optional)
+
+ - Value is taken from the Shipping Charges field in the Discount and Tax section.
+
+ - Displayed regardless of whether Intra-State (CGST + SGST) is checked or not.
+
+Grand Total
+
+- Final calculation including:
+- Sub Total – Product Discounts – Additional Discounts + IGST + Shipping Charges
+
+Communication Section
+------------------------
+ 
+
+To Email
+
+- Dropdown list populated from the Principle → based on the selected Principle.
+
+- Supports multiple entries.
+
+- Purpose: Primary email addresses for sending the PO.
+
+- Example: purchase@biorad.com, accounts@biorad.com
+
+From Email
+
+- The sender’s email address (default based on the selected branch/warehouse email and assigned user email ,,,, can change).
+
+CC Email (Optional)
+
+- Manually added additional recipients.
+
+- Purpose: To include stakeholders (e.g., manager, auditor) in the loop.
+
+
+
+Actions (Buttons)
+-----------------
+
+
+Generate PO (based on principle selected template changes)
+Preview  (to cross check)
+- then request for approval (assigns to user who has access for po approval based on branch/warehouse selected)
+
+
+
+Purchase Order Approval Flow
+1. Access Control
+-----------------------
+
+-Approval is assigned only to users who have PO approval rights based on Branch/Warehouse selected.
+
+- PO creator can view the approval status once it is created.
+
+2. PO Preview & Edit
+
+- The approver sees a preview of the PO generated.
+
+Approver can:
+-----------------
+
+-Edit product details or add new product(Qty, FOC, Unit Price, Discount).
+
+Add remarks per product.
+
+Change Bill To / Ship To details.
+
+Change email IDs (if required for dispatch/confirmation).
+
+3. Product List Table
+----------------------
+
+Products are filtered by the selected Principle → Portfolio → Category → Subcategory.
+
+Search filter: Product Code / Product Name.
+
+Table Fields:
+
+S. No → Auto-generated
+
+Product Code → From Product master
+
+Description → Product name/details
+
+Qty → Quantity ordered (entered by approver)
+
+FOC → Free of Cost units (optional)
+
+Unit Price → Fetched from master, but editable
+
+Discount → Per item discount (₹ / %)
+
+Total Cost → Formula:
+((Qty – FOC) × Unit Price) – Discount
+
+Remarks → Editable notes per product
+
+4. Discount & Tax Section
+------------------------------
+
+Intra-State GST (CGST + SGST)
+
+Checkbox → If checked, apply CGST + SGST
+
+Additional Discount (bulk/negotiation)
+
+% or ₹, applied at the final bill level
+
+Shipping/Additional Charges
+
+% or ₹ (delivery/logistics)
+
+GST Rate (%)
+
+Default: 5% IGST if not intra-state
+
+5. Grand Total Section
+-----------------------
+
+Sub Total → Sum of all products before discounts
+
+Product-Level Discount → Total discount from table
+
+Additional Discount → From Discount & Tax section
+
+IGST / CGST+SGST → Based on checkbox selection
+
+Shipping Charges → From Discount & Tax section
+
+Grand Total →
+Sub Total – Product Discounts – Additional Discounts + GST + Shipping
+
+6. Approval Actions
+---------------------
+
+Preview changes → Approver checks final summary.
+
+Update PO → Modified PO version is saved.
+
+Approve PO →
+ 
+
+Order is placed to the Principle selected.
+
+Approved PO is visible to PO creator with status + remarks.
+
+
+
+Invoice & Products Received (Against Approved PO)
+Access Control
+------------------
+
+-Any user can physically collect products (courier, handover, etc.).
+
+-Only Approved Users can fill & submit this form.
+
+1.  PO Selection
+---------------------------
+
+- PO Number (Required) → Dropdown of Approved POs. OR BASED ON PO NO
+
+-  PO Date → Auto-fills (from PO). (READ ONLY)
+
+ - Billing Name → Auto-fills (Principle/Supplier from PO). (READ ONLY)
+
+2. Shipping & received Info 
+---------------------------------
+
+Shipping To → Auto-fills from PO. (READ ONLY)
+
+Received By (Required) → Dropdown: Person recording receipt.
+
+3. Invoice & Received
+---------------------------
+
+Invoice Number (Required)
+
+Supports Multiple Invoices (cases: backlogs,  partial supplies).
+
+Received Date (Required)
+Invoice amount: total amount as per invoice 
+due date to pay invoice amount : time line with in 60 days
+
+Defaults → Today’s date, editable.
+
+4. PO Ordered Products List
+--------------------------------
+Core Logic:
+
+System matches Ordered Products (from PO) vs Received Qty (from Invoice).
+
+Table Fields:
+-----
+
+S. No (auto)
+
+Product Code (from PO)
+
+Product Description (from master)
+
+Ordered Qty (from PO)
+
+Received Qty (entered by approver)
+
+FOC (if applicable) (entered)
+
+Unit Price (from PO but editable)
+state(status) :   backlog or received 
+
+Remarks (e.g. Short supply)
+
+System Behavior:
+--
+
+If Received Qty < Ordered Qty → Auto-mark difference as Backlog Qty.
+
+If Ordered Product not received at all → Moves entire qty to Backlog Products List.
+
+If Extra Qty received → Highlight as exception (requires manual remark/approval).
+
+
+
+5. Supporting Documents
+---------------------------
+
+Document Name → Label (e.g., Invoice, Courier Slip, Packing List).
+
+Upload Document → File picker (PDF, images, Excel).
+
+ Preview uploaded documents 
+ 
+
+
+6. Actions
+------------
+
+Submit to QC →
+
+Locks this receipt entry.
+
+Sends for Quality Check workflow.
+
+Captures System Date as “Submitted to QC Date”.
+
+Links invoice(s) + received qty + backlog details to the Original PO record.
