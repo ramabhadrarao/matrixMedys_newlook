@@ -1,4 +1,4 @@
-// src/services/productAPI.ts - Updated with new fields
+// src/services/productAPI.ts - Fixed version
 import api from './api';
 import { useAuthStore } from '../store/authStore';
 
@@ -168,9 +168,9 @@ const createFormDataRequest = async (
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response = JSON.parse(xhr.responseText);
-          resolve(response);
+          resolve({ data: response });
         } catch (e) {
-          resolve(xhr.responseText);
+          resolve({ data: xhr.responseText });
         }
       } else {
         try {
@@ -274,11 +274,11 @@ export const productAPI = {
       if (data.photo || (data.documents && data.documents.length > 0)) {
         // Use FormData for file upload
         const response = await createFormDataRequest('/products', data, 'POST', onProgress);
-        console.log('Create product response:', response);
-        return response;
+        console.log('Create product response:', response.data);
+        return response.data;
       } else {
         // Regular JSON request
-        const { photo, documents, ...productData } = data;
+        const { photo, documents, documentNames, ...productData } = data;
         const response = await api.post('/products', productData);
         console.log('Create product response:', response.data);
         return response.data;
@@ -301,56 +301,17 @@ export const productAPI = {
       if (data.photo || (data.documents && data.documents.length > 0)) {
         // Use FormData for file upload
         const response = await createFormDataRequest(`/products/${id}`, data as ProductFormData, 'PUT', onProgress);
-        console.log('Update product response:', response);
-        return response;
+        console.log('Update product response:', response.data);
+        return response.data;
       } else {
         // Regular JSON request
-        const { photo, documents, ...productData } = data;
+        const { photo, documents, documentNames, ...productData } = data;
         const response = await api.put(`/products/${id}`, productData);
         console.log('Update product response:', response.data);
         return response.data;
       }
     } catch (error) {
       console.error('Error updating product:', error);
-      throw error;
-    }
-  },
-
-  // Update product with photo (specialized method)
-  updateProductWithPhoto: async (
-    id: string,
-    data: ProductFormData,
-    onProgress?: (progress: number) => void
-  ): Promise<{ message: string; product: Product }> => {
-    try {
-      console.log('Updating product with photo:', id, data);
-      
-      const formData = new FormData();
-      
-      // Add all fields to FormData
-      Object.keys(data).forEach(key => {
-        const value = (data as any)[key];
-        if (value !== undefined && value !== null) {
-          if (key === 'photo' && value instanceof File) {
-            formData.append('photo', value);
-          } else if (key === 'documents' && Array.isArray(value)) {
-            value.forEach((file: File) => {
-              formData.append('documents', file);
-            });
-          } else if (key === 'defaultDiscount' && typeof value === 'object') {
-            formData.append('defaultDiscountType', value.type);
-            formData.append('defaultDiscountValue', value.value.toString());
-          } else {
-            formData.append(key, value.toString());
-          }
-        }
-      });
-      
-      const response = await createFormDataRequest(`/products/${id}/photo`, formData, 'PUT', onProgress);
-      console.log('Update product with photo response:', response);
-      return response;
-    } catch (error) {
-      console.error('Error updating product with photo:', error);
       throw error;
     }
   },
@@ -385,8 +346,8 @@ export const productAPI = {
       }
       
       const response = await createFormDataRequest(`/products/${id}/documents`, formData, 'POST', onProgress);
-      console.log('Add document response:', response);
-      return response;
+      console.log('Add document response:', response.data);
+      return response.data;
     } catch (error) {
       console.error('Error adding product document:', error);
       throw error;
@@ -465,7 +426,7 @@ export const productAPI = {
     return basePrice;
   },
 
-  // Check stock validity
+  // Check stock validity - FIXED
   checkStockValidity: (product: Product): {
     isValid: boolean;
     warnings: string[];
@@ -483,8 +444,13 @@ export const productAPI = {
       result.isValid = false;
     }
     
-    // Check if expiring soon (within 30 days)
-    if (product.daysUntilExpiry !== null && product.daysUntilExpiry <= 30 && product.daysUntilExpiry > 0) {
+    // Check if expiring soon (within 30 days) - FIXED TYPE CHECK
+    if (
+      product.daysUntilExpiry !== undefined && 
+      product.daysUntilExpiry !== null && 
+      product.daysUntilExpiry <= 30 && 
+      product.daysUntilExpiry > 0
+    ) {
       result.warnings.push(`Product expiring in ${product.daysUntilExpiry} days`);
     }
     
