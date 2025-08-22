@@ -67,6 +67,10 @@ export interface WarehouseContact {
     _id: string;
     name: string;
   };
+  branch: {
+    _id: string;
+    name: string;
+  };
   contactPersonName: string;
   department: 'Admin' | 'Operations' | 'Sales' | 'Logistics';
   designation: string;
@@ -160,8 +164,7 @@ const createFormDataRequest = async (
     }
   }
 
-  const { getToken } = useAuthStore.getState();
-  const token = getToken();
+  const token = useAuthStore.getState().accessToken;
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -204,10 +207,9 @@ const createFormDataRequest = async (
 // Helper function to download files with authentication
 const downloadFileWithAuth = async (filename: string, originalName?: string) => {
   try {
-    const { getToken } = useAuthStore.getState();
-    const token = getToken();
+    const token = useAuthStore.getState().accessToken;
     
-    const response = await fetch(`${api.defaults.baseURL}/api/files/download/${filename}`, {
+    const response = await fetch(`${api.defaults.baseURL}/files/download/${filename}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -235,10 +237,9 @@ const downloadFileWithAuth = async (filename: string, originalName?: string) => 
 // Helper function to view files with authentication
 const viewFileWithAuth = (filename: string) => {
   try {
-    const { getToken } = useAuthStore.getState();
-    const token = getToken();
+    const token = useAuthStore.getState().accessToken;
     
-    const url = `${api.defaults.baseURL}/api/files/view/${filename}?token=${encodeURIComponent(token)}`;
+    const url = `${api.defaults.baseURL}/files/view/${filename}?token=${encodeURIComponent(token)}`;
     window.open(url, '_blank');
   } catch (error) {
     console.error('View error:', error);
@@ -251,7 +252,7 @@ export const warehouseAPI = {
   getWarehouses: async (params?: { page?: number; limit?: number; search?: string; branch?: string }) => {
     try {
       const response = await api.get('/warehouses', { params });
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -261,7 +262,7 @@ export const warehouseAPI = {
   getWarehouse: async (id: string) => {
     try {
       const response = await api.get(`/warehouses/${id}`);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -271,7 +272,7 @@ export const warehouseAPI = {
   getWarehousesByBranch: async (branchId: string, params?: { page?: number; limit?: number; search?: string }) => {
     try {
       const response = await api.get(`/warehouses/branch/${branchId}`, { params });
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -281,7 +282,7 @@ export const warehouseAPI = {
   createWarehouse: async (data: WarehouseFormData, onProgress?: (progress: number) => void) => {
     try {
       const response = await createFormDataRequest('/warehouses', data, 'POST', onProgress);
-      return response;
+      return { data: response };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -291,7 +292,7 @@ export const warehouseAPI = {
   updateWarehouse: async (id: string, data: WarehouseFormData, onProgress?: (progress: number) => void) => {
     try {
       const response = await createFormDataRequest(`/warehouses/${id}`, data, 'PUT', onProgress);
-      return response;
+      return { data: response };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -301,7 +302,7 @@ export const warehouseAPI = {
   deleteWarehouse: async (id: string) => {
     try {
       const response = await api.delete(`/warehouses/${id}`);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -311,13 +312,13 @@ export const warehouseAPI = {
   addDocument: async (warehouseId: string, documentData: WarehouseDocumentFormData, onProgress?: (progress: number) => void) => {
     try {
       const formData = new FormData();
-      formData.append('file', documentData.file);
+      formData.append('document', documentData.file);
       formData.append('documentName', documentData.documentName);
       formData.append('validityStartDate', documentData.validityStartDate);
       formData.append('validityEndDate', documentData.validityEndDate);
       
       const response = await createFormDataRequest(`/warehouses/${warehouseId}/documents`, formData, 'POST', onProgress);
-      return response;
+      return { data: response };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -326,7 +327,7 @@ export const warehouseAPI = {
   updateDocument: async (warehouseId: string, documentId: string, data: { documentName?: string; validityStartDate?: string; validityEndDate?: string }) => {
     try {
       const response = await api.put(`/warehouses/${warehouseId}/documents/${documentId}`, data);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -335,7 +336,7 @@ export const warehouseAPI = {
   deleteDocument: async (warehouseId: string, documentId: string) => {
     try {
       const response = await api.delete(`/warehouses/${warehouseId}/documents/${documentId}`);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -367,7 +368,7 @@ export const warehouseAPI = {
   getWarehouseContacts: async (warehouseId: string, params?: { page?: number; limit?: number; search?: string }) => {
     try {
       const response = await api.get(`/warehouses/${warehouseId}/contacts`, { params });
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -376,7 +377,7 @@ export const warehouseAPI = {
   createWarehouseContact: async (warehouseId: string, data: WarehouseContactFormData) => {
     try {
       const response = await api.post(`/warehouses/${warehouseId}/contacts`, data);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -385,7 +386,7 @@ export const warehouseAPI = {
   updateWarehouseContact: async (warehouseId: string, contactId: string, data: WarehouseContactFormData) => {
     try {
       const response = await api.put(`/warehouses/${warehouseId}/contacts/${contactId}`, data);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -394,7 +395,7 @@ export const warehouseAPI = {
   deleteWarehouseContact: async (warehouseId: string, contactId: string) => {
     try {
       const response = await api.delete(`/warehouses/${warehouseId}/contacts/${contactId}`);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
       throw handleApiError(error);
     }

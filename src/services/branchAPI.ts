@@ -63,12 +63,16 @@ export interface BranchContact {
     _id: string;
     name: string;
   };
-  contactPersonName: string;
+  name: string;  // This should be the contact name
+  contactPersonName: string;  // Alternative field name
   department: 'Admin' | 'Operations' | 'Sales' | 'Logistics';
   designation: string;
-  contactNumber: string;
+  phone: string;  // This should be the phone
+  contactNumber: string;  // Alternative field name
+  alternatePhone?: string;
   alternateContactPerson?: string;
-  emailAddress: string;
+  email: string;  // This should be the email
+  emailAddress: string;  // Alternative field name
   isActive: boolean;
   createdBy: {
     _id: string;
@@ -106,12 +110,16 @@ export interface BranchFormData {
 }
 
 export interface BranchContactFormData {
-  contactPersonName: string;
+  name: string;
+  contactPersonName?: string;
   department: 'Admin' | 'Operations' | 'Sales' | 'Logistics';
   designation: string;
-  contactNumber: string;
+  phone: string;
+  contactNumber?: string;
+  alternatePhone?: string;
   alternateContactPerson?: string;
-  emailAddress: string;
+  email: string;
+  emailAddress?: string;
   isActive?: boolean;
 }
 
@@ -156,8 +164,7 @@ const createFormDataRequest = async (
     }
   }
 
-  const { getToken } = useAuthStore.getState();
-  const token = getToken();
+  const token = useAuthStore.getState().accessToken;
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -200,10 +207,9 @@ const createFormDataRequest = async (
 // Helper function to download files with authentication
 const downloadFileWithAuth = async (filename: string, originalName?: string) => {
   try {
-    const { getToken } = useAuthStore.getState();
-    const token = getToken();
+    const token = useAuthStore.getState().accessToken;
     
-    const response = await fetch(`${api.defaults.baseURL}/api/files/download/${filename}`, {
+    const response = await fetch(`${api.defaults.baseURL}/files/download/${filename}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -231,10 +237,9 @@ const downloadFileWithAuth = async (filename: string, originalName?: string) => 
 // Helper function to view files with authentication
 const viewFileWithAuth = (filename: string) => {
   try {
-    const { getToken } = useAuthStore.getState();
-    const token = getToken();
+    const token = useAuthStore.getState().accessToken;
     
-    const url = `${api.defaults.baseURL}/api/files/view/${filename}?token=${encodeURIComponent(token)}`;
+    const url = `${api.defaults.baseURL}/files/view/${filename}?token=${encodeURIComponent(token)}`;
     window.open(url, '_blank');
   } catch (error) {
     console.error('View error:', error);
@@ -247,8 +252,10 @@ export const branchAPI = {
   getBranches: async (params?: { page?: number; limit?: number; search?: string }) => {
     try {
       const response = await api.get('/branches', { params });
-      return response.data;
+      console.log('Branch API Response:', response.data); // Debug log
+      return { data: response.data };
     } catch (error) {
+      console.error('Error fetching branches:', error);
       throw handleApiError(error);
     }
   },
@@ -257,8 +264,10 @@ export const branchAPI = {
   getBranch: async (id: string) => {
     try {
       const response = await api.get(`/branches/${id}`);
-      return response.data;
+      console.log('Single Branch API Response:', response.data); // Debug log
+      return { data: response.data };
     } catch (error) {
+      console.error('Error fetching branch:', error);
       throw handleApiError(error);
     }
   },
@@ -267,8 +276,9 @@ export const branchAPI = {
   createBranch: async (data: BranchFormData, onProgress?: (progress: number) => void) => {
     try {
       const response = await createFormDataRequest('/branches', data, 'POST', onProgress);
-      return response;
+      return { data: response };
     } catch (error) {
+      console.error('Error creating branch:', error);
       throw handleApiError(error);
     }
   },
@@ -277,8 +287,9 @@ export const branchAPI = {
   updateBranch: async (id: string, data: BranchFormData, onProgress?: (progress: number) => void) => {
     try {
       const response = await createFormDataRequest(`/branches/${id}`, data, 'PUT', onProgress);
-      return response;
+      return { data: response };
     } catch (error) {
+      console.error('Error updating branch:', error);
       throw handleApiError(error);
     }
   },
@@ -287,24 +298,20 @@ export const branchAPI = {
   deleteBranch: async (id: string) => {
     try {
       const response = await api.delete(`/branches/${id}`);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
+      console.error('Error deleting branch:', error);
       throw handleApiError(error);
     }
   },
 
   // Document management
-  addDocument: async (branchId: string, documentData: BranchDocumentFormData, onProgress?: (progress: number) => void) => {
+  addDocument: async (branchId: string, documentData: FormData, onProgress?: (progress: number) => void) => {
     try {
-      const formData = new FormData();
-      formData.append('file', documentData.file);
-      formData.append('documentName', documentData.documentName);
-      formData.append('validityStartDate', documentData.validityStartDate);
-      formData.append('validityEndDate', documentData.validityEndDate);
-      
-      const response = await createFormDataRequest(`/branches/${branchId}/documents`, formData, 'POST', onProgress);
-      return response;
+      const response = await createFormDataRequest(`/branches/${branchId}/documents`, documentData, 'POST', onProgress);
+      return { data: response };
     } catch (error) {
+      console.error('Error adding document:', error);
       throw handleApiError(error);
     }
   },
@@ -312,8 +319,9 @@ export const branchAPI = {
   updateDocument: async (branchId: string, documentId: string, data: { documentName?: string; validityStartDate?: string; validityEndDate?: string }) => {
     try {
       const response = await api.put(`/branches/${branchId}/documents/${documentId}`, data);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
+      console.error('Error updating document:', error);
       throw handleApiError(error);
     }
   },
@@ -321,8 +329,9 @@ export const branchAPI = {
   deleteDocument: async (branchId: string, documentId: string) => {
     try {
       const response = await api.delete(`/branches/${branchId}/documents/${documentId}`);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
+      console.error('Error deleting document:', error);
       throw handleApiError(error);
     }
   },
@@ -332,6 +341,7 @@ export const branchAPI = {
     try {
       viewFileWithAuth(filename);
     } catch (error) {
+      console.error('Error viewing file:', error);
       throw handleApiError(error);
     }
   },
@@ -340,6 +350,7 @@ export const branchAPI = {
     try {
       await downloadFileWithAuth(filename, originalName);
     } catch (error) {
+      console.error('Error downloading file:', error);
       throw handleApiError(error);
     }
   },
@@ -353,26 +364,52 @@ export const branchAPI = {
   getBranchContacts: async (branchId: string, params?: { page?: number; limit?: number; search?: string }) => {
     try {
       const response = await api.get(`/branches/${branchId}/contacts`, { params });
-      return response.data;
+      console.log('Branch Contacts API Response:', response.data); // Debug log
+      return { data: response.data };
     } catch (error) {
+      console.error('Error fetching branch contacts:', error);
       throw handleApiError(error);
     }
   },
 
   createBranchContact: async (branchId: string, data: BranchContactFormData) => {
     try {
-      const response = await api.post(`/branches/${branchId}/contacts`, data);
-      return response.data;
+      // Map the form data to the backend expected format
+      const contactData = {
+        contactPersonName: data.name || data.contactPersonName,
+        department: data.department,
+        designation: data.designation,
+        contactNumber: data.phone || data.contactNumber,
+        alternateContactPerson: data.alternatePhone || data.alternateContactPerson,
+        emailAddress: data.email || data.emailAddress,
+        isActive: data.isActive
+      };
+      
+      const response = await api.post(`/branches/${branchId}/contacts`, contactData);
+      return { data: response.data };
     } catch (error) {
+      console.error('Error creating branch contact:', error);
       throw handleApiError(error);
     }
   },
 
   updateBranchContact: async (branchId: string, contactId: string, data: BranchContactFormData) => {
     try {
-      const response = await api.put(`/branches/${branchId}/contacts/${contactId}`, data);
-      return response.data;
+      // Map the form data to the backend expected format
+      const contactData = {
+        contactPersonName: data.name || data.contactPersonName,
+        department: data.department,
+        designation: data.designation,
+        contactNumber: data.phone || data.contactNumber,
+        alternateContactPerson: data.alternatePhone || data.alternateContactPerson,
+        emailAddress: data.email || data.emailAddress,
+        isActive: data.isActive
+      };
+      
+      const response = await api.put(`/branches/${branchId}/contacts/${contactId}`, contactData);
+      return { data: response.data };
     } catch (error) {
+      console.error('Error updating branch contact:', error);
       throw handleApiError(error);
     }
   },
@@ -380,8 +417,9 @@ export const branchAPI = {
   deleteBranchContact: async (branchId: string, contactId: string) => {
     try {
       const response = await api.delete(`/branches/${branchId}/contacts/${contactId}`);
-      return response.data;
+      return { data: response.data };
     } catch (error) {
+      console.error('Error deleting branch contact:', error);
       throw handleApiError(error);
     }
   },

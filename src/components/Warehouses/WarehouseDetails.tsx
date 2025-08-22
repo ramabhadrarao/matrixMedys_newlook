@@ -23,13 +23,26 @@ import {
   XCircle,
   AlertTriangle,
   Hash,
-  Clock
+  Clock,
+  Save,
+  X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { useForm } from 'react-hook-form';
 import { warehouseAPI, Warehouse, WarehouseContact, WarehouseDocument } from '../../services/warehouseAPI';
 import { handleApiError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+
+interface ContactFormData {
+  name: string;
+  department: 'Admin' | 'Operations' | 'Sales' | 'Logistics';
+  designation: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  isActive: boolean;
+}
 
 const WarehouseDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,11 +58,26 @@ const WarehouseDetails: React.FC = () => {
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [editingContact, setEditingContact] = useState<WarehouseContact | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<WarehouseContact | null>(null);
+  const [showContactDeleteModal, setShowContactDeleteModal] = useState(false);
   
   const { hasPermission } = useAuthStore();
   const canUpdate = hasPermission('warehouses', 'update');
   const canDelete = hasPermission('warehouses', 'delete');
-  const canView = hasPermission('warehouses', 'read');
+  const canView = hasPermission('warehouses', 'view'); // Changed from 'read' to 'view'
+  const canCreate = hasPermission('warehouses', 'create');
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ContactFormData>({
+    defaultValues: {
+      isActive: true,
+    },
+  });
 
   useEffect(() => {
     if (id) {
@@ -58,13 +86,23 @@ const WarehouseDetails: React.FC = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (id) {
+        fetchContacts();
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, id]);
+
   const fetchWarehouse = async () => {
     if (!id) return;
     
     try {
       setLoading(true);
       const response = await warehouseAPI.getWarehouse(id);
-      setWarehouse(response.data);
+      setWarehouse(response.data.warehouse);
     } catch (error) {
       console.error('Error fetching warehouse:', error);
       handleApiError(error);
@@ -82,7 +120,7 @@ const WarehouseDetails: React.FC = () => {
       const response = await warehouseAPI.getWarehouseContacts(id, {
         search: searchTerm
       });
-      setContacts(response.data || []);
+      setContacts(response.data.contacts || []);
     } catch (error) {
       console.error('Error fetching contacts:', error);
       handleApiError(error);
@@ -110,20 +148,102 @@ const WarehouseDetails: React.FC = () => {
     }
   };
 
-  const handleDeleteContact = async (contactId: string) => {
-    if (!warehouse || !canDelete) {
+  const handleAddContact = async (data: ContactFormData) => {
+    if (!canCreate || !id) {
+      toast.error('You do not have permission to add contacts');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await warehouseAPI.createWarehouseContact(id, {
+        contactPersonName: data.name,
+        department: data.department,
+        designation: data.designation,
+        contactNumber: data.phone,
+        alternateContactPerson: data.alternatePhone,
+        emailAddress: data.email,
+        isActive: data.isActive
+      });
+      toast.success('Contact added successfully');
+      setShowContactModal(false);
+      reset();
+      fetchContacts();
+    } catch (error) {
+      handleApiError(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditContact = async (data: ContactFormData) => {
+    if (!canUpdate || !editingContact || !id) {
+      toast.error('You do not have permission to update contacts');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await warehouseAPI.updateWarehouseContact(id, editingContact._id, {
+        contactPersonName: data.name,
+        department: data.department,
+        designation: data.designation,
+        contactNumber: data.phone,
+        alternateContactPerson: data.alternatePhone,
+        emailAddress: data.email,
+        isActive: data.isActive
+      });
+      toast.success('Contact updated successfully');
+      setEditingContact(null);
+      setShowContactModal(false);
+      reset();
+      fetchContacts();
+    } catch (error) {
+      handleApiError(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteContact = async () => {
+    if (!warehouse || !canDelete || !contactToDelete || !id) {
       toast.error('You do not have permission to delete contacts');
       return;
     }
 
     try {
-      await warehouseAPI.deleteBranchContact(warehouse._id, contactId);
+      setDeleteLoading(true);
+      await warehouseAPI.deleteWarehouseContact(id, contactToDelete._id);
       toast.success('Contact deleted successfully');
+      setShowContactDeleteModal(false);
+      setContactToDelete(null);
       fetchContacts();
     } catch (error) {
       console.error('Error deleting contact:', error);
       handleApiError(error);
+    } finally {
+      setDeleteLoading(false);
     }
+  };
+
+  const startEditContact = (contact: WarehouseContact) => {
+    setEditingContact(contact);
+    reset({
+      name: contact.contactPersonName,
+      department: contact.department,
+      designation: contact.designation,
+      phone: contact.contactNumber,
+      alternatePhone: contact.alternateContactPerson || '',
+      email: contact.emailAddress,
+      isActive: contact.isActive,
+    });
+    setShowContactModal(true);
+  };
+
+  const cancelContactEdit = () => {
+    setEditingContact(null);
+    setShowContactModal(false);
+    reset();
   };
 
   const handleDownloadDocument = async (filename: string, originalName?: string) => {
@@ -219,9 +339,9 @@ const WarehouseDetails: React.FC = () => {
   };
 
   const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.phone.includes(searchTerm)
+    contact.contactPersonName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.emailAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.contactNumber.includes(searchTerm)
   );
 
   if (loading) {
@@ -330,24 +450,20 @@ const WarehouseDetails: React.FC = () => {
                 <p className="text-gray-900">{warehouse.branch.name}</p>
               </div>
               
-              {warehouse.capacity && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Storage Capacity</label>
-                  <p className="text-gray-900">{warehouse.capacity}</p>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Drug License Number</label>
+                <p className="text-gray-900">{warehouse.drugLicenseNumber}</p>
+              </div>
               
-              {warehouse.storageType && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Storage Type</label>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStorageTypeColor(warehouse.storageType)}`}>
-                      {getStorageTypeIcon(warehouse.storageType)}
-                      {warehouse.storageType.charAt(0).toUpperCase() + warehouse.storageType.slice(1)}
-                    </span>
-                  </div>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                <p className="text-gray-900">{warehouse.district}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <p className="text-gray-900">{warehouse.status}</p>
+              </div>
             </div>
           </div>
 
@@ -366,8 +482,8 @@ const WarehouseDetails: React.FC = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <p className="text-gray-900">{warehouse.city}</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                  <p className="text-gray-900">{warehouse.district}</p>
                 </div>
                 
                 <div>
@@ -399,6 +515,16 @@ const WarehouseDetails: React.FC = () => {
                 </div>
               </div>
               
+              {warehouse.alternatePhone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Alternate Phone</label>
+                    <p className="text-gray-900">{warehouse.alternatePhone}</p>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-gray-400" />
                 <div>
@@ -406,58 +532,8 @@ const WarehouseDetails: React.FC = () => {
                   <p className="text-gray-900">{warehouse.email}</p>
                 </div>
               </div>
-              
-              {warehouse.website && (
-                <div className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Website</label>
-                    <a 
-                      href={warehouse.website} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-                      {warehouse.website}
-                    </a>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
-
-          {/* Manager Information */}
-          {(warehouse.managerName || warehouse.managerPhone || warehouse.managerEmail) && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Manager Information
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {warehouse.managerName && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                    <p className="text-gray-900">{warehouse.managerName}</p>
-                  </div>
-                )}
-                
-                {warehouse.managerPhone && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                    <p className="text-gray-900">{warehouse.managerPhone}</p>
-                  </div>
-                )}
-                
-                {warehouse.managerEmail && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <p className="text-gray-900">{warehouse.managerEmail}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Remarks */}
           {warehouse.remarks && (
@@ -512,15 +588,6 @@ const WarehouseDetails: React.FC = () => {
                 <FileText className="h-5 w-5" />
                 Documents
               </h2>
-              
-              {canUpdate && (
-                <button
-                  onClick={() => setShowDocumentModal(true)}
-                  className="text-blue-600 hover:text-blue-800 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              )}
             </div>
             
             {warehouse.documents && warehouse.documents.length > 0 ? (
@@ -583,14 +650,6 @@ const WarehouseDetails: React.FC = () => {
               <div className="text-center py-6">
                 <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">No documents uploaded</p>
-                {canUpdate && (
-                  <button
-                    onClick={() => setShowDocumentModal(true)}
-                    className="text-blue-600 hover:text-blue-800 text-sm mt-2 transition-colors"
-                  >
-                    Upload first document
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -605,10 +664,19 @@ const WarehouseDetails: React.FC = () => {
             Contacts ({contacts.length})
           </h2>
           
-          {canUpdate && (
+          {canCreate && (
             <button
               onClick={() => {
                 setEditingContact(null);
+                reset({
+                  name: '',
+                  department: 'Admin',
+                  designation: '',
+                  phone: '',
+                  alternatePhone: '',
+                  email: '',
+                  isActive: true,
+                });
                 setShowContactModal(true);
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
@@ -649,52 +717,65 @@ const WarehouseDetails: React.FC = () => {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h4 className="font-medium text-gray-900">{contact.name}</h4>
+                    <h4 className="font-medium text-gray-900">{contact.contactPersonName}</h4>
                     <p className="text-sm text-gray-600">{contact.designation}</p>
                   </div>
                   
-                  <div className="flex items-center gap-1">
-                    {canUpdate && (
-                      <button
-                        onClick={() => {
-                          setEditingContact(contact);
-                          setShowContactModal(true);
-                        }}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Edit Contact"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </button>
-                    )}
-                    
-                    {canDelete && (
-                      <button
-                        onClick={() => handleDeleteContact(contact._id)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Delete Contact"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    contact.isActive 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {contact.isActive ? 'Active' : 'Inactive'}
+                  </span>
                 </div>
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-gray-600">
-                    <Phone className="h-3 w-3" />
-                    <span>{contact.phone}</span>
+                    <Building2 className="h-3 w-3" />
+                    <span>{contact.department}</span>
                   </div>
                   
                   <div className="flex items-center gap-2 text-gray-600">
-                    <Mail className="h-3 w-3" />
-                    <span className="truncate">{contact.email}</span>
+                    <Phone className="h-3 w-3" />
+                    <span>{contact.contactNumber}</span>
                   </div>
                   
-                  {contact.department && (
+                  {contact.alternateContactPerson && (
                     <div className="flex items-center gap-2 text-gray-600">
-                      <Building2 className="h-3 w-3" />
-                      <span>{contact.department}</span>
+                      <User className="h-3 w-3" />
+                      <span>{contact.alternateContactPerson}</span>
                     </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Mail className="h-3 w-3" />
+                    <span className="truncate">{contact.emailAddress}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-1 mt-3 pt-3 border-t border-gray-100">
+                  {canUpdate && (
+                    <button
+                      onClick={() => startEditContact(contact)}
+                      className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors flex items-center gap-1 text-xs"
+                    >
+                      <Edit className="h-3 w-3" />
+                      Edit
+                    </button>
+                  )}
+                  
+                  {canDelete && (
+                    <button
+                      onClick={() => {
+                        setContactToDelete(contact);
+                        setShowContactDeleteModal(true);
+                      }}
+                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors flex items-center gap-1 text-xs"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
                   )}
                 </div>
               </motion.div>
@@ -707,10 +788,19 @@ const WarehouseDetails: React.FC = () => {
             <p className="text-gray-600 mb-4">
               {searchTerm ? 'Try adjusting your search criteria.' : 'No contacts have been added yet.'}
             </p>
-            {canUpdate && !searchTerm && (
+            {canCreate && !searchTerm && (
               <button
                 onClick={() => {
                   setEditingContact(null);
+                  reset({
+                    name: '',
+                    department: 'Admin',
+                    designation: '',
+                    phone: '',
+                    alternatePhone: '',
+                    email: '',
+                    isActive: true,
+                  });
                   setShowContactModal(true);
                 }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors"
@@ -723,7 +813,206 @@ const WarehouseDetails: React.FC = () => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Add/Edit Contact Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {editingContact ? 'Edit Contact' : 'Add Contact'}
+              </h3>
+              <button
+                onClick={cancelContactEdit}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit(editingContact ? handleEditContact : handleAddContact)} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  {...register('name', { required: 'Name is required' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter contact name"
+                />
+                {errors.name && (
+                  <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Department *
+                </label>
+                <select
+                  {...register('department', { required: 'Department is required' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Department</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Sales">Sales</option>
+                  <option value="Logistics">Logistics</option>
+                </select>
+                {errors.department && (
+                  <p className="text-red-500 text-sm mt-1">{errors.department.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Designation *
+                </label>
+                <input
+                  type="text"
+                  {...register('designation', { required: 'Designation is required' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., Manager, Supervisor"
+                />
+                {errors.designation && (
+                  <p className="text-red-500 text-sm mt-1">{errors.designation.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone *
+                </label>
+                <input
+                  type="tel"
+                  {...register('phone', { required: 'Phone is required' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter phone number"
+                />
+                {errors.phone && (
+                  <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Alternate Contact Person
+                </label>
+                <input
+                  type="text"
+                  {...register('alternatePhone')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter alternate contact person (optional)"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  {...register('email', { 
+                    required: 'Email is required',
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Invalid email address'
+                    }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter email address"
+                />
+                {errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  {...register('isActive')}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label className="text-sm font-medium text-gray-700">
+                  Active Contact
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={cancelContactEdit}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  {saving ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {saving ? 'Saving...' : (editingContact ? 'Update' : 'Add')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Contact Modal */}
+      {showContactDeleteModal && contactToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Contact</h3>
+                <p className="text-gray-600">Are you sure you want to delete this contact?</p>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <p className="font-medium text-gray-900">{contactToDelete.contactPersonName}</p>
+              <p className="text-sm text-gray-600">{contactToDelete.department} - {contactToDelete.designation}</p>
+            </div>
+            
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowContactDeleteModal(false);
+                  setContactToDelete(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteContact}
+                disabled={deleteLoading}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {deleteLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Warehouse Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -740,7 +1029,7 @@ const WarehouseDetails: React.FC = () => {
             <div className="bg-gray-50 rounded-lg p-3 mb-4">
               <p className="font-medium text-gray-900">{warehouse.name}</p>
               <p className="text-sm text-gray-600">
-                {warehouse.city}, {warehouse.state.name}
+                {warehouse.district}, {warehouse.state.name}
               </p>
               <p className="text-sm text-gray-600">Branch: {warehouse.branch.name}</p>
             </div>

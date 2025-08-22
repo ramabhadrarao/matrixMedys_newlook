@@ -106,14 +106,24 @@ const WarehouseForm: React.FC = () => {
   };
 
   const fetchBranches = async () => {
-    try {
-      const response = await branchAPI.getBranches({ limit: 100 });
-      setBranches(response.data.branches || []);
-    } catch (error) {
-      console.error('Error fetching branches:', error);
-      handleApiError(error);
+  try {
+    const response = await branchAPI.getBranches({ limit: 100 });
+    console.log('Fetched branches response:', response); // Debug log
+    
+    // Handle the response structure correctly
+    if (response && response.data) {
+      const branchesData = response.data.branches || [];
+      setBranches(branchesData);
+    } else {
+      setBranches([]);
+      console.error('Unexpected response structure:', response);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching branches:', error);
+    handleApiError(error);
+    setBranches([]); // Set empty array on error
+  }
+};
 
   const fetchWarehouse = async (warehouseId: string) => {
     try {

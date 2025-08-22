@@ -51,14 +51,16 @@ const WarehousesList: React.FC = () => {
   const canCreate = hasPermission('warehouses', 'create');
   const canUpdate = hasPermission('warehouses', 'update');
   const canDelete = hasPermission('warehouses', 'delete');
-  const canView = hasPermission('warehouses', 'read');
+  const canView = hasPermission('warehouses', 'view'); // Changed from 'read' to 'view'
 
   const itemsPerPage = 12;
 
   useEffect(() => {
-    fetchWarehouses();
-    fetchBranches();
-  }, [currentPage, searchTerm, selectedBranch]);
+    if (canView) {
+      fetchWarehouses();
+      fetchBranches();
+    }
+  }, [currentPage, searchTerm, selectedBranch, canView]);
 
   useEffect(() => {
     // Update URL params
@@ -80,8 +82,10 @@ const WarehousesList: React.FC = () => {
       });
       
       setWarehouses(response.data.warehouses || []);
-      setTotalPages(response.data.totalPages || 1);
-      setTotalWarehouses(response.data.total || 0);
+      if (response.data.pagination) {
+        setTotalPages(response.data.pagination.pages || 1);
+        setTotalWarehouses(response.data.pagination.total || 0);
+      }
     } catch (error) {
       console.error('Error fetching warehouses:', error);
       handleApiError(error);
@@ -90,15 +94,27 @@ const WarehousesList: React.FC = () => {
     }
   };
 
-  const fetchBranches = async () => {
-    try {
-      const response = await branchAPI.getBranches({ limit: 100 });
-      setBranches(response.data.branches || []);
-    } catch (error) {
-      console.error('Error fetching branches:', error);
-      handleApiError(error);
+  // Update the fetchBranches function:
+
+const fetchBranches = async () => {
+  try {
+    const response = await branchAPI.getBranches({ limit: 100 });
+    console.log('Fetched branches response:', response); // Debug log
+    
+    // Handle the response structure correctly
+    if (response && response.data) {
+      const branchesData = response.data.branches || [];
+      setBranches(branchesData);
+    } else {
+      setBranches([]);
+      console.error('Unexpected response structure:', response);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching branches:', error);
+    handleApiError(error);
+    setBranches([]); // Set empty array on error
+  }
+};
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -236,15 +252,6 @@ const WarehousesList: React.FC = () => {
             </select>
           </div>
           
-          {/* Filter Toggle */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-          </button>
-          
           {/* Clear Filters */}
           {(searchTerm || selectedBranch) && (
             <button
@@ -326,7 +333,7 @@ const WarehousesList: React.FC = () => {
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <MapPin className="h-4 w-4" />
                     <span className="truncate">
-                      {warehouse.city}, {warehouse.state.name}
+                      {warehouse.district}, {warehouse.state.name}
                     </span>
                   </div>
                   
@@ -454,7 +461,7 @@ const WarehousesList: React.FC = () => {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`px-3 py-2 rounded-lg text-sm transition-colors ${
                     currentPage === pageNum
-                      ? 'bg-blue-600 text-white'
+                     ? 'bg-blue-600 text-white'
                       : 'border border-gray-300 hover:bg-gray-50'
                   }`}
                 >
@@ -491,7 +498,7 @@ const WarehousesList: React.FC = () => {
             <div className="bg-gray-50 rounded-lg p-3 mb-4">
               <p className="font-medium text-gray-900">{warehouseToDelete.name}</p>
               <p className="text-sm text-gray-600">
-                {warehouseToDelete.city}, {warehouseToDelete.state.name}
+                {warehouseToDelete.district}, {warehouseToDelete.state.name}
               </p>
               <p className="text-sm text-gray-600">Branch: {warehouseToDelete.branch.name}</p>
             </div>

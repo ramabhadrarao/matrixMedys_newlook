@@ -184,18 +184,17 @@ const BranchDetails: React.FC = () => {
   };
 
   const startEditContact = (contact: BranchContact) => {
-    setEditingContact(contact);
-    reset({
-      name: contact.name,
-      department: contact.department,
-      designation: contact.designation,
-      phone: contact.phone,
-      alternatePhone: contact.alternatePhone || '',
-      email: contact.email,
-      isActive: contact.isActive,
-    });
-  };
-
+  setEditingContact(contact);
+  reset({
+    name: contact.contactPersonName || contact.name,
+    department: contact.department,
+    designation: contact.designation,
+    phone: contact.contactNumber || contact.phone,
+    alternatePhone: contact.alternateContactPerson || contact.alternatePhone || '',
+    email: contact.emailAddress || contact.email,
+    isActive: contact.isActive,
+  });
+};
   const cancelEdit = () => {
     setEditingContact(null);
     setShowAddContact(false);
@@ -308,12 +307,12 @@ const BranchDetails: React.FC = () => {
     }
   };
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+const filteredContacts = contacts.filter(contact =>
+  (contact.contactPersonName || contact.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+  contact.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  contact.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  (contact.emailAddress || contact.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+);
 
   if (loading) {
     return (
@@ -663,54 +662,56 @@ const BranchDetails: React.FC = () => {
           ) : filteredContacts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredContacts.map((contact) => (
-                <motion.div
-                  key={contact._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <User className="h-5 w-5 text-gray-400" />
-                      <h3 className="font-medium text-gray-900">{contact.name}</h3>
-                    </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      contact.isActive 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {contact.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-600">
-                      <span className="font-medium">Department:</span> {contact.department}
-                    </p>
-                    <p className="text-gray-600">
-                      <span className="font-medium">Designation:</span> {contact.designation}
-                    </p>
-                    <p className="text-gray-600">
-                      <span className="font-medium">Phone:</span> 
-                      <a href={`tel:${contact.phone}`} className="text-blue-600 hover:text-blue-800 ml-1">
-                        {contact.phone}
-                      </a>
-                    </p>
-                    {contact.alternatePhone && (
-                      <p className="text-gray-600">
-                        <span className="font-medium">Alt Phone:</span> 
-                        <a href={`tel:${contact.alternatePhone}`} className="text-blue-600 hover:text-blue-800 ml-1">
-                          {contact.alternatePhone}
-                        </a>
-                      </p>
-                    )}
-                    <p className="text-gray-600">
-                      <span className="font-medium">Email:</span> 
-                      <a href={`mailto:${contact.email}`} className="text-blue-600 hover:text-blue-800 ml-1">
-                        {contact.email}
-                      </a>
-                    </p>
-                  </div>
+  <motion.div
+    key={contact._id}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+  >
+    <div className="flex items-start justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <User className="h-5 w-5 text-gray-400" />
+        <h3 className="font-medium text-gray-900">
+          {contact.contactPersonName || contact.name}
+        </h3>
+      </div>
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+        contact.isActive 
+          ? 'bg-green-100 text-green-800' 
+          : 'bg-red-100 text-red-800'
+      }`}>
+        {contact.isActive ? 'Active' : 'Inactive'}
+      </span>
+    </div>
+    
+    <div className="space-y-2 text-sm">
+      <p className="text-gray-600">
+        <span className="font-medium">Department:</span> {contact.department}
+      </p>
+      <p className="text-gray-600">
+        <span className="font-medium">Designation:</span> {contact.designation}
+      </p>
+      <p className="text-gray-600">
+        <span className="font-medium">Phone:</span> 
+        <a href={`tel:${contact.contactNumber || contact.phone}`} className="text-blue-600 hover:text-blue-800 ml-1">
+          {contact.contactNumber || contact.phone}
+        </a>
+      </p>
+      {(contact.alternateContactPerson || contact.alternatePhone) && (
+        <p className="text-gray-600">
+          <span className="font-medium">Alt Contact:</span> 
+          <span className="ml-1">
+            {contact.alternateContactPerson || contact.alternatePhone}
+          </span>
+        </p>
+      )}
+      <p className="text-gray-600">
+        <span className="font-medium">Email:</span> 
+        <a href={`mailto:${contact.emailAddress || contact.email}`} className="text-blue-600 hover:text-blue-800 ml-1">
+          {contact.emailAddress || contact.email}
+        </a>
+      </p>
+    </div>
                   
                   <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
                     {canUpdate && (
