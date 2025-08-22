@@ -1,0 +1,20 @@
+All permissions in database:
+============================
+branches: create, delete, update, view
+categories: create, delete, update, view
+doctors: create, delete, update, view
+hospitals: create, delete, update, view
+invoice_receiving: view
+invoices: create, delete, update, view
+po_receiving: qc_approve, qc_check, receive
+po_workflow: approve_final, approve_level1, approve_level2, cancel, reject, return
+portfolios: create, delete, update, view
+principals: create, delete, update, view
+products: create, delete, update, view
+purchase_orders: create, delete, update, view
+states: create, delete, update, view
+users: create, delete, update, view
+warehouses: create, delete, update, view
+workflow: assign, manage, view
+
+Total permissions: 61
