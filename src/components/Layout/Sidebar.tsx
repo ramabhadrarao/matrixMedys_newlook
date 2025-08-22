@@ -15,7 +15,9 @@ import {
   Package,
   ShoppingCart,
   Truck,
-  GitBranch
+  GitBranch,
+  Warehouse,
+  Workflow
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -61,6 +63,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       permission: { resource: 'portfolios', action: 'view' },
     },
     {
+      path: '/branches',
+      name: 'Branches',
+      icon: GitBranch,
+      permission: { resource: 'branches', action: 'view' },
+    },
+    {
+      path: '/warehouses',
+      name: 'Warehouses',
+      icon: Warehouse,
+      permission: { resource: 'warehouses', action: 'view' },
+    },
+    {
   path: '/categories',
   name: 'Categories',
   icon: FolderTree,
@@ -87,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     {
       path: '/workflow/stages',
       name: 'Workflow',
-      icon: GitBranch,
+      icon: Workflow,
       permission: { resource: 'workflow', action: 'view' },
     },
     {

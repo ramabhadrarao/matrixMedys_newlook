@@ -164,6 +164,58 @@ const permissions = [
     resource: 'principals',
     action: 'delete',
   },
+  
+  // Branches permissions
+  {
+    name: 'View Branches',
+    description: 'Can view list of branches and their details',
+    resource: 'branches',
+    action: 'view',
+  },
+  {
+    name: 'Create Branches',
+    description: 'Can create new branches',
+    resource: 'branches',
+    action: 'create',
+  },
+  {
+    name: 'Update Branches',
+    description: 'Can update existing branches',
+    resource: 'branches',
+    action: 'update',
+  },
+  {
+    name: 'Delete Branches',
+    description: 'Can delete branches',
+    resource: 'branches',
+    action: 'delete',
+  },
+  
+  // Warehouses permissions
+  {
+    name: 'View Warehouses',
+    description: 'Can view list of warehouses and their details',
+    resource: 'warehouses',
+    action: 'view',
+  },
+  {
+    name: 'Create Warehouses',
+    description: 'Can create new warehouses',
+    resource: 'warehouses',
+    action: 'create',
+  },
+  {
+    name: 'Update Warehouses',
+    description: 'Can update existing warehouses',
+    resource: 'warehouses',
+    action: 'update',
+  },
+  {
+    name: 'Delete Warehouses',
+    description: 'Can delete warehouses',
+    resource: 'warehouses',
+    action: 'delete',
+  },
 ];
 
 const seedPermissions = async () => {

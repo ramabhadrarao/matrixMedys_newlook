@@ -24,6 +24,9 @@ import fileRoutes from './routes/files.js';
 import purchaseOrderRoutes from './routes/purchaseOrders.js';
 import invoiceReceivingRoutes from './routes/invoiceReceiving.js';
 import workflowRoutes from './routes/workflow.js';
+// Branch and Warehouse routes
+import branchRoutes from './routes/branches.js';
+import warehouseRoutes from './routes/warehouses.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,6 +94,9 @@ app.use('/api/products', productRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/invoice-receiving', invoiceReceivingRoutes);
 app.use('/api/workflow', workflowRoutes);
+// Branch and Warehouse routes
+app.use('/api/branches', branchRoutes);
+app.use('/api/warehouses', warehouseRoutes);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

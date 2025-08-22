@@ -58,6 +58,16 @@ import { InvoiceReceivingList, InvoiceReceivingForm, InvoiceReceivingDetails } f
 // Import Workflow components
 import { WorkflowStagesList, WorkflowStageForm, UserAssignmentModal } from './components/Workflow';
 
+// Branch Components
+import BranchesList from './components/Branches/BranchesList';
+import BranchForm from './components/Branches/BranchForm';
+import BranchDetails from './components/Branches/BranchDetails';
+
+// Warehouse Components
+import WarehousesList from './components/Warehouses/WarehousesList';
+import WarehouseForm from './components/Warehouses/WarehouseForm';
+import WarehouseDetails from './components/Warehouses/WarehouseDetails';
+
 import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
 import ProfileInformation from './components/Settings/ProfileInformation';
@@ -177,6 +187,19 @@ function App() {
             <Route path="portfolios" element={<PortfoliosList />} />
             <Route path="portfolios/new" element={<PortfolioForm />} />
             <Route path="portfolios/:id/edit" element={<PortfolioForm />} />
+            
+            {/* Branch Routes */}
+            <Route path="branches" element={<BranchesList />} />
+            <Route path="branches/new" element={<BranchForm />} />
+            <Route path="branches/:id" element={<BranchDetails />} />
+            <Route path="branches/:id/edit" element={<BranchForm />} />
+            
+            {/* Warehouse Routes */}
+            <Route path="warehouses" element={<WarehousesList />} />
+            <Route path="warehouses/new" element={<WarehouseForm />} />
+            <Route path="warehouses/:id" element={<WarehouseDetails />} />
+            <Route path="warehouses/:id/edit" element={<WarehouseForm />} />
+            
             {/* Principal Routes */}
             <Route path="principals" element={<PrincipalsList />} />
             <Route path="principals/new" element={<PrincipalForm />} />

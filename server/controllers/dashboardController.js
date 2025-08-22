@@ -13,6 +13,9 @@ import UserPermission from '../models/UserPermission.js';
 import PurchaseOrder from '../models/PurchaseOrder.js';
 import InvoiceReceiving from '../models/InvoiceReceiving.js';
 import WorkflowStage from '../models/WorkflowStage.js';
+import Branch from '../models/Branch.js';
+import Warehouse from '../models/Warehouse.js';
+import BranchContact from '../models/BranchContact.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -1114,6 +1117,183 @@ export const getDashboardStats = async (req, res) => {
         });
       } catch (error) {
         console.error('Error fetching workflow stats:', error);
+      }
+    }
+    
+    // ========== BRANCHES STATISTICS ==========
+    if (resourcePermissions.branches && resourcePermissions.branches.includes('view')) {
+      try {
+        const totalBranches = await Branch.countDocuments();
+        const activeBranches = await Branch.countDocuments({ isActive: true });
+        const inactiveBranches = totalBranches - activeBranches;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentBranches = await Branch.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Branches by state
+        const branchesByState = await Branch.aggregate([
+          {
+            $lookup: {
+              from: 'states',
+              localField: 'state',
+              foreignField: '_id',
+              as: 'stateInfo'
+            }
+          },
+          { $unwind: '$stateInfo' },
+          {
+            $group: {
+              _id: '$stateInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Branches with warehouses count
+        const branchesWithWarehouses = await Branch.aggregate([
+          {
+            $lookup: {
+              from: 'warehouses',
+              localField: '_id',
+              foreignField: 'branch',
+              as: 'warehouses'
+            }
+          },
+          {
+            $project: {
+              name: 1,
+              branchCode: 1,
+              warehouseCount: { $size: '$warehouses' }
+            }
+          },
+          { $sort: { warehouseCount: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Total contacts across all branches
+        const totalBranchContacts = await BranchContact.countDocuments({ warehouse: null });
+        
+        dashboardCards.push({
+          id: 'branches',
+          title: 'Branches',
+          resource: 'branches',
+          icon: 'Building2',
+          color: 'green',
+          stats: {
+            total: totalBranches,
+            active: activeBranches,
+            inactive: inactiveBranches,
+            recent: recentBranches,
+            branchesByState,
+            branchesWithWarehouses,
+            totalContacts: totalBranchContacts
+          },
+          actions: resourcePermissions.branches,
+          route: '/branches',
+          description: 'Branch locations and management'
+        });
+      } catch (error) {
+        console.error('Error fetching branches stats:', error);
+      }
+    }
+    
+    // ========== WAREHOUSES STATISTICS ==========
+    if (resourcePermissions.warehouses && resourcePermissions.warehouses.includes('view')) {
+      try {
+        const totalWarehouses = await Warehouse.countDocuments();
+        const activeWarehouses = await Warehouse.countDocuments({ isActive: true });
+        const inactiveWarehouses = totalWarehouses - activeWarehouses;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentWarehouses = await Warehouse.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Warehouses by status
+        const warehousesByStatus = await Warehouse.aggregate([
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } }
+        ]);
+        
+        // Warehouses by branch
+        const warehousesByBranch = await Warehouse.aggregate([
+          {
+            $lookup: {
+              from: 'branches',
+              localField: 'branch',
+              foreignField: '_id',
+              as: 'branchInfo'
+            }
+          },
+          { $unwind: '$branchInfo' },
+          {
+            $group: {
+              _id: '$branchInfo.name',
+              branchCode: { $first: '$branchInfo.branchCode' },
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Warehouses by state
+        const warehousesByState = await Warehouse.aggregate([
+          {
+            $lookup: {
+              from: 'states',
+              localField: 'state',
+              foreignField: '_id',
+              as: 'stateInfo'
+            }
+          },
+          { $unwind: '$stateInfo' },
+          {
+            $group: {
+              _id: '$stateInfo.name',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        // Total warehouse contacts
+        const totalWarehouseContacts = await BranchContact.countDocuments({ warehouse: { $ne: null } });
+        
+        dashboardCards.push({
+          id: 'warehouses',
+          title: 'Warehouses',
+          resource: 'warehouses',
+          icon: 'Warehouse',
+          color: 'purple',
+          stats: {
+            total: totalWarehouses,
+            active: activeWarehouses,
+            inactive: inactiveWarehouses,
+            recent: recentWarehouses,
+            warehousesByStatus,
+            warehousesByBranch,
+            warehousesByState,
+            totalContacts: totalWarehouseContacts
+          },
+          actions: resourcePermissions.warehouses,
+          route: '/warehouses',
+          description: 'Warehouse facilities and inventory'
+        });
+      } catch (error) {
+        console.error('Error fetching warehouses stats:', error);
       }
     }
     
