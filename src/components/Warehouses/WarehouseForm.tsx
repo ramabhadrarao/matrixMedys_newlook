@@ -72,16 +72,14 @@ const WarehouseForm: React.FC = () => {
       branch: '',
       address: '',
       city: '',
+      district: '',
+      drugLicenseNumber: '',
       state: '',
       pincode: '',
       phone: '',
       email: '',
-      website: '',
-      managerName: '',
-      managerPhone: '',
-      managerEmail: '',
-      capacity: '',
-      storageType: '',
+      alternatePhone: '',
+      status: 'Active',
       isActive: true,
       remarks: ''
     }
@@ -98,38 +96,48 @@ const WarehouseForm: React.FC = () => {
   const fetchStates = async () => {
     try {
       const response = await statesAPI.getStates();
-      setStates(response.data || []);
+      console.log('States response:', response);
+      // Handle the response structure
+      if (response && response.data) {
+        const statesData = response.data.states || response.data || [];
+        setStates(Array.isArray(statesData) ? statesData : []);
+      } else if (Array.isArray(response)) {
+        setStates(response);
+      } else {
+        setStates([]);
+      }
     } catch (error) {
       console.error('Error fetching states:', error);
       handleApiError(error);
+      setStates([]);
     }
   };
 
   const fetchBranches = async () => {
-  try {
-    const response = await branchAPI.getBranches({ limit: 100 });
-    console.log('Fetched branches response:', response); // Debug log
-    
-    // Handle the response structure correctly
-    if (response && response.data) {
-      const branchesData = response.data.branches || [];
-      setBranches(branchesData);
-    } else {
+    try {
+      const response = await branchAPI.getBranches({ limit: 100 });
+      console.log('Fetched branches response:', response);
+      
+      // Handle the response structure correctly
+      if (response && response.data) {
+        const branchesData = response.data.branches || [];
+        setBranches(branchesData);
+      } else {
+        setBranches([]);
+        console.error('Unexpected response structure:', response);
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+      handleApiError(error);
       setBranches([]);
-      console.error('Unexpected response structure:', response);
     }
-  } catch (error) {
-    console.error('Error fetching branches:', error);
-    handleApiError(error);
-    setBranches([]); // Set empty array on error
-  }
-};
+  };
 
   const fetchWarehouse = async (warehouseId: string) => {
     try {
       setInitialLoading(true);
       const response = await warehouseAPI.getWarehouse(warehouseId);
-      const warehouse = response.data;
+      const warehouse = response.data.warehouse || response.data;
       
       // Populate form with warehouse data
       reset({
@@ -138,16 +146,14 @@ const WarehouseForm: React.FC = () => {
         branch: warehouse.branch._id || '',
         address: warehouse.address || '',
         city: warehouse.city || '',
+        district: warehouse.district || '',
+        drugLicenseNumber: warehouse.drugLicenseNumber || '',
         state: warehouse.state._id || '',
         pincode: warehouse.pincode || '',
         phone: warehouse.phone || '',
         email: warehouse.email || '',
-        website: warehouse.website || '',
-        managerName: warehouse.managerName || '',
-        managerPhone: warehouse.managerPhone || '',
-        managerEmail: warehouse.managerEmail || '',
-        capacity: warehouse.capacity || '',
-        storageType: warehouse.storageType || '',
+        alternatePhone: warehouse.alternatePhone || '',
+        status: warehouse.status || 'Active',
         isActive: warehouse.isActive !== undefined ? warehouse.isActive : true,
         remarks: warehouse.remarks || ''
       });
@@ -183,7 +189,7 @@ const WarehouseForm: React.FC = () => {
         file,
         documentName: file.name.split('.')[0],
         validityStartDate: new Date().toISOString().split('T')[0],
-        validityEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 1 year from now
+        validityEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       };
       
       setSelectedFiles(prev => [...prev, newFile]);
@@ -430,10 +436,56 @@ const WarehouseForm: React.FC = () => {
                 </p>
               )}
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Drug License Number *
+              </label>
+              <Controller
+                name="drugLicenseNumber"
+                control={control}
+                rules={{ required: 'Drug license number is required' }}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    type="text"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.drugLicenseNumber ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter drug license number"
+                  />
+                )}
+              />
+              {errors.drugLicenseNumber && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.drugLicenseNumber.message}
+                </p>
+              )}
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Status
+              </label>
+              <Controller
+                name="status"
+                control={control}
+                render={({ field }) => (
+                  <select
+                    {...field}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                )}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Active Status
               </label>
               <Controller
                 name="isActive"
@@ -489,7 +541,7 @@ const WarehouseForm: React.FC = () => {
               )}
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   City *
@@ -513,6 +565,33 @@ const WarehouseForm: React.FC = () => {
                   <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
                     {errors.city.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  District *
+                </label>
+                <Controller
+                  name="district"
+                  control={control}
+                  rules={{ required: 'District is required' }}
+                  render={({ field }) => (
+                    <input
+                      {...field}
+                      type="text"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.district ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter district"
+                    />
+                  )}
+                />
+                {errors.district && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {errors.district.message}
                   </p>
                 )}
               </div>
@@ -630,6 +709,28 @@ const WarehouseForm: React.FC = () => {
                 </p>
               )}
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Alternate Phone
+              </label>
+              <Controller
+                name="alternatePhone"
+                control={control}
+                render={({ field }) => (
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <input
+                      {...field}
+                      type="tel"
+                      maxLength={10}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="9876543210"
+                    />
+                  </div>
+                )}
+              />
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -666,153 +767,14 @@ const WarehouseForm: React.FC = () => {
                 </p>
               )}
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Website
-              </label>
-              <Controller
-                name="website"
-                control={control}
-                render={({ field }) => (
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <input
-                      {...field}
-                      type="url"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="https://warehouse.company.com"
-                    />
-                  </div>
-                )}
-              />
-            </div>
           </div>
         </div>
 
-        {/* Manager Information */}
+        {/* Additional Information */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Manager Information
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Manager Name
-              </label>
-              <Controller
-                name="managerName"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter manager name"
-                  />
-                )}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Manager Phone
-              </label>
-              <Controller
-                name="managerPhone"
-                control={control}
-                render={({ field }) => (
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <input
-                      {...field}
-                      type="tel"
-                      maxLength={10}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="9876543210"
-                    />
-                  </div>
-                )}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Manager Email
-              </label>
-              <Controller
-                name="managerEmail"
-                control={control}
-                render={({ field }) => (
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <input
-                      {...field}
-                      type="email"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="manager@company.com"
-                    />
-                  </div>
-                )}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Warehouse Details */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Warehouse Details
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Storage Capacity
-              </label>
-              <Controller
-                name="capacity"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., 10000 sq ft, 500 pallets"
-                  />
-                )}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Storage Type
-              </label>
-              <Controller
-                name="storageType"
-                control={control}
-                render={({ field }) => (
-                  <select
-                    {...field}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select Storage Type</option>
-                    <option value="ambient">Ambient</option>
-                    <option value="cold">Cold Storage</option>
-                    <option value="frozen">Frozen Storage</option>
-                    <option value="controlled">Controlled Environment</option>
-                    <option value="hazmat">Hazardous Materials</option>
-                    <option value="mixed">Mixed Storage</option>
-                  </select>
-                )}
-              />
-            </div>
-          </div>
-          
-          <div className="mt-6">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Remarks
             </label>
