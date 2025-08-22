@@ -18,6 +18,8 @@ export const getPurchaseOrders = async (req, res) => {
       search 
     } = req.query;
     
+    console.log('Get POs request params:', req.query);
+    
     let query = {};
     
     if (status) query.status = status;
@@ -36,29 +38,56 @@ export const getPurchaseOrders = async (req, res) => {
       ];
     }
     
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    console.log('Query:', query);
+    console.log('Skip:', skip, 'Limit:', parseInt(limit));
+    
     const purchaseOrders = await PurchaseOrder.find(query)
-      .populate('principal', 'name gstNumber')
+      .populate('principal', 'name gstNumber email')
       .populate('createdBy', 'name email')
       .populate('approvedBy', 'name email')
       .populate('currentStage')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(parseInt(limit))
+      .skip(skip);
     
     const total = await PurchaseOrder.countDocuments(query);
     
-    res.json({
-      purchaseOrders,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(total / limit)
+    console.log(`Found ${purchaseOrders.length} POs out of ${total} total`);
+    
+    // Ensure products have default values
+    const processedPOs = purchaseOrders.map(po => {
+      const poObj = po.toObject();
+      // Ensure products array exists
+      if (!poObj.products) {
+        poObj.products = [];
       }
+      // Ensure grandTotal exists
+      if (!poObj.grandTotal && poObj.grandTotal !== 0) {
+        poObj.grandTotal = 0;
+      }
+      return poObj;
     });
+    
+    const response = {
+      purchaseOrders: processedPOs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    };
+    
+    console.log('Sending response with', response.purchaseOrders.length, 'POs');
+    res.json(response);
   } catch (error) {
     console.error('Get purchase orders error:', error);
-    res.status(500).json({ message: 'Failed to fetch purchase orders' });
+    res.status(500).json({ 
+      message: 'Failed to fetch purchase orders',
+      error: error.message 
+    });
   }
 };
 
@@ -89,26 +118,14 @@ export const getPurchaseOrder = async (req, res) => {
 };
 
 // Create PO
+// Add this to server/controllers/purchaseOrderController.js
+// Replace the createPurchaseOrder function (starting around line 59)
+
 export const createPurchaseOrder = async (req, res) => {
   try {
     const {
-      principal,
-      billTo,
-      shipTo,
-      products,
-      additionalDiscount,
-      taxType,
-      gstRate,
-      shippingCharges,
-      toEmails,
-      fromEmail,
-      ccEmails
-    } = req.body;
-    
-    // Get initial workflow stage
-    const draftStage = await WorkflowStage.findOne({ code: 'DRAFT' });
-    
-    const purchaseOrder = new PurchaseOrder({
+      poNumber,
+      poDate,
       principal,
       billTo,
       shipTo,
@@ -120,6 +137,102 @@ export const createPurchaseOrder = async (req, res) => {
       toEmails,
       fromEmail,
       ccEmails,
+      terms,
+      notes
+    } = req.body;
+    
+    // Validate required fields
+    if (!principal) {
+      return res.status(400).json({ message: 'Principal is required' });
+    }
+    
+    if (!billTo || !billTo.branchWarehouse) {
+      return res.status(400).json({ message: 'Billing information is required' });
+    }
+    
+    if (!shipTo || !shipTo.branchWarehouse) {
+      return res.status(400).json({ message: 'Shipping information is required' });
+    }
+    
+    if (!products || products.length === 0) {
+      return res.status(400).json({ message: 'At least one product is required' });
+    }
+    
+    // Get or generate PO number
+    let finalPoNumber = poNumber;
+    if (!finalPoNumber) {
+      // Generate PO number if not provided
+      const principalDoc = await Principal.findById(principal);
+      if (!principalDoc) {
+        return res.status(404).json({ message: 'Principal not found' });
+      }
+      
+      const principalCode = principalDoc.name.substring(0, 3).toUpperCase();
+      const date = new Date();
+      const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
+      
+      // Get count of POs for today to generate serial number
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      const poCount = await PurchaseOrder.countDocuments({
+        createdAt: { $gte: todayStart, $lte: todayEnd }
+      });
+      
+      const serialNo = (poCount + 1).toString().padStart(3, '0');
+      finalPoNumber = `MM-${principalCode}-${dateStr}/${serialNo}`;
+    }
+    
+    // Get initial workflow stage
+    let draftStage = await WorkflowStage.findOne({ code: 'DRAFT' });
+    
+    // If no DRAFT stage exists, create a default one
+    if (!draftStage) {
+      draftStage = new WorkflowStage({
+        name: 'Draft',
+        code: 'DRAFT',
+        description: 'Initial draft stage',
+        sequence: 1,
+        allowedActions: ['edit', 'approve', 'cancel'],
+        isActive: true
+      });
+      await draftStage.save();
+    }
+    
+    // Process products to ensure all required fields
+    const processedProducts = products.map(product => ({
+      product: product.product,
+      productCode: product.productCode || '',
+      productName: product.productName || '',
+      description: product.description || '',
+      quantity: Number(product.quantity) || 1,
+      unitPrice: Number(product.unitPrice) || 0,
+      foc: Number(product.foc) || 0,
+      discount: Number(product.discount) || 0,
+      discountType: product.discountType || 'amount',
+      unit: product.unit || 'PCS',
+      gstRate: Number(product.gstRate) || 18,
+      remarks: product.remarks || ''
+    }));
+    
+    const purchaseOrder = new PurchaseOrder({
+      poNumber: finalPoNumber,
+      poDate: poDate || new Date(),
+      principal,
+      billTo,
+      shipTo,
+      products: processedProducts,
+      additionalDiscount: additionalDiscount || { type: 'amount', value: 0 },
+      taxType: taxType || 'IGST',
+      gstRate: Number(gstRate) || 5,
+      shippingCharges: shippingCharges || { type: 'amount', value: 0 },
+      toEmails: toEmails || [],
+      fromEmail: fromEmail || req.user.email,
+      ccEmails: ccEmails || [],
+      terms: terms || '',
+      notes: notes || '',
       currentStage: draftStage._id,
       status: 'draft',
       createdBy: req.user._id
@@ -133,12 +246,16 @@ export const createPurchaseOrder = async (req, res) => {
       stage: draftStage._id,
       action: 'created',
       actionBy: req.user._id,
+      actionDate: new Date(),
       remarks: 'Purchase order created'
     });
     
     await purchaseOrder.save();
-    await purchaseOrder.populate('principal', 'name');
+    
+    // Populate references for response
+    await purchaseOrder.populate('principal', 'name gstNumber email mobile');
     await purchaseOrder.populate('currentStage');
+    await purchaseOrder.populate('createdBy', 'name email');
     
     res.status(201).json({
       message: 'Purchase order created successfully',
@@ -146,7 +263,11 @@ export const createPurchaseOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('Create purchase order error:', error);
-    res.status(500).json({ message: 'Failed to create purchase order' });
+    res.status(500).json({ 
+      message: 'Failed to create purchase order',
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 

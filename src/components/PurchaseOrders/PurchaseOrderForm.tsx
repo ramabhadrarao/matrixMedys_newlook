@@ -414,80 +414,114 @@ const PurchaseOrderForm: React.FC = () => {
     }));
   };
 
-  const handleSubmit = async () => {
-    // Validation
-    if (!formData.principal) {
-      toast.error('Please select a principal');
-      return;
-    }
-    
-    if (!formData.billToBranch) {
-      toast.error('Please select billing branch');
-      return;
-    }
-    
-    if (!formData.shipToBranch && !formData.shipToWarehouse) {
-      toast.error('Please select shipping location');
-      return;
-    }
-    
-    if (formData.products.length === 0) {
-      toast.error('Please add at least one product');
-      return;
-    }
-    
-    if (formData.toEmails.length === 0) {
-      toast.error('Please add at least one recipient email');
-      return;
-    }
-    
-    try {
-      setSaving(true);
+  // Replace the handleSubmit function in PurchaseOrderForm.tsx (around line 555)
+
+const handleSubmit = async () => {
+  // Validation
+  if (!formData.principal) {
+    toast.error('Please select a principal');
+    return;
+  }
+  
+  if (!formData.billToBranch) {
+    toast.error('Please select billing branch');
+    return;
+  }
+  
+  if (!formData.shipToBranch && !formData.shipToWarehouse) {
+    toast.error('Please select shipping location');
+    return;
+  }
+  
+  if (formData.products.length === 0) {
+    toast.error('Please add at least one product');
+    return;
+  }
+  
+  if (formData.toEmails.length === 0) {
+    toast.error('Please add at least one recipient email');
+    return;
+  }
+
+  // Generate PO Number if not in edit mode and not already generated
+  if (!isEdit && !formData.poNumber) {
+    const principal = principals.find(p => p._id === formData.principal);
+    if (principal) {
+      const principalCode = principal.name.substring(0, 3).toUpperCase();
+      const date = new Date();
+      const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
       
-      const payload = {
-        principal: formData.principal,
-        billTo: formData.billTo,
-        shipTo: formData.shipTo,
-        products: formData.products.map(p => ({
-          product: p.product,
-          productCode: p.productCode,
-          productName: p.productName,
-          description: p.description,
-          quantity: p.quantity,
-          unitPrice: p.unitPrice,
-          foc: p.foc,
-          discount: {
-            type: p.discountType,
-            value: p.discount
-          },
-          remarks: p.remarks
-        })),
-        additionalDiscount: formData.additionalDiscount,
-        taxType: formData.intraStateGST ? 'CGST_SGST' : 'IGST',
-        gstRate: formData.gstRate,
-        shippingCharges: formData.shippingCharges,
-        toEmails: formData.toEmails,
-        fromEmail: formData.fromEmail,
-        ccEmails: formData.ccEmails,
-        terms: formData.terms,
-        notes: formData.notes
-      };
+      // Generate serial number based on timestamp to ensure uniqueness
+      const timestamp = Date.now();
+      const serialNo = (timestamp % 1000).toString().padStart(3, '0');
       
-      if (isEdit && id) {
-        await purchaseOrderAPI.updatePurchaseOrder(id, payload);
-        toast.success('Purchase order updated successfully');
-      } else {
-        await purchaseOrderAPI.createPurchaseOrder(payload);
-        toast.success('Purchase order created successfully');
-      }
+      const poNumber = `MM-${principalCode}-${dateStr}/${serialNo}`;
+      setFormData(prev => ({ ...prev, poNumber }));
       
-      navigate('/purchase-orders');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save purchase order');
-    } finally {
-      setSaving(false);
+      // Use the generated PO number
+      formData.poNumber = poNumber;
     }
-  };
+  }
+  
+  try {
+    setSaving(true);
+    
+    const payload = {
+      poNumber: formData.poNumber, // Include PO number
+      poDate: formData.poDate,
+      principal: formData.principal,
+      billTo: formData.billTo,
+      shipTo: formData.shipTo,
+      products: formData.products.map(p => ({
+        product: p.product,
+        productCode: p.productCode,
+        productName: p.productName,
+        description: p.description,
+        quantity: p.quantity,
+        unitPrice: p.unitPrice,
+        foc: p.foc || 0,
+        discount: p.discount || 0,
+        discountType: p.discountType || 'amount',
+        unit: p.unit || 'PCS',
+        gstRate: p.gstRate || 18,
+        remarks: p.remarks || ''
+      })),
+      additionalDiscount: formData.additionalDiscount || { type: 'amount', value: 0 },
+      taxType: formData.intraStateGST ? 'CGST_SGST' : 'IGST',
+      gstRate: formData.gstRate || 5,
+      shippingCharges: formData.shippingCharges || { type: 'amount', value: 0 },
+      toEmails: formData.toEmails,
+      fromEmail: formData.fromEmail,
+      ccEmails: formData.ccEmails || [],
+      terms: formData.terms || '',
+      notes: formData.notes || ''
+    };
+
+    console.log('Submitting PO with payload:', payload);
+    
+    if (isEdit && id) {
+      await purchaseOrderAPI.updatePurchaseOrder(id, payload);
+      toast.success('Purchase order updated successfully');
+    } else {
+      const response = await purchaseOrderAPI.createPurchaseOrder(payload);
+      console.log('PO creation response:', response);
+      toast.success('Purchase order created successfully');
+    }
+    
+    navigate('/purchase-orders');
+  } catch (error: any) {
+    console.error('PO submission error:', error);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to save purchase order';
+    toast.error(errorMessage);
+    
+    // Log detailed error for debugging
+    if (error.response?.data) {
+      console.error('Server error details:', error.response.data);
+    }
+  } finally {
+    setSaving(false);
+  }
+};
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({

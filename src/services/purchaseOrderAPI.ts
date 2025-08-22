@@ -182,13 +182,17 @@ export interface PaginatedResponse<T> {
 }
 
 // Purchase Order API Service
+// Update the getPurchaseOrders method in src/services/purchaseOrderAPI.ts
+
 export const purchaseOrderAPI = {
   // Get all purchase orders with pagination
-  getPurchaseOrders: async (filters?: POFilters): Promise<PaginatedResponse<PurchaseOrder>> => {
+  getPurchaseOrders: async (filters?: POFilters): Promise<any> => {
     try {
       console.log('Fetching purchase orders with filters:', filters);
       const response = await api.get('/purchase-orders', { params: filters });
-      console.log('Purchase orders response:', response.data);
+      console.log('Raw API response:', response);
+      
+      // Return the data directly - axios response is in response.data
       return response.data;
     } catch (error) {
       console.error('Error fetching purchase orders:', error);
@@ -197,7 +201,7 @@ export const purchaseOrderAPI = {
   },
 
   // Get single purchase order
-  getPurchaseOrder: async (id: string): Promise<{ purchaseOrder: PurchaseOrder }> => {
+  getPurchaseOrder: async (id: string): Promise<any> => {
     try {
       console.log('Fetching purchase order:', id);
       const response = await api.get(`/purchase-orders/${id}`);
@@ -210,7 +214,7 @@ export const purchaseOrderAPI = {
   },
 
   // Create purchase order
-  createPurchaseOrder: async (data: PurchaseOrderFormData): Promise<{ message: string; purchaseOrder: PurchaseOrder }> => {
+  createPurchaseOrder: async (data: PurchaseOrderFormData): Promise<any> => {
     try {
       console.log('Creating purchase order:', data);
       const response = await api.post('/purchase-orders', data);
@@ -223,7 +227,7 @@ export const purchaseOrderAPI = {
   },
 
   // Update purchase order
-  updatePurchaseOrder: async (id: string, data: Partial<PurchaseOrderFormData>): Promise<{ message: string; purchaseOrder: PurchaseOrder }> => {
+  updatePurchaseOrder: async (id: string, data: Partial<PurchaseOrderFormData>): Promise<any> => {
     try {
       console.log('Updating purchase order:', id, data);
       const response = await api.put(`/purchase-orders/${id}`, data);
@@ -235,8 +239,9 @@ export const purchaseOrderAPI = {
     }
   },
 
+  // Other methods remain the same...
   // Delete purchase order (only draft)
-  deletePurchaseOrder: async (id: string): Promise<{ message: string }> => {
+  deletePurchaseOrder: async (id: string): Promise<any> => {
     try {
       console.log('Deleting purchase order:', id);
       const response = await api.delete(`/purchase-orders/${id}`);
@@ -249,7 +254,7 @@ export const purchaseOrderAPI = {
   },
 
   // Workflow Actions
-  approvePurchaseOrder: async (id: string, remarks?: string): Promise<{ message: string; purchaseOrder: PurchaseOrder }> => {
+  approvePurchaseOrder: async (id: string, remarks?: string): Promise<any> => {
     try {
       console.log('Approving purchase order:', id);
       const response = await api.post(`/purchase-orders/${id}/approve`, { remarks });
@@ -261,7 +266,7 @@ export const purchaseOrderAPI = {
     }
   },
 
-  rejectPurchaseOrder: async (id: string, remarks: string): Promise<{ message: string; purchaseOrder: PurchaseOrder }> => {
+  rejectPurchaseOrder: async (id: string, remarks: string): Promise<any> => {
     try {
       console.log('Rejecting purchase order:', id);
       const response = await api.post(`/purchase-orders/${id}/reject`, { remarks });
@@ -273,7 +278,44 @@ export const purchaseOrderAPI = {
     }
   },
 
-  // Calculate totals locally (since backend does this automatically)
+  sendPurchaseOrder: async (id: string): Promise<any> => {
+    try {
+      console.log('Sending purchase order:', id);
+      const response = await api.post(`/purchase-orders/${id}/send`);
+      console.log('Send PO response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error sending purchase order:', error);
+      throw error;
+    }
+  },
+
+  cancelPurchaseOrder: async (id: string): Promise<any> => {
+    try {
+      console.log('Cancelling purchase order:', id);
+      const response = await api.post(`/purchase-orders/${id}/cancel`);
+      console.log('Cancel PO response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling purchase order:', error);
+      throw error;
+    }
+  },
+
+  downloadPurchaseOrder: async (id: string): Promise<any> => {
+    try {
+      console.log('Downloading purchase order:', id);
+      const response = await api.get(`/purchase-orders/${id}/download`, {
+        responseType: 'blob'
+      });
+      return response;
+    } catch (error) {
+      console.error('Error downloading purchase order:', error);
+      throw error;
+    }
+  },
+
+  // Keep the calculateTotals helper function
   calculateTotals: (formData: Partial<PurchaseOrderFormData>) => {
     const products = formData.products || [];
     

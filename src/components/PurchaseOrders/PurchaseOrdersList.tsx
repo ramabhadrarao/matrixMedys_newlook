@@ -78,30 +78,53 @@ const PurchaseOrdersList: React.FC = () => {
   };
 
   const fetchPurchaseOrders = async () => {
-    try {
-      setLoading(true);
-      const params: any = {
-        page: currentPage,
-        limit: 10
-      };
-      
-      if (searchTerm) params.search = searchTerm;
-      if (selectedStatus) params.status = selectedStatus;
-      if (selectedPrincipal) params.principal = selectedPrincipal;
-      if (dateFrom) params.fromDate = dateFrom;
-      if (dateTo) params.toDate = dateTo;
-      
-      const response = await purchaseOrderAPI.getPurchaseOrders(params);
+  try {
+    setLoading(true);
+    const params: any = {
+      page: currentPage,
+      limit: 10
+    };
+    
+    if (searchTerm) params.search = searchTerm;
+    if (selectedStatus) params.status = selectedStatus;
+    if (selectedPrincipal) params.principal = selectedPrincipal;
+    if (dateFrom) params.fromDate = dateFrom;
+    if (dateTo) params.toDate = dateTo;
+    
+    console.log('Fetching POs with params:', params);
+    const response = await purchaseOrderAPI.getPurchaseOrders(params);
+    console.log('PO List Response:', response);
+    
+    // Handle both response structures
+    if (response.purchaseOrders) {
+      setPurchaseOrders(response.purchaseOrders);
+      if (response.pagination) {
+        setTotalPages(response.pagination.pages || 1);
+        setTotalCount(response.pagination.total || 0);
+      }
+    } else if (response.data) {
+      // Handle if data is wrapped
       setPurchaseOrders(response.data.purchaseOrders || []);
-      setTotalPages(response.data.totalPages || 1);
-      setTotalCount(response.data.totalCount || 0);
-    } catch (error) {
-      toast.error('Failed to fetch purchase orders');
+      if (response.data.pagination) {
+        setTotalPages(response.data.pagination.pages || 1);
+        setTotalCount(response.data.pagination.total || 0);
+      }
+    } else {
+      // Fallback
       setPurchaseOrders([]);
-    } finally {
-      setLoading(false);
+      setTotalPages(1);
+      setTotalCount(0);
     }
-  };
+  } catch (error: any) {
+    console.error('Error fetching purchase orders:', error);
+    toast.error('Failed to fetch purchase orders');
+    setPurchaseOrders([]);
+    setTotalPages(1);
+    setTotalCount(0);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleApprove = async (id: string) => {
     try {
@@ -347,106 +370,120 @@ const PurchaseOrdersList: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {purchaseOrders.map((po, index) => (
-                    <motion.tr
-                      key={po._id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <FileText className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm font-medium text-gray-900">
-                            {po.poNumber}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{po.principal?.name || 'N/A'}</div>
-                        {po.principal?.email && (
-                          <div className="text-xs text-gray-500">{po.principal.email}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-                          {new Date(po.poDate).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="text-gray-900">{po.billTo?.branchWarehouse || 'N/A'}</div>
-                          <div className="text-gray-500 text-xs">→ {po.shipTo?.branchWarehouse || 'N/A'}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(po.grandTotal || 0)}
-                        </div>
-                        {po.products && (
-                          <div className="text-xs text-gray-500">
-                            {po.products.length} item(s)
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(po.status)}`}>
-                          {statusOptions.find(s => s.value === po.status)?.label || po.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            to={`/purchase-orders/${po._id}`}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          
-                          {canUpdate && po.status === 'draft' && (
-                            <Link
-                              to={`/purchase-orders/${po._id}/edit`}
-                              className="text-green-600 hover:text-green-900 p-1 rounded"
-                              title="Edit"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Link>
-                          )}
-                          
-                          {canApprove && po.status === 'pending_approval' && (
-                            <button
-                              onClick={() => handleApprove(po._id)}
-                              className="text-green-600 hover:text-green-900 p-1 rounded"
-                              title="Approve"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                            </button>
-                          )}
-                          
-                          {po.status === 'approved' && (
-                            <button
-                              onClick={() => handleSendToSupplier(po._id)}
-                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                              title="Send to Supplier"
-                            >
-                              <Send className="w-4 h-4" />
-                            </button>
-                          )}
-                          
-                          <button
-                            onClick={() => handleDownloadPO(po._id, po.poNumber)}
-                            className="text-gray-600 hover:text-gray-900 p-1 rounded"
-                            title="Download PDF"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
+                  {purchaseOrders && purchaseOrders.length > 0 ? (
+  purchaseOrders.map((po, index) => {
+    console.log('Rendering PO:', po);
+    return (
+      <motion.tr
+        key={po._id || index}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: index * 0.05 }}
+        className="hover:bg-gray-50"
+      >
+        <td className="px-6 py-4">
+          <div className="flex items-center">
+            <FileText className="w-4 h-4 text-gray-400 mr-2" />
+            <span className="text-sm font-medium text-gray-900">
+              {po.poNumber || 'N/A'}
+            </span>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="text-sm text-gray-900">
+            {po.principal?.name || po.principal || 'N/A'}
+          </div>
+          {po.principal?.email && (
+            <div className="text-xs text-gray-500">{po.principal.email}</div>
+          )}
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center text-sm text-gray-900">
+            <Calendar className="w-4 h-4 text-gray-400 mr-2" />
+            {po.poDate ? new Date(po.poDate).toLocaleDateString() : 'N/A'}
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="text-sm">
+            <div className="text-gray-900">{po.billTo?.branchWarehouse || 'N/A'}</div>
+            <div className="text-gray-500 text-xs">→ {po.shipTo?.branchWarehouse || 'N/A'}</div>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="text-sm font-medium text-gray-900">
+            {formatCurrency(po.grandTotal || 0)}
+          </div>
+          {po.products && (
+            <div className="text-xs text-gray-500">
+              {po.products.length} item(s)
+            </div>
+          )}
+        </td>
+        <td className="px-6 py-4">
+          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(po.status || 'draft')}`}>
+            {statusOptions.find(s => s.value === po.status)?.label || po.status || 'Draft'}
+          </span>
+        </td>
+        <td className="px-6 py-4 text-right">
+          <div className="flex items-center justify-end space-x-2">
+            <Link
+              to={`/purchase-orders/${po._id}`}
+              className="text-blue-600 hover:text-blue-900 p-1 rounded"
+              title="View Details"
+            >
+              <Eye className="w-4 h-4" />
+            </Link>
+            
+            {canUpdate && (po.status === 'draft' || !po.status) && (
+              <Link
+                to={`/purchase-orders/${po._id}/edit`}
+                className="text-green-600 hover:text-green-900 p-1 rounded"
+                title="Edit"
+              >
+                <Edit className="w-4 h-4" />
+              </Link>
+            )}
+            
+            {canApprove && po.status === 'pending_approval' && (
+              <button
+                onClick={() => handleApprove(po._id)}
+                className="text-green-600 hover:text-green-900 p-1 rounded"
+                title="Approve"
+              >
+                <CheckCircle className="w-4 h-4" />
+              </button>
+            )}
+            
+            {po.status === 'approved' && (
+              <button
+                onClick={() => handleSendToSupplier(po._id)}
+                className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                title="Send to Supplier"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            )}
+            
+            <button
+              onClick={() => handleDownloadPO(po._id, po.poNumber)}
+              className="text-gray-600 hover:text-gray-900 p-1 rounded"
+              title="Download PDF"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
+        </td>
+      </motion.tr>
+    );
+  })
+) : (
+  <tr>
+    <td colSpan={7} className="text-center py-8">
+      <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+      <p className="text-gray-500 text-lg">No purchase orders found</p>
+    </td>
+  </tr>
+)}
                 </tbody>
               </table>
             </div>
