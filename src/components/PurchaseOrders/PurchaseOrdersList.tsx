@@ -43,10 +43,13 @@ const PurchaseOrdersList: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [principals, setPrincipals] = useState<any[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   
   const canCreate = hasPermission('purchase_orders', 'create');
   const canUpdate = hasPermission('purchase_orders', 'update');
   const canApprove = hasPermission('po_workflow', 'approve_level1');
+  const canReject = hasPermission('po_workflow', 'reject');
+  const canCancel = hasPermission('po_workflow', 'cancel');
 
   const statusOptions = [
     { value: '', label: 'All Status', color: '' },
@@ -57,6 +60,7 @@ const PurchaseOrdersList: React.FC = () => {
     { value: 'partial_received', label: 'Partial Received', color: 'bg-orange-100 text-orange-800' },
     { value: 'received', label: 'Received', color: 'bg-purple-100 text-purple-800' },
     { value: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
+    { value: 'rejected', label: 'Rejected', color: 'bg-red-100 text-red-800' },
     { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-800' }
   ];
 
@@ -78,78 +82,106 @@ const PurchaseOrdersList: React.FC = () => {
   };
 
   const fetchPurchaseOrders = async () => {
-  try {
-    setLoading(true);
-    const params: any = {
-      page: currentPage,
-      limit: 10
-    };
-    
-    if (searchTerm) params.search = searchTerm;
-    if (selectedStatus) params.status = selectedStatus;
-    if (selectedPrincipal) params.principal = selectedPrincipal;
-    if (dateFrom) params.fromDate = dateFrom;
-    if (dateTo) params.toDate = dateTo;
-    
-    console.log('Fetching POs with params:', params);
-    const response = await purchaseOrderAPI.getPurchaseOrders(params);
-    console.log('PO List Response:', response);
-    
-    // Handle both response structures
-    if (response.purchaseOrders) {
-      setPurchaseOrders(response.purchaseOrders);
-      if (response.pagination) {
-        setTotalPages(response.pagination.pages || 1);
-        setTotalCount(response.pagination.total || 0);
-      }
-    } else if (response.data) {
-      // Handle if data is wrapped
-      setPurchaseOrders(response.data.purchaseOrders || []);
-      if (response.data.pagination) {
-        setTotalPages(response.data.pagination.pages || 1);
-        setTotalCount(response.data.pagination.total || 0);
-      }
-    } else {
-      // Fallback
+    try {
+      setLoading(true);
+      const params: any = {
+        page: currentPage,
+        limit: 10
+      };
+      
+      if (searchTerm) params.search = searchTerm;
+      if (selectedStatus) params.status = selectedStatus;
+      if (selectedPrincipal) params.principal = selectedPrincipal;
+      if (dateFrom) params.fromDate = dateFrom;
+      if (dateTo) params.toDate = dateTo;
+      
+      console.log('Fetching POs with params:', params);
+      const response = await purchaseOrderAPI.getPurchaseOrders(params);
+      console.log('PO List Response:', response);
+      
+      // Backend returns { purchaseOrders: [], pagination: {} }
+      setPurchaseOrders(response.purchaseOrders || []);
+      setTotalPages(response.pagination?.pages || 1);
+      setTotalCount(response.pagination?.total || 0);
+      
+    } catch (error: any) {
+      console.error('Error fetching purchase orders:', error);
+      toast.error('Failed to fetch purchase orders');
       setPurchaseOrders([]);
       setTotalPages(1);
       setTotalCount(0);
-    }
-  } catch (error: any) {
-    console.error('Error fetching purchase orders:', error);
-    toast.error('Failed to fetch purchase orders');
-    setPurchaseOrders([]);
-    setTotalPages(1);
-    setTotalCount(0);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const handleApprove = async (id: string) => {
-    try {
-      await purchaseOrderAPI.approvePurchaseOrder(id);
-      toast.success('Purchase order approved successfully');
-      fetchPurchaseOrders();
-    } catch (error) {
-      toast.error('Failed to approve purchase order');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSendToSupplier = async (id: string) => {
+  const handleApprove = async (id: string) => {
     try {
-      await purchaseOrderAPI.sendPurchaseOrder(id);
-      toast.success('Purchase order sent to supplier');
+      setActionLoading(`approve-${id}`);
+      const response = await purchaseOrderAPI.approvePurchaseOrder(id);
+      toast.success(response.message || 'Purchase order approved successfully');
       fetchPurchaseOrders();
-    } catch (error) {
-      toast.error('Failed to send purchase order');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to approve purchase order';
+      toast.error(errorMessage);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    // In a real app, you'd show a modal to collect remarks
+    const remarks = prompt('Please enter rejection remarks:');
+    if (!remarks) return;
+
+    try {
+      setActionLoading(`reject-${id}`);
+      const response = await purchaseOrderAPI.rejectPurchaseOrder(id, remarks);
+      toast.success(response.message || 'Purchase order rejected');
+      fetchPurchaseOrders();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to reject purchase order';
+      toast.error(errorMessage);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    if (!confirm('Are you sure you want to cancel this purchase order?')) return;
+
+    try {
+      setActionLoading(`cancel-${id}`);
+      const response = await purchaseOrderAPI.cancelPurchaseOrder(id);
+      toast.success(response.message || 'Purchase order cancelled');
+      fetchPurchaseOrders();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to cancel purchase order';
+      toast.error(errorMessage);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSendEmail = async (id: string) => {
+    try {
+      setActionLoading(`send-${id}`);
+      const response = await purchaseOrderAPI.sendPurchaseOrderEmail(id);
+      toast.success(response.message || 'Purchase order sent successfully');
+      fetchPurchaseOrders();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to send purchase order';
+      toast.error(errorMessage);
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleDownloadPO = async (id: string, poNumber: string) => {
     try {
+      setActionLoading(`download-${id}`);
       const response = await purchaseOrderAPI.downloadPurchaseOrder(id);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const blob = new Blob([response], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -159,14 +191,16 @@ const PurchaseOrdersList: React.FC = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success('Purchase order downloaded');
-    } catch (error) {
-      toast.error('Failed to download purchase order');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to download purchase order';
+      toast.error(errorMessage);
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const statusOption = statusOptions.find(s => s.value === status);
-    return statusOption ? statusOption.color : 'bg-gray-100 text-gray-800';
+    return purchaseOrderAPI.getStatusBadgeColor(status);
   };
 
   const clearFilters = () => {
@@ -179,11 +213,15 @@ const PurchaseOrdersList: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(amount);
+    return purchaseOrderAPI.formatCurrency(amount);
+  };
+
+  const formatDate = (date: string) => {
+    return purchaseOrderAPI.formatDate(date);
+  };
+
+  const getStatusLabel = (status: string) => {
+    return purchaseOrderAPI.getStatusLabel(status);
   };
 
   return (
@@ -219,7 +257,7 @@ const PurchaseOrdersList: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by PO number, supplier..."
+                  placeholder="Search by PO number, principal name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -370,120 +408,153 @@ const PurchaseOrdersList: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {purchaseOrders && purchaseOrders.length > 0 ? (
-  purchaseOrders.map((po, index) => {
-    console.log('Rendering PO:', po);
-    return (
-      <motion.tr
-        key={po._id || index}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: index * 0.05 }}
-        className="hover:bg-gray-50"
-      >
-        <td className="px-6 py-4">
-          <div className="flex items-center">
-            <FileText className="w-4 h-4 text-gray-400 mr-2" />
-            <span className="text-sm font-medium text-gray-900">
-              {po.poNumber || 'N/A'}
-            </span>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="text-sm text-gray-900">
-            {po.principal?.name || po.principal || 'N/A'}
-          </div>
-          {po.principal?.email && (
-            <div className="text-xs text-gray-500">{po.principal.email}</div>
-          )}
-        </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center text-sm text-gray-900">
-            <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-            {po.poDate ? new Date(po.poDate).toLocaleDateString() : 'N/A'}
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="text-sm">
-            <div className="text-gray-900">{po.billTo?.branchWarehouse || 'N/A'}</div>
-            <div className="text-gray-500 text-xs">→ {po.shipTo?.branchWarehouse || 'N/A'}</div>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="text-sm font-medium text-gray-900">
-            {formatCurrency(po.grandTotal || 0)}
-          </div>
-          {po.products && (
-            <div className="text-xs text-gray-500">
-              {po.products.length} item(s)
-            </div>
-          )}
-        </td>
-        <td className="px-6 py-4">
-          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(po.status || 'draft')}`}>
-            {statusOptions.find(s => s.value === po.status)?.label || po.status || 'Draft'}
-          </span>
-        </td>
-        <td className="px-6 py-4 text-right">
-          <div className="flex items-center justify-end space-x-2">
-            <Link
-              to={`/purchase-orders/${po._id}`}
-              className="text-blue-600 hover:text-blue-900 p-1 rounded"
-              title="View Details"
-            >
-              <Eye className="w-4 h-4" />
-            </Link>
-            
-            {canUpdate && (po.status === 'draft' || !po.status) && (
-              <Link
-                to={`/purchase-orders/${po._id}/edit`}
-                className="text-green-600 hover:text-green-900 p-1 rounded"
-                title="Edit"
-              >
-                <Edit className="w-4 h-4" />
-              </Link>
-            )}
-            
-            {canApprove && po.status === 'pending_approval' && (
-              <button
-                onClick={() => handleApprove(po._id)}
-                className="text-green-600 hover:text-green-900 p-1 rounded"
-                title="Approve"
-              >
-                <CheckCircle className="w-4 h-4" />
-              </button>
-            )}
-            
-            {po.status === 'approved' && (
-              <button
-                onClick={() => handleSendToSupplier(po._id)}
-                className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                title="Send to Supplier"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            )}
-            
-            <button
-              onClick={() => handleDownloadPO(po._id, po.poNumber)}
-              className="text-gray-600 hover:text-gray-900 p-1 rounded"
-              title="Download PDF"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          </div>
-        </td>
-      </motion.tr>
-    );
-  })
-) : (
-  <tr>
-    <td colSpan={7} className="text-center py-8">
-      <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-      <p className="text-gray-500 text-lg">No purchase orders found</p>
-    </td>
-  </tr>
-)}
+                  {purchaseOrders.map((po, index) => (
+                    <motion.tr
+                      key={po._id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      className="hover:bg-gray-50"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <FileText className="w-4 h-4 text-gray-400 mr-2" />
+                          <span className="text-sm font-medium text-gray-900">
+                            {po.poNumber}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {po.principal?.name || 'N/A'}
+                        </div>
+                        {po.principal?.email && (
+                          <div className="text-xs text-gray-500">{po.principal.email}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Calendar className="w-4 h-4 text-gray-400 mr-2" />
+                          {formatDate(po.poDate)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          <div className="text-gray-900">{po.billTo?.branchWarehouse || 'N/A'}</div>
+                          <div className="text-gray-500 text-xs">→ {po.shipTo?.branchWarehouse || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(po.grandTotal || 0)}
+                        </div>
+                        {po.products && (
+                          <div className="text-xs text-gray-500">
+                            {po.products.length} item(s)
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(po.status || 'draft')}`}>
+                          {getStatusLabel(po.status || 'draft')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Link
+                            to={`/purchase-orders/${po._id}`}
+                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                          
+                          {canUpdate && (po.status === 'draft' || !po.status) && (
+                            <Link
+                              to={`/purchase-orders/${po._id}/edit`}
+                              className="text-green-600 hover:text-green-900 p-1 rounded"
+                              title="Edit"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Link>
+                          )}
+                          
+                          {canApprove && po.status === 'pending_approval' && (
+                            <button
+                              onClick={() => handleApprove(po._id)}
+                              disabled={actionLoading === `approve-${po._id}`}
+                              className="text-green-600 hover:text-green-900 p-1 rounded disabled:opacity-50"
+                              title="Approve"
+                            >
+                              {actionLoading === `approve-${po._id}` ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                              ) : (
+                                <CheckCircle className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                          
+                          {canReject && (po.status === 'pending_approval' || po.status === 'approved') && (
+                            <button
+                              onClick={() => handleReject(po._id)}
+                              disabled={actionLoading === `reject-${po._id}`}
+                              className="text-red-600 hover:text-red-900 p-1 rounded disabled:opacity-50"
+                              title="Reject"
+                            >
+                              {actionLoading === `reject-${po._id}` ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                              ) : (
+                                <XCircle className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                          
+                          {po.status === 'approved' && (
+                            <button
+                              onClick={() => handleSendEmail(po._id)}
+                              disabled={actionLoading === `send-${po._id}`}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded disabled:opacity-50"
+                              title="Send to Supplier"
+                            >
+                              {actionLoading === `send-${po._id}` ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                          
+                          {canCancel && (po.status === 'draft' || po.status === 'pending_approval') && (
+                            <button
+                              onClick={() => handleCancel(po._id)}
+                              disabled={actionLoading === `cancel-${po._id}`}
+                              className="text-red-600 hover:text-red-900 p-1 rounded disabled:opacity-50"
+                              title="Cancel"
+                            >
+                              {actionLoading === `cancel-${po._id}` ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                              ) : (
+                                <XCircle className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                          
+                          <button
+                            onClick={() => handleDownloadPO(po._id, po.poNumber)}
+                            disabled={actionLoading === `download-${po._id}`}
+                            className="text-gray-600 hover:text-gray-900 p-1 rounded disabled:opacity-50"
+                            title="Download PDF"
+                          >
+                            {actionLoading === `download-${po._id}` ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -507,11 +578,11 @@ const PurchaseOrdersList: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
-                        {new Date(po.poDate).toLocaleDateString()}
+                        {formatDate(po.poDate)}
                       </div>
                     </div>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(po.status)}`}>
-                      {statusOptions.find(s => s.value === po.status)?.label || po.status}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(po.status || 'draft')}`}>
+                      {getStatusLabel(po.status || 'draft')}
                     </span>
                   </div>
                   
@@ -530,6 +601,14 @@ const PurchaseOrdersList: React.FC = () => {
                       <span className="text-gray-500">Items:</span>
                       <span className="ml-2 text-gray-900">{po.products?.length || 0} product(s)</span>
                     </div>
+                    <div className="text-sm">
+                      <span className="text-gray-500">Bill To:</span>
+                      <span className="ml-2 text-gray-900">{po.billTo?.branchWarehouse || 'N/A'}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-500">Ship To:</span>
+                      <span className="ml-2 text-gray-900">{po.shipTo?.branchWarehouse || 'N/A'}</span>
+                    </div>
                   </div>
                   
                   <div className="flex items-center justify-between">
@@ -541,7 +620,7 @@ const PurchaseOrdersList: React.FC = () => {
                     </Link>
                     
                     <div className="flex items-center space-x-2">
-                      {canUpdate && po.status === 'draft' && (
+                      {canUpdate && (po.status === 'draft' || !po.status) && (
                         <Link
                           to={`/purchase-orders/${po._id}/edit`}
                           className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50"
@@ -553,17 +632,41 @@ const PurchaseOrdersList: React.FC = () => {
                       {canApprove && po.status === 'pending_approval' && (
                         <button
                           onClick={() => handleApprove(po._id)}
-                          className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50"
+                          disabled={actionLoading === `approve-${po._id}`}
+                          className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50 disabled:opacity-50"
                         >
-                          <CheckCircle className="w-4 h-4" />
+                          {actionLoading === `approve-${po._id}` ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                          ) : (
+                            <CheckCircle className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      
+                      {po.status === 'approved' && (
+                        <button
+                          onClick={() => handleSendEmail(po._id)}
+                          disabled={actionLoading === `send-${po._id}`}
+                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          {actionLoading === `send-${po._id}` ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
                         </button>
                       )}
                       
                       <button
                         onClick={() => handleDownloadPO(po._id, po.poNumber)}
-                        className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-50"
+                        disabled={actionLoading === `download-${po._id}`}
+                        className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                       >
-                        <Download className="w-4 h-4" />
+                        {actionLoading === `download-${po._id}` ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>

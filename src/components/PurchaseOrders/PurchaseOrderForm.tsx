@@ -198,21 +198,39 @@ const PurchaseOrderForm: React.FC = () => {
       const response = await purchaseOrderAPI.getPurchaseOrder(poId);
       const po = response.purchaseOrder;
       
-      // Map the data to form structure
+      // Map the backend data to form structure
       setFormData({
-        principal: po.principal._id,
+        principal: po.principal._id || po.principal,
         poNumber: po.poNumber,
         poDate: new Date(po.poDate).toISOString().split('T')[0],
-        billToBranch: po.billTo.branchWarehouse,
+        
+        // For edit mode, we'll need to determine which branch/warehouse was selected
+        // This is complex as we only have the branchWarehouse string
+        billToBranch: '', // We'll need to find this by matching po.billTo.branchWarehouse
         billTo: po.billTo,
-        shipToType: po.shipTo.branchWarehouse.includes('Warehouse') ? 'warehouse' : 'branch',
-        shipToBranch: po.shipTo.branchWarehouse,
+        
+        shipToType: po.shipTo.branchWarehouse.toLowerCase().includes('warehouse') ? 'warehouse' : 'branch',
+        shipToBranch: '', // We'll need to find this
         shipToWarehouse: '',
         shipTo: po.shipTo,
+        
         products: po.products.map((p: any) => ({
-          ...p,
-          _id: Math.random().toString()
+          _id: Math.random().toString(),
+          product: p.product._id || p.product,
+          productCode: p.productCode || '',
+          productName: p.productName || '',
+          description: p.description || '',
+          unitPrice: p.unitPrice || 0,
+          quantity: p.quantity || 1,
+          foc: p.foc || 0,
+          discount: p.discount || 0,
+          discountType: p.discountType || 'amount',
+          unit: p.unit || 'PCS',
+          gstRate: p.gstRate || 18,
+          totalCost: p.totalCost || 0,
+          remarks: p.remarks || ''
         })),
+        
         intraStateGST: po.taxType === 'CGST_SGST',
         additionalDiscount: po.additionalDiscount || { type: 'amount', value: 0 },
         shippingCharges: po.shippingCharges || { type: 'amount', value: 0 },
@@ -231,19 +249,27 @@ const PurchaseOrderForm: React.FC = () => {
     }
   };
 
-  const generatePONumber = () => {
+  const generatePONumber = async () => {
     if (!formData.principal || isEdit) return;
     
-    const principal = principals.find(p => p._id === formData.principal);
-    if (!principal) return;
-    
-    const principalCode = principal.name.substring(0, 3).toUpperCase();
-    const date = new Date();
-    const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
-    const serialNo = '001'; // This should be fetched from backend
-    
-    const poNumber = `MM-${principalCode}-${dateStr}/${serialNo}`;
-    setFormData(prev => ({ ...prev, poNumber }));
+    try {
+      const response = await purchaseOrderAPI.getNextPONumber(formData.principal, formData.poDate);
+      setFormData(prev => ({ ...prev, poNumber: response.nextPONumber }));
+    } catch (error) {
+      console.error('Error generating PO number:', error);
+      // Fallback to client-side generation if API fails
+      const principal = principals.find(p => p._id === formData.principal);
+      if (principal) {
+        const principalCode = principal.name.substring(0, 3).toUpperCase();
+        const date = new Date();
+        const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
+        const timestamp = Date.now();
+        const serialNo = (timestamp % 1000).toString().padStart(3, '0');
+        
+        const poNumber = `MM-${principalCode}-${dateStr}/${serialNo}`;
+        setFormData(prev => ({ ...prev, poNumber }));
+      }
+    }
   };
 
   const loadPrincipalEmails = () => {
@@ -264,7 +290,7 @@ const PurchaseOrderForm: React.FC = () => {
         billTo: {
           branchWarehouse: branch.name,
           name: 'MATRYX MEDISYS PRIVATE LIMITED',
-          address: `${branch.gstAddress}, ${branch.city}, ${branch.state.name} - ${branch.pincode}`,
+          address: `${branch.gstAddress}, ${branch.city}, ${branch.state?.name || ''} - ${branch.pincode}`,
           gstin: branch.gstNumber,
           drugLicense: branch.drugLicenseNumber,
           phone: branch.phone
@@ -282,7 +308,7 @@ const PurchaseOrderForm: React.FC = () => {
           shipTo: {
             branchWarehouse: branch.name,
             name: branch.name,
-            address: `${branch.gstAddress}, ${branch.city}, ${branch.state.name} - ${branch.pincode}`,
+            address: `${branch.gstAddress}, ${branch.city}, ${branch.state?.name || ''} - ${branch.pincode}`,
             gstin: branch.gstNumber,
             drugLicense: branch.drugLicenseNumber,
             phone: branch.phone
@@ -297,8 +323,8 @@ const PurchaseOrderForm: React.FC = () => {
           shipTo: {
             branchWarehouse: warehouse.name,
             name: warehouse.name,
-            address: `${warehouse.address}, ${warehouse.district}, ${warehouse.state.name} - ${warehouse.pincode}`,
-            gstin: warehouse.branch.gstNumber || '',
+            address: `${warehouse.address}, ${warehouse.district}, ${warehouse.state?.name || ''} - ${warehouse.pincode}`,
+            gstin: warehouse.branch?.gstNumber || '',
             drugLicense: warehouse.drugLicenseNumber,
             phone: warehouse.phone
           }
@@ -308,67 +334,15 @@ const PurchaseOrderForm: React.FC = () => {
   };
 
   const calculateTotals = () => {
-    let subTotal = 0;
-    let productLevelDiscount = 0;
+    const calculationsResult = purchaseOrderAPI.calculateTotals(
+      formData.products,
+      formData.additionalDiscount,
+      formData.shippingCharges,
+      formData.gstRate,
+      formData.intraStateGST
+    );
     
-    formData.products.forEach(product => {
-      const qty = product.quantity - product.foc;
-      const baseAmount = qty * product.unitPrice;
-      
-      let discount = 0;
-      if (product.discountType === 'percentage') {
-        discount = (baseAmount * product.discount) / 100;
-      } else {
-        discount = product.discount;
-      }
-      
-      productLevelDiscount += discount;
-      const lineTotal = baseAmount - discount;
-      product.totalCost = lineTotal;
-      subTotal += lineTotal;
-    });
-    
-    // Additional Discount
-    let additionalDiscountAmount = 0;
-    if (formData.additionalDiscount.type === 'percentage') {
-      additionalDiscountAmount = (subTotal * formData.additionalDiscount.value) / 100;
-    } else {
-      additionalDiscountAmount = formData.additionalDiscount.value;
-    }
-    
-    const afterDiscount = subTotal - additionalDiscountAmount;
-    
-    // GST Calculation
-    const gstAmount = (afterDiscount * formData.gstRate) / 100;
-    let cgst = 0, sgst = 0, igst = 0;
-    
-    if (formData.intraStateGST) {
-      cgst = gstAmount / 2;
-      sgst = gstAmount / 2;
-    } else {
-      igst = gstAmount;
-    }
-    
-    // Shipping Charges
-    let shippingAmount = 0;
-    if (formData.shippingCharges.type === 'percentage') {
-      shippingAmount = (afterDiscount * formData.shippingCharges.value) / 100;
-    } else {
-      shippingAmount = formData.shippingCharges.value;
-    }
-    
-    const grandTotal = afterDiscount + gstAmount + shippingAmount;
-    
-    setCalculations({
-      subTotal,
-      productLevelDiscount,
-      additionalDiscountAmount,
-      cgst,
-      sgst,
-      igst,
-      shippingAmount,
-      grandTotal
-    });
+    setCalculations(calculationsResult);
   };
 
   const handleAddProduct = (product: any) => {
@@ -414,114 +388,100 @@ const PurchaseOrderForm: React.FC = () => {
     }));
   };
 
-  // Replace the handleSubmit function in PurchaseOrderForm.tsx (around line 555)
-
-const handleSubmit = async () => {
-  // Validation
-  if (!formData.principal) {
-    toast.error('Please select a principal');
-    return;
-  }
-  
-  if (!formData.billToBranch) {
-    toast.error('Please select billing branch');
-    return;
-  }
-  
-  if (!formData.shipToBranch && !formData.shipToWarehouse) {
-    toast.error('Please select shipping location');
-    return;
-  }
-  
-  if (formData.products.length === 0) {
-    toast.error('Please add at least one product');
-    return;
-  }
-  
-  if (formData.toEmails.length === 0) {
-    toast.error('Please add at least one recipient email');
-    return;
-  }
-
-  // Generate PO Number if not in edit mode and not already generated
-  if (!isEdit && !formData.poNumber) {
-    const principal = principals.find(p => p._id === formData.principal);
-    if (principal) {
-      const principalCode = principal.name.substring(0, 3).toUpperCase();
-      const date = new Date();
-      const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
-      
-      // Generate serial number based on timestamp to ensure uniqueness
-      const timestamp = Date.now();
-      const serialNo = (timestamp % 1000).toString().padStart(3, '0');
-      
-      const poNumber = `MM-${principalCode}-${dateStr}/${serialNo}`;
-      setFormData(prev => ({ ...prev, poNumber }));
-      
-      // Use the generated PO number
-      formData.poNumber = poNumber;
-    }
-  }
-  
-  try {
-    setSaving(true);
-    
-    const payload = {
-      poNumber: formData.poNumber, // Include PO number
-      poDate: formData.poDate,
-      principal: formData.principal,
-      billTo: formData.billTo,
-      shipTo: formData.shipTo,
-      products: formData.products.map(p => ({
-        product: p.product,
-        productCode: p.productCode,
-        productName: p.productName,
-        description: p.description,
-        quantity: p.quantity,
-        unitPrice: p.unitPrice,
-        foc: p.foc || 0,
-        discount: p.discount || 0,
-        discountType: p.discountType || 'amount',
-        unit: p.unit || 'PCS',
-        gstRate: p.gstRate || 18,
-        remarks: p.remarks || ''
-      })),
-      additionalDiscount: formData.additionalDiscount || { type: 'amount', value: 0 },
-      taxType: formData.intraStateGST ? 'CGST_SGST' : 'IGST',
-      gstRate: formData.gstRate || 5,
-      shippingCharges: formData.shippingCharges || { type: 'amount', value: 0 },
-      toEmails: formData.toEmails,
-      fromEmail: formData.fromEmail,
-      ccEmails: formData.ccEmails || [],
-      terms: formData.terms || '',
-      notes: formData.notes || ''
-    };
-
-    console.log('Submitting PO with payload:', payload);
-    
-    if (isEdit && id) {
-      await purchaseOrderAPI.updatePurchaseOrder(id, payload);
-      toast.success('Purchase order updated successfully');
-    } else {
-      const response = await purchaseOrderAPI.createPurchaseOrder(payload);
-      console.log('PO creation response:', response);
-      toast.success('Purchase order created successfully');
+  const handleSubmit = async () => {
+    // Validation
+    if (!formData.principal) {
+      toast.error('Please select a principal');
+      return;
     }
     
-    navigate('/purchase-orders');
-  } catch (error: any) {
-    console.error('PO submission error:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to save purchase order';
-    toast.error(errorMessage);
-    
-    // Log detailed error for debugging
-    if (error.response?.data) {
-      console.error('Server error details:', error.response.data);
+    if (!formData.billToBranch) {
+      toast.error('Please select billing branch');
+      return;
     }
-  } finally {
-    setSaving(false);
-  }
-};
+    
+    if (!formData.shipToBranch && !formData.shipToWarehouse) {
+      toast.error('Please select shipping location');
+      return;
+    }
+    
+    if (formData.products.length === 0) {
+      toast.error('Please add at least one product');
+      return;
+    }
+    
+    if (formData.toEmails.length === 0) {
+      toast.error('Please add at least one recipient email');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      const payload = {
+        // Don't send poNumber for new POs - let backend generate it
+        ...(isEdit && { poNumber: formData.poNumber }),
+        poDate: formData.poDate,
+        principal: formData.principal,
+        billTo: formData.billTo,
+        shipTo: formData.shipTo,
+        
+        // Products - match backend expected structure
+        products: formData.products.map(p => ({
+          product: p.product,
+          productCode: p.productCode,
+          productName: p.productName,
+          description: p.description,
+          quantity: p.quantity,
+          unitPrice: p.unitPrice,
+          foc: p.foc || 0,
+          discount: p.discount || 0,
+          discountType: p.discountType || 'amount',
+          unit: p.unit || 'PCS',
+          gstRate: p.gstRate || 18,
+          remarks: p.remarks || ''
+        })),
+        
+        // Financial settings
+        additionalDiscount: formData.additionalDiscount || { type: 'amount', value: 0 },
+        taxType: formData.intraStateGST ? 'CGST_SGST' : 'IGST',
+        gstRate: formData.gstRate || 5,
+        shippingCharges: formData.shippingCharges || { type: 'amount', value: 0 },
+        
+        // Communication
+        toEmails: formData.toEmails,
+        fromEmail: formData.fromEmail,
+        ccEmails: formData.ccEmails || [],
+        terms: formData.terms || '',
+        notes: formData.notes || ''
+      };
+
+      console.log('Submitting PO with payload:', payload);
+      
+      if (isEdit && id) {
+        const response = await purchaseOrderAPI.updatePurchaseOrder(id, payload);
+        toast.success(response.message || 'Purchase order updated successfully');
+      } else {
+        const response = await purchaseOrderAPI.createPurchaseOrder(payload);
+        console.log('PO creation response:', response);
+        
+        // Show generated PO number if available
+        if (response.generatedPONumber) {
+          toast.success(`Purchase order created with PO# ${response.generatedPONumber}`);
+        } else {
+          toast.success(response.message || 'Purchase order created successfully');
+        }
+      }
+      
+      navigate('/purchase-orders');
+    } catch (error: any) {
+      console.error('PO submission error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save purchase order';
+      toast.error(errorMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -531,11 +491,7 @@ const handleSubmit = async () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(amount);
+    return purchaseOrderAPI.formatCurrency(amount);
   };
 
   useEffect(() => {
@@ -1131,6 +1087,34 @@ const handleSubmit = async () => {
               }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="cc1@example.com, cc2@example.com"
+            />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Terms & Conditions
+            </label>
+            <textarea
+              value={formData.terms}
+              onChange={(e) => setFormData(prev => ({ ...prev, terms: e.target.value }))}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter terms and conditions..."
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter additional notes..."
             />
           </div>
         </div>
