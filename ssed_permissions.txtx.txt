@@ -1,0 +1,9 @@
+node scripts\createAdmin.js
+node seeders\permissionSeeder.js
+node seeders\workflowPermissionsSeeder.js
+
+node seeders\testSeeder.js
+node seeders\indianStatesSeeder.js
+node seeders\branchSeeder.js 
+node seeders\warehouseSeeder.js
+node seeders\categoryProductSeeder.js

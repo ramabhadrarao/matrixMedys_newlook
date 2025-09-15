@@ -5,6 +5,106 @@ import Principal from '../models/Principal.js';
 import Product from '../models/Product.js';
 import { sendPOEmail } from '../services/emailService.js';
 
+// Helper function to generate principal code
+const getPrincipalCode = (principalName) => {
+  // Split by spaces and take first letter of each word, max 3 characters
+  const words = principalName.trim().split(/\s+/);
+  let code = '';
+  
+  if (words.length === 1) {
+    // Single word - take first 3 characters
+    code = words[0].substring(0, 3).toUpperCase();
+  } else {
+    // Multiple words - take first letter of each word, max 3
+    code = words.slice(0, 3).map(word => word.charAt(0)).join('').toUpperCase();
+  }
+  
+  return code.padEnd(3, 'X'); // Pad with X if less than 3 characters
+};
+
+// Helper function to generate PO number
+const generatePONumber = async (principalId, customDate = null) => {
+  try {
+    // Get principal details
+    const principal = await Principal.findById(principalId);
+    if (!principal) {
+      throw new Error('Principal not found');
+    }
+    
+    // Generate principal code
+    const principalCode = getPrincipalCode(principal.name);
+    
+    // Use provided date or current date
+    const date = customDate ? new Date(customDate) : new Date();
+    const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
+    
+    // Find the highest sequence number for this principal on this date
+    const datePattern = `MM-${principalCode}-${dateStr}`;
+    const existingPOs = await PurchaseOrder.find({
+      principal: principalId,
+      poNumber: { $regex: `^${datePattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/` }
+    }).sort({ poNumber: -1 }).limit(1);
+    
+    let nextSequence = 1;
+    
+    if (existingPOs.length > 0) {
+      // Extract sequence number from the last PO
+      const lastPONumber = existingPOs[0].poNumber;
+      const sequencePart = lastPONumber.split('/')[1];
+      if (sequencePart) {
+        nextSequence = parseInt(sequencePart) + 1;
+      }
+    }
+    
+    // Generate final PO number
+    const sequenceStr = nextSequence.toString().padStart(3, '0');
+    const poNumber = `${datePattern}/${sequenceStr}`;
+    
+    // Double-check for uniqueness (in case of race conditions)
+    const duplicateCheck = await PurchaseOrder.findOne({ poNumber });
+    if (duplicateCheck) {
+      // If duplicate found, recursively try with next sequence
+      return await generatePONumberRecursive(principalId, customDate, nextSequence + 1);
+    }
+    
+    return poNumber;
+    
+  } catch (error) {
+    console.error('Error generating PO number:', error);
+    throw error;
+  }
+};
+
+// Recursive function for handling race conditions
+const generatePONumberRecursive = async (principalId, customDate = null, startSequence = 1) => {
+  try {
+    const principal = await Principal.findById(principalId);
+    if (!principal) {
+      throw new Error('Principal not found');
+    }
+    
+    const principalCode = getPrincipalCode(principal.name);
+    const date = customDate ? new Date(customDate) : new Date();
+    const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
+    
+    const sequenceStr = startSequence.toString().padStart(3, '0');
+    const poNumber = `MM-${principalCode}-${dateStr}/${sequenceStr}`;
+    
+    // Check for uniqueness
+    const existingPO = await PurchaseOrder.findOne({ poNumber });
+    if (existingPO) {
+      // Try with next sequence
+      return await generatePONumberRecursive(principalId, customDate, startSequence + 1);
+    }
+    
+    return poNumber;
+    
+  } catch (error) {
+    console.error('Error generating PO number recursively:', error);
+    throw error;
+  }
+};
+
 // Get all POs with filtering
 export const getPurchaseOrders = async (req, res) => {
   try {
@@ -118,13 +218,10 @@ export const getPurchaseOrder = async (req, res) => {
 };
 
 // Create PO
-// Add this to server/controllers/purchaseOrderController.js
-// Replace the createPurchaseOrder function (starting around line 59)
-
 export const createPurchaseOrder = async (req, res) => {
   try {
     const {
-      poNumber,
+      poNumber, // Optional - will auto-generate if not provided
       poDate,
       principal,
       billTo,
@@ -158,31 +255,27 @@ export const createPurchaseOrder = async (req, res) => {
       return res.status(400).json({ message: 'At least one product is required' });
     }
     
-    // Get or generate PO number
+    // Validate principal exists
+    const principalDoc = await Principal.findById(principal);
+    if (!principalDoc) {
+      return res.status(404).json({ message: 'Principal not found' });
+    }
+    
+    // Generate or validate PO number
     let finalPoNumber = poNumber;
     if (!finalPoNumber) {
-      // Generate PO number if not provided
-      const principalDoc = await Principal.findById(principal);
-      if (!principalDoc) {
-        return res.status(404).json({ message: 'Principal not found' });
+      // Auto-generate PO number
+      finalPoNumber = await generatePONumber(principal, poDate);
+      console.log('Generated PO Number:', finalPoNumber);
+    } else {
+      // Validate provided PO number is unique
+      const existingPO = await PurchaseOrder.findOne({ poNumber: finalPoNumber });
+      if (existingPO) {
+        return res.status(400).json({ 
+          message: 'PO number already exists',
+          existingPO: finalPoNumber 
+        });
       }
-      
-      const principalCode = principalDoc.name.substring(0, 3).toUpperCase();
-      const date = new Date();
-      const dateStr = `${date.getDate().toString().padStart(2, '0')}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getFullYear().toString().substr(-2)}`;
-      
-      // Get count of POs for today to generate serial number
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-      
-      const poCount = await PurchaseOrder.countDocuments({
-        createdAt: { $gte: todayStart, $lte: todayEnd }
-      });
-      
-      const serialNo = (poCount + 1).toString().padStart(3, '0');
-      finalPoNumber = `MM-${principalCode}-${dateStr}/${serialNo}`;
     }
     
     // Get initial workflow stage
@@ -196,7 +289,10 @@ export const createPurchaseOrder = async (req, res) => {
         description: 'Initial draft stage',
         sequence: 1,
         allowedActions: ['edit', 'approve', 'cancel'],
-        isActive: true
+        requiredPermissions: [],
+        nextStages: [],
+        isActive: true,
+        createdBy: req.user._id
       });
       await draftStage.save();
     }
@@ -259,7 +355,8 @@ export const createPurchaseOrder = async (req, res) => {
     
     res.status(201).json({
       message: 'Purchase order created successfully',
-      purchaseOrder
+      purchaseOrder,
+      generatedPONumber: !poNumber ? finalPoNumber : undefined // Show generated number
     });
   } catch (error) {
     console.error('Create purchase order error:', error);
@@ -321,6 +418,10 @@ export const updatePurchaseOrder = async (req, res) => {
     
     await purchaseOrder.save();
     
+    await purchaseOrder.populate('principal', 'name gstNumber email');
+    await purchaseOrder.populate('currentStage');
+    await purchaseOrder.populate('updatedBy', 'name email');
+    
     res.json({
       message: 'Purchase order updated successfully',
       purchaseOrder
@@ -356,6 +457,9 @@ export const approvePurchaseOrder = async (req, res) => {
     // Get next stage based on current stage
     let nextStageCode;
     switch (currentStage.code) {
+      case 'DRAFT':
+        nextStageCode = 'PENDING_APPROVAL';
+        break;
       case 'PENDING_APPROVAL':
         nextStageCode = 'APPROVED_L1';
         break;
@@ -370,6 +474,9 @@ export const approvePurchaseOrder = async (req, res) => {
     }
     
     const nextStage = await WorkflowStage.findOne({ code: nextStageCode });
+    if (!nextStage) {
+      return res.status(404).json({ message: `Next stage ${nextStageCode} not found` });
+    }
     
     // Update PO
     purchaseOrder.currentStage = nextStage._id;
@@ -392,8 +499,17 @@ export const approvePurchaseOrder = async (req, res) => {
     
     // Send email if ordered
     if (nextStageCode === 'ORDERED') {
-      await sendPOEmail(purchaseOrder);
+      try {
+        await sendPOEmail(purchaseOrder);
+      } catch (emailError) {
+        console.error('Failed to send PO email:', emailError);
+        // Don't fail the approval, just log the error
+      }
     }
+    
+    await purchaseOrder.populate('principal', 'name gstNumber email');
+    await purchaseOrder.populate('currentStage');
+    await purchaseOrder.populate('approvedBy', 'name email');
     
     res.json({
       message: 'Purchase order approved successfully',
@@ -430,21 +546,40 @@ export const rejectPurchaseOrder = async (req, res) => {
       });
     }
     
-    const cancelledStage = await WorkflowStage.findOne({ code: 'CANCELLED' });
+    let rejectedStage = await WorkflowStage.findOne({ code: 'REJECTED' });
+    
+    // Create REJECTED stage if it doesn't exist
+    if (!rejectedStage) {
+      rejectedStage = new WorkflowStage({
+        name: 'Rejected',
+        code: 'REJECTED',
+        description: 'Purchase order rejected',
+        sequence: 999,
+        allowedActions: ['edit'],
+        requiredPermissions: [],
+        nextStages: [],
+        isActive: true,
+        createdBy: req.user._id
+      });
+      await rejectedStage.save();
+    }
     
     // Update PO
-    purchaseOrder.currentStage = cancelledStage._id;
+    purchaseOrder.currentStage = rejectedStage._id;
     purchaseOrder.status = 'rejected';
     
     // Add to workflow history
     purchaseOrder.workflowHistory.push({
-      stage: cancelledStage._id,
+      stage: rejectedStage._id,
       action: 'rejected',
       actionBy: req.user._id,
       remarks
     });
     
     await purchaseOrder.save();
+    
+    await purchaseOrder.populate('principal', 'name gstNumber email');
+    await purchaseOrder.populate('currentStage');
     
     res.json({
       message: 'Purchase order rejected',
@@ -453,6 +588,72 @@ export const rejectPurchaseOrder = async (req, res) => {
   } catch (error) {
     console.error('Reject purchase order error:', error);
     res.status(500).json({ message: 'Failed to reject purchase order' });
+  }
+};
+
+export const cancelPurchaseOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body;
+    
+    const purchaseOrder = await PurchaseOrder.findById(id)
+      .populate('currentStage');
+    
+    if (!purchaseOrder) {
+      return res.status(404).json({ message: 'Purchase order not found' });
+    }
+    
+    const currentStage = purchaseOrder.currentStage;
+    
+    // Check if cancel action is allowed
+    if (!currentStage.allowedActions.includes('cancel')) {
+      return res.status(403).json({ 
+        message: 'Cancellation not allowed in current stage' 
+      });
+    }
+    
+    let cancelledStage = await WorkflowStage.findOne({ code: 'CANCELLED' });
+    
+    // Create CANCELLED stage if it doesn't exist
+    if (!cancelledStage) {
+      cancelledStage = new WorkflowStage({
+        name: 'Cancelled',
+        code: 'CANCELLED',
+        description: 'Purchase order cancelled',
+        sequence: 998,
+        allowedActions: [],
+        requiredPermissions: [],
+        nextStages: [],
+        isActive: true,
+        createdBy: req.user._id
+      });
+      await cancelledStage.save();
+    }
+    
+    // Update PO
+    purchaseOrder.currentStage = cancelledStage._id;
+    purchaseOrder.status = 'cancelled';
+    
+    // Add to workflow history
+    purchaseOrder.workflowHistory.push({
+      stage: cancelledStage._id,
+      action: 'cancelled',
+      actionBy: req.user._id,
+      remarks: remarks || 'Purchase order cancelled'
+    });
+    
+    await purchaseOrder.save();
+    
+    await purchaseOrder.populate('principal', 'name gstNumber email');
+    await purchaseOrder.populate('currentStage');
+    
+    res.json({
+      message: 'Purchase order cancelled successfully',
+      purchaseOrder
+    });
+  } catch (error) {
+    console.error('Cancel purchase order error:', error);
+    res.status(500).json({ message: 'Failed to cancel purchase order' });
   }
 };
 
@@ -482,6 +683,164 @@ export const deletePurchaseOrder = async (req, res) => {
   }
 };
 
+// Function to get next PO number preview (useful for frontend)
+export const getNextPONumber = async (req, res) => {
+  try {
+    const { principalId, date } = req.query;
+    
+    if (!principalId) {
+      return res.status(400).json({ message: 'Principal ID is required' });
+    }
+    
+    const nextPONumber = await generatePONumber(principalId, date);
+    
+    res.json({ 
+      nextPONumber,
+      preview: true
+    });
+  } catch (error) {
+    console.error('Get next PO number error:', error);
+    res.status(500).json({ 
+      message: 'Failed to generate PO number preview',
+      error: error.message 
+    });
+  }
+};
+
+// Function to validate PO number format
+export const validatePONumber = async (req, res) => {
+  try {
+    const { poNumber, principalId } = req.body;
+    
+    if (!poNumber) {
+      return res.status(400).json({ message: 'PO number is required' });
+    }
+    
+    // Check if PO number already exists
+    const existingPO = await PurchaseOrder.findOne({ poNumber });
+    if (existingPO) {
+      return res.status(409).json({ 
+        message: 'PO number already exists',
+        isValid: false,
+        existingPO: {
+          id: existingPO._id,
+          poNumber: existingPO.poNumber,
+          principal: existingPO.principal,
+          status: existingPO.status,
+          createdAt: existingPO.createdAt
+        }
+      });
+    }
+    
+    // Validate format if principal is provided
+    if (principalId) {
+      const principal = await Principal.findById(principalId);
+      if (principal) {
+        const expectedCode = getPrincipalCode(principal.name);
+        const poPattern = new RegExp(`^MM-${expectedCode}-\\d{6}/\\d{3}$`);
+        
+        if (!poPattern.test(poNumber)) {
+          return res.status(400).json({
+            message: `PO number format should be MM-${expectedCode}-DDMMYY/XXX`,
+            isValid: false,
+            expectedFormat: `MM-${expectedCode}-DDMMYY/XXX`,
+            example: `MM-${expectedCode}-150925/001`
+          });
+        }
+      }
+    }
+    
+    res.json({ 
+      message: 'PO number is valid',
+      isValid: true,
+      poNumber
+    });
+  } catch (error) {
+    console.error('Validate PO number error:', error);
+    res.status(500).json({ 
+      message: 'Failed to validate PO number',
+      error: error.message 
+    });
+  }
+};
+
+// Get PO statistics
+export const getPurchaseOrderStats = async (req, res) => {
+  try {
+    const { fromDate, toDate, principal } = req.query;
+    
+    let matchQuery = {};
+    
+    if (fromDate || toDate) {
+      matchQuery.poDate = {};
+      if (fromDate) matchQuery.poDate.$gte = new Date(fromDate);
+      if (toDate) matchQuery.poDate.$lte = new Date(toDate);
+    }
+    
+    if (principal) {
+      matchQuery.principal = new mongoose.Types.ObjectId(principal);
+    }
+    
+    const stats = await PurchaseOrder.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalValue: { $sum: '$grandTotal' }
+        }
+      }
+    ]);
+    
+    const totalPOs = await PurchaseOrder.countDocuments(matchQuery);
+    const totalValue = await PurchaseOrder.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: null, total: { $sum: '$grandTotal' } } }
+    ]);
+    
+    res.json({
+      stats,
+      summary: {
+        totalPOs,
+        totalValue: totalValue[0]?.total || 0
+      }
+    });
+  } catch (error) {
+    console.error('Get PO stats error:', error);
+    res.status(500).json({ message: 'Failed to fetch PO statistics' });
+  }
+};
+
+// Send PO via email
+export const sendPurchaseOrderEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recipients, subject, message } = req.body;
+    
+    const purchaseOrder = await PurchaseOrder.findById(id)
+      .populate('principal')
+      .populate('products.product')
+      .populate('createdBy', 'name email');
+    
+    if (!purchaseOrder) {
+      return res.status(404).json({ message: 'Purchase order not found' });
+    }
+    
+    // Update email recipients if provided
+    if (recipients && recipients.length > 0) {
+      purchaseOrder.toEmails = recipients;
+      await purchaseOrder.save();
+    }
+    
+    await sendPOEmail(purchaseOrder, { subject, message });
+    
+    res.json({ message: 'Purchase order sent successfully' });
+  } catch (error) {
+    console.error('Send PO email error:', error);
+    res.status(500).json({ message: 'Failed to send purchase order email' });
+  }
+};
+
 export default {
   getPurchaseOrders,
   getPurchaseOrder,
@@ -489,5 +848,10 @@ export default {
   updatePurchaseOrder,
   approvePurchaseOrder,
   rejectPurchaseOrder,
-  deletePurchaseOrder
+  cancelPurchaseOrder,
+  deletePurchaseOrder,
+  getNextPONumber,
+  validatePONumber,
+  getPurchaseOrderStats,
+  sendPurchaseOrderEmail
 };

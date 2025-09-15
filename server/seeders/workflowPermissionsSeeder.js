@@ -35,7 +35,41 @@ const workflowPermissions = [
   // Workflow Management
   { name: 'workflow_view', description: 'View workflow stages', resource: 'workflow', action: 'view' },
   { name: 'workflow_manage', description: 'Manage workflow stages', resource: 'workflow', action: 'manage' },
-  { name: 'workflow_assign', description: 'Assign workflow permissions', resource: 'workflow', action: 'assign' }
+  { name: 'workflow_assign', description: 'Assign workflow permissions', resource: 'workflow', action: 'assign' },
+  // Missing user-to-stage assignment permissions
+{ name: 'stage_assignments_create', description: 'Assign users to workflow stages', resource: 'stage_assignments', action: 'create' },
+{ name: 'stage_assignments_update', description: 'Update stage assignments', resource: 'stage_assignments', action: 'update' },
+{ name: 'stage_assignments_delete', description: 'Remove stage assignments', resource: 'stage_assignments', action: 'delete' },
+{ name: 'stage_assignments_view', description: 'View stage assignments', resource: 'stage_assignments', action: 'view' },
+{ name: 'stage_assignments_bulk', description: 'Bulk assign users to stages', resource: 'stage_assignments', action: 'bulk_assign' },
+
+// Missing PO workflow actions
+{ name: 'po_submit', description: 'Submit PO for approval', resource: 'po_workflow', action: 'submit' },
+{ name: 'po_send', description: 'Send PO to supplier', resource: 'po_workflow', action: 'send' },
+{ name: 'po_complete', description: 'Mark PO as completed', resource: 'po_workflow', action: 'complete' },
+{ name: 'po_assign', description: 'Assign PO to user', resource: 'po_workflow', action: 'assign' },
+{ name: 'po_reassign', description: 'Reassign PO to different user', resource: 'po_workflow', action: 'reassign' },
+// Missing workflow stage CRUD permissions
+{ name: 'workflow_stages_create', description: 'Create workflow stages', resource: 'workflow_stages', action: 'create' },
+{ name: 'workflow_stages_update', description: 'Update workflow stages', resource: 'workflow_stages', action: 'update' },
+{ name: 'workflow_stages_delete', description: 'Delete workflow stages', resource: 'workflow_stages', action: 'delete' },
+{ name: 'workflow_stages_view', description: 'View workflow stages', resource: 'workflow_stages', action: 'view' },
+// Missing invoice receiving permissions
+{ name: 'invoice_receiving_create', description: 'Create invoice receiving records', resource: 'invoice_receiving', action: 'create' },
+{ name: 'invoice_receiving_update', description: 'Update invoice receiving records', resource: 'invoice_receiving', action: 'update' },
+{ name: 'invoice_receiving_delete', description: 'Delete invoice receiving records', resource: 'invoice_receiving', action: 'delete' },
+{ name: 'invoice_receiving_qc_submit', description: 'Submit for QC', resource: 'invoice_receiving', action: 'qc_submit' },
+{ name: 'invoice_receiving_qc_approve', description: 'Approve QC results', resource: 'invoice_receiving', action: 'qc_approve' },
+{ name: 'invoice_receiving_qc_reject', description: 'Reject QC results', resource: 'invoice_receiving', action: 'qc_reject' },
+// Missing workflow reporting permissions
+{ name: 'workflow_history_view', description: 'View workflow history', resource: 'workflow_history', action: 'view' },
+{ name: 'workflow_history_export', description: 'Export workflow reports', resource: 'workflow_history', action: 'export' },
+{ name: 'workflow_analytics_view', description: 'View workflow analytics', resource: 'workflow_analytics', action: 'view' },
+// Missing transition management permissions
+{ name: 'workflow_transitions_create', description: 'Create workflow transitions', resource: 'workflow_transitions', action: 'create' },
+{ name: 'workflow_transitions_update', description: 'Update workflow transitions', resource: 'workflow_transitions', action: 'update' },
+{ name: 'workflow_transitions_delete', description: 'Delete workflow transitions', resource: 'workflow_transitions', action: 'delete' },
+{ name: 'workflow_transitions_view', description: 'View workflow transitions', resource: 'workflow_transitions', action: 'view' },
 ];
 
 const workflowStages = [

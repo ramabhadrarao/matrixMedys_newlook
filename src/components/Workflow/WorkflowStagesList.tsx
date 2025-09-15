@@ -35,9 +35,11 @@ const WorkflowStagesList: React.FC = () => {
     try {
       setLoading(true);
       const response = await workflowAPI.getWorkflowStages();
-      setStages(response.data);
+      // FIX: Access the stages property from the response
+      setStages(response.stages || []); // Use response.stages instead of response.data
     } catch (error: any) {
       toast.error('Failed to load workflow stages');
+      console.error('Error loading stages:', error);
     } finally {
       setLoading(false);
     }
@@ -57,7 +59,8 @@ const WorkflowStagesList: React.FC = () => {
     }
   };
 
-  const filteredStages = stages.filter(stage => {
+  // Add defensive check for stages array
+  const filteredStages = (stages || []).filter(stage => {
     const matchesSearch = stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          stage.code.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -223,7 +226,7 @@ const WorkflowStagesList: React.FC = () => {
                             key={index}
                             className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700"
                           >
-                            {nextStage}
+                            {typeof nextStage === 'string' ? nextStage : nextStage.code}
                           </span>
                         ))}
                         {stage.nextStages && stage.nextStages.length > 2 && (
