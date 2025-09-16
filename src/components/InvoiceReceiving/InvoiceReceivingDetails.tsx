@@ -378,7 +378,7 @@ const InvoiceReceivingDetails: React.FC = () => {
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Products:</span>
-                    <span className="font-medium">{receiving.receivedProducts.length}</span>
+                    <span className="font-medium">{receiving.receivedProducts?.length || 0}</span>
                   </div>
                   
                   <div className="flex justify-between">
@@ -446,7 +446,7 @@ const InvoiceReceivingDetails: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {receiving.receivedProducts.map((product, index) => (
+                  {receiving.receivedProducts?.map((product, index) => (
                     <tr key={index}>
                       <td className="px-4 py-4">
                         <div className="font-medium text-gray-900">{product.productName}</div>
@@ -516,7 +516,7 @@ const InvoiceReceivingDetails: React.FC = () => {
             
             {receiving.qcRequired ? (
               <div className="space-y-4">
-                {receiving.receivedProducts.map((product, index) => (
+                {receiving.receivedProducts?.map((product, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
