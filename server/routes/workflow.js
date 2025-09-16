@@ -1,4 +1,4 @@
-// server/routes/workflow.js
+// server/routes/workflow.js - COMPLETE UPDATED VERSION
 import express from 'express';
 import { body, param, query } from 'express-validator';
 import { validate } from '../middleware/validate.js';
@@ -32,7 +32,7 @@ const router = express.Router();
 
 // ========== VALIDATION RULES ==========
 
-// Workflow Stage validation
+// Workflow Stage validation - FIXED TO ALLOW EMPTY ARRAYS
 const workflowStageValidation = [
   body('name')
     .trim()
@@ -57,11 +57,12 @@ const workflowStageValidation = [
     .isArray()
     .withMessage('Required permissions must be an array'),
   body('requiredPermissions.*')
+    .optional()
     .isMongoId()
     .withMessage('Each permission must be a valid ID'),
   body('allowedActions')
-    .isArray()
-    .withMessage('Allowed actions must be an array'),
+    .isArray({ min: 1 })
+    .withMessage('At least one allowed action is required'),
   body('allowedActions.*')
     .isIn(['edit', 'approve', 'reject', 'return', 'cancel', 'receive', 'qc_check'])
     .withMessage('Invalid action type'),
@@ -70,6 +71,7 @@ const workflowStageValidation = [
     .isArray()
     .withMessage('Next stages must be an array'),
   body('nextStages.*')
+    .optional()
     .isMongoId()
     .withMessage('Each next stage must be a valid ID'),
   body('isActive')
@@ -109,7 +111,7 @@ const workflowTransitionValidation = [
     .withMessage('Notification template must not exceed 100 characters')
 ];
 
-// Permission Assignment validation
+// Permission Assignment validation - FIXED TO ALLOW EMPTY PERMISSIONS
 const permissionAssignmentValidation = [
   body('userId')
     .isMongoId()
@@ -118,15 +120,22 @@ const permissionAssignmentValidation = [
     .isMongoId()
     .withMessage('Stage ID must be valid'),
   body('permissions')
-    .isArray({ min: 1 })
-    .withMessage('At least one permission is required'),
+    .optional()
+    .isArray()
+    .withMessage('Permissions must be an array'),
   body('permissions.*')
+    .optional()
     .isMongoId()
     .withMessage('Each permission must be a valid ID'),
   body('expiryDate')
     .optional()
     .isISO8601()
-    .withMessage('Expiry date must be a valid date')
+    .withMessage('Expiry date must be a valid date'),
+  body('remarks')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Remarks must not exceed 500 characters')
 ];
 
 // Workflow Action validation
@@ -152,7 +161,7 @@ const workflowActionValidation = [
     .withMessage('Additional data must be an object')
 ];
 
-// Bulk Assignment validation
+// Bulk Assignment validation - FIXED TO ALLOW EMPTY PERMISSIONS
 const bulkAssignmentValidation = [
   body('assignments')
     .isArray({ min: 1 })
@@ -164,8 +173,13 @@ const bulkAssignmentValidation = [
     .isMongoId()
     .withMessage('Each stage ID must be valid'),
   body('assignments.*.permissions')
-    .isArray({ min: 1 })
-    .withMessage('Each assignment must have at least one permission'),
+    .optional()
+    .isArray()
+    .withMessage('Each assignment permissions must be an array'),
+  body('assignments.*.permissions.*')
+    .optional()
+    .isMongoId()
+    .withMessage('Each permission must be a valid ID'),
   body('overwrite')
     .optional()
     .isBoolean()
@@ -363,7 +377,11 @@ router.post('/permissions/revoke',
     body('permissions')
       .optional()
       .isArray()
-      .withMessage('Permissions must be an array')
+      .withMessage('Permissions must be an array'),
+    body('permissions.*')
+      .optional()
+      .isMongoId()
+      .withMessage('Each permission must be a valid ID')
   ],
   validate,
   revokeStagePermissions

@@ -9,10 +9,11 @@ import {
   Plus,
   Minus,
   AlertCircle,
-  UserCheck
+  UserCheck,
+  Shield
 } from 'lucide-react';
 import { workflowAPI } from '../../services/workflowAPI';
-import { usersAPI } from '../../services/api';
+import { usersAPI, permissionsAPI } from '../../services/api';
 import { User as UserType } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -46,6 +47,22 @@ interface StageUser {
   createdAt: string;
 }
 
+interface Permission {
+  _id: string;
+  name: string;
+  resource: string;
+  action: string;
+  description: string;
+}
+
+interface StageDetails {
+  _id: string;
+  name: string;
+  code: string;
+  requiredPermissions: Permission[];
+  allowedActions: string[];
+}
+
 const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
   isOpen,
   onClose,
@@ -55,6 +72,8 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
 }) => {
   const [users, setUsers] = useState<UserType[]>([]);
   const [stageUsers, setStageUsers] = useState<StageUser[]>([]);
+  const [stageDetails, setStageDetails] = useState<StageDetails | null>(null);
+  const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -62,25 +81,39 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
 
   useEffect(() => {
     if (isOpen && stageId) {
-      loadUsers();
-      loadStageUsers();
+      loadData();
     }
   }, [isOpen, stageId]);
 
-  const loadUsers = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
+      await Promise.all([
+        loadUsers(),
+        loadStageUsers(),
+        loadStageDetails(),
+        loadAllPermissions()
+      ]);
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
       const response = await usersAPI.getUsers({ 
         page: 1, 
-        limit: 100
+        limit: 100,
+        isActive: true
       });
       console.log('Users response:', response.data);
       setUsers(response.data.users || []);
     } catch (error: any) {
       console.error('Error loading users:', error);
-      toast.error('Failed to load users');
-    } finally {
-      setLoading(false);
+      throw error;
     }
   };
 
@@ -98,7 +131,29 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
       setSelectedUsers(new Set(assignedUserIds));
     } catch (error: any) {
       console.error('Error loading stage users:', error);
-      toast.error('Failed to load stage assignments');
+      throw error;
+    }
+  };
+
+  const loadStageDetails = async () => {
+    try {
+      const response = await workflowAPI.getWorkflowStage(stageId);
+      console.log('Stage details response:', response);
+      setStageDetails(response.stage);
+    } catch (error: any) {
+      console.error('Error loading stage details:', error);
+      throw error;
+    }
+  };
+
+  const loadAllPermissions = async () => {
+    try {
+      const response = await permissionsAPI.getPermissions();
+      console.log('All permissions response:', response.data);
+      setAllPermissions(response.data.permissions || []);
+    } catch (error: any) {
+      console.error('Error loading permissions:', error);
+      throw error;
     }
   };
 
@@ -110,6 +165,27 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
       newSelected.add(userId);
     }
     setSelectedUsers(newSelected);
+  };
+
+  const getDefaultPermissionsForStage = (): string[] => {
+    if (!stageDetails || !stageDetails.requiredPermissions) {
+      return [];
+    }
+    
+    // Return the required permissions for this stage
+    return stageDetails.requiredPermissions.map(permission => permission._id);
+  };
+
+  const getUserExistingPermissions = (userId: string): string[] => {
+    const existingAssignment = stageUsers.find(su => 
+      su.userId._id === userId && su.isActive
+    );
+    
+    if (existingAssignment && existingAssignment.permissions) {
+      return existingAssignment.permissions.map(p => p._id);
+    }
+    
+    return [];
   };
 
   const handleSaveAssignments = async () => {
@@ -133,22 +209,32 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
         !selectedArray.includes(userId)
       );
       
+      console.log('Users to assign:', usersToAssign);
+      console.log('Users to revoke:', usersToRevoke);
+      
       // Process assignments and revocations
       const promises: Promise<any>[] = [];
       
-      // Assign new users
+      // Assign new users with default permissions
+      const defaultPermissions = getDefaultPermissionsForStage();
+      console.log('Default permissions for stage:', defaultPermissions);
+      
       usersToAssign.forEach(userId => {
+        const assignmentData = {
+          userId,
+          stageId,
+          permissions: defaultPermissions, // Use stage's required permissions
+        };
+        
+        console.log('Assigning user with data:', assignmentData);
         promises.push(
-          workflowAPI.assignStagePermissions({
-            userId,
-            stageId,
-            permissions: [], // You may want to set default permissions here
-          })
+          workflowAPI.assignStagePermissions(assignmentData)
         );
       });
       
       // Revoke users
       usersToRevoke.forEach(userId => {
+        console.log('Revoking user:', userId);
         promises.push(
           workflowAPI.revokeStagePermissions({
             userId,
@@ -158,18 +244,24 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
       });
       
       // Execute all operations
-      await Promise.all(promises);
-      
-      toast.success('User assignments updated successfully');
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        toast.success('User assignments updated successfully');
+      } else {
+        toast.info('No changes to save');
+      }
       
       if (onAssignmentUpdate) {
         onAssignmentUpdate();
       }
       
-      onClose();
+      // Reload the assignments to reflect changes
+      await loadStageUsers();
+      
     } catch (error: any) {
       console.error('Error updating assignments:', error);
-      toast.error('Failed to update user assignments');
+      const errorMessage = error.response?.data?.message || 'Failed to update user assignments';
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -193,7 +285,7 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -203,6 +295,12 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
             <p className="text-sm text-gray-600 mt-1">
               Stage: {stageName}
             </p>
+            {stageDetails && stageDetails.requiredPermissions.length > 0 && (
+              <div className="flex items-center mt-2 text-xs text-blue-600">
+                <Shield className="w-3 h-3 mr-1" />
+                {stageDetails.requiredPermissions.length} required permission(s)
+              </div>
+            )}
           </div>
           
           <button
@@ -212,6 +310,23 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Stage Permissions Info */}
+        {stageDetails && stageDetails.requiredPermissions.length > 0 && (
+          <div className="p-4 bg-blue-50 border-b border-blue-200">
+            <h4 className="text-sm font-medium text-blue-900 mb-2">Required Permissions for this Stage:</h4>
+            <div className="flex flex-wrap gap-1">
+              {stageDetails.requiredPermissions.map(permission => (
+                <span
+                  key={permission._id}
+                  className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800"
+                >
+                  {permission.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="p-6 border-b border-gray-200">
@@ -246,6 +361,7 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
               {filteredUsers.map(user => {
                 const isSelected = selectedUsers.has(user._id);
                 const assignmentInfo = getAssignmentInfo(user._id);
+                const existingPermissions = getUserExistingPermissions(user._id);
                 
                 return (
                   <div
@@ -281,6 +397,14 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
                           </div>
                           
                           <p className="text-sm text-gray-600">{user.email}</p>
+                          
+                          {assignmentInfo && existingPermissions.length > 0 && (
+                            <div className="mt-1">
+                              <p className="text-xs text-gray-500">
+                                {existingPermissions.length} permission(s) assigned
+                              </p>
+                            </div>
+                          )}
                           
                           <div className="flex items-center space-x-2 mt-1">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
@@ -333,6 +457,11 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
               <span>
                 {selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''} selected for assignment
               </span>
+              {stageDetails && stageDetails.requiredPermissions.length > 0 && (
+                <span className="text-blue-600">
+                  (will receive {stageDetails.requiredPermissions.length} required permission{stageDetails.requiredPermissions.length !== 1 ? 's' : ''})
+                </span>
+              )}
             </div>
           </div>
         )}

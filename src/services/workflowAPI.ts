@@ -1,4 +1,4 @@
-// src/services/workflowAPI.ts - COMPLETE UPDATED VERSION
+// src/services/workflowAPI.ts - UPDATED VERSION WITH BETTER ERROR HANDLING
 import api from './api';
 
 // Interfaces
@@ -330,11 +330,30 @@ export const workflowAPI = {
   assignStagePermissions: async (data: StagePermissionAssignment): Promise<{ message: string; assignment: StagePermission }> => {
     try {
       console.log('Assigning stage permissions:', data);
+      
+      // Validate the data before sending
+      if (!data.userId || !data.stageId) {
+        throw new Error('userId and stageId are required');
+      }
+      
+      if (!data.permissions || !Array.isArray(data.permissions)) {
+        console.warn('No permissions provided, using empty array');
+        data.permissions = [];
+      }
+      
       const response = await api.post('/workflow/permissions/assign', data);
       console.log('Assign permissions response:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error assigning permissions:', error);
+      
+      // Enhanced error logging for debugging
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+      }
+      
       throw error;
     }
   },
@@ -388,58 +407,6 @@ export const workflowAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching stage users:', error);
-      throw error;
-    }
-  },
-
-  // ===== MISSING METHODS FOR USER ASSIGNMENT =====
-
-  // Get stage assignments (alias for getStageUsers)
-  getStageAssignments: async (stageId: string): Promise<{ users: StagePermission[] }> => {
-    return workflowAPI.getStageUsers(stageId, true);
-  },
-
-  // Update stage assignments (bulk update method)
-  updateStageAssignments: async (stageId: string, data: { userIds: string[] }): Promise<{ message: string }> => {
-    try {
-      console.log('Updating stage assignments for stage:', stageId, data);
-      
-      // First, get current assignments
-      const currentResponse = await workflowAPI.getStageUsers(stageId, true);
-      const currentUserIds = currentResponse.users
-        .filter(user => user.isActive)
-        .map(user => typeof user.userId === 'string' ? user.userId : user.userId._id);
-      
-      // Find users to assign and revoke
-      const usersToAssign = data.userIds.filter(userId => !currentUserIds.includes(userId));
-      const usersToRevoke = currentUserIds.filter(userId => !data.userIds.includes(userId));
-      
-      // Create assignment operations
-      const assignments = usersToAssign.map(userId => ({
-        userId,
-        stageId,
-        permissions: [], // Default empty permissions, can be configured later
-      }));
-      
-      // Execute bulk assignment if there are new users
-      if (assignments.length > 0) {
-        await workflowAPI.bulkAssignPermissions({
-          assignments,
-          overwrite: false
-        });
-      }
-      
-      // Revoke permissions for removed users
-      for (const userId of usersToRevoke) {
-        await workflowAPI.revokeStagePermissions({
-          userId,
-          stageId
-        });
-      }
-      
-      return { message: 'Stage assignments updated successfully' };
-    } catch (error) {
-      console.error('Error updating stage assignments:', error);
       throw error;
     }
   },

@@ -312,22 +312,91 @@ export const deleteWorkflowTransition = async (req, res) => {
 
 export const assignStagePermissions = async (req, res) => {
   try {
-    const { userId, stageId, permissions, expiryDate } = req.body;
+    const { userId, stageId, permissions = [], expiryDate, remarks } = req.body;
     
-    // Remove existing permissions for this user-stage combination
-    await StagePermission.deleteMany({ userId, stageId });
-    
-    // Create new permission assignment
-    const assignment = new StagePermission({
+    console.log('Assigning stage permissions:', {
       userId,
       stageId,
       permissions,
       expiryDate,
+      remarks,
       assignedBy: req.user._id
     });
     
+    // Validate required fields
+    if (!userId || !stageId) {
+      return res.status(400).json({ 
+        message: 'userId and stageId are required' 
+      });
+    }
+    
+    // Validate that user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        message: 'User not found' 
+      });
+    }
+    
+    // Validate that stage exists
+    const stage = await WorkflowStage.findById(stageId);
+    if (!stage) {
+      return res.status(404).json({ 
+        message: 'Workflow stage not found' 
+      });
+    }
+    
+    // Validate permissions if provided
+    if (permissions && permissions.length > 0) {
+      const validPermissions = await Permission.find({
+        _id: { $in: permissions }
+      });
+      
+      if (validPermissions.length !== permissions.length) {
+        return res.status(400).json({ 
+          message: 'One or more invalid permission IDs provided' 
+        });
+      }
+    }
+    
+    // Remove existing permissions for this user-stage combination
+    await StagePermission.deleteMany({ userId, stageId });
+    
+    // Create new permission assignment only if there are permissions to assign
+    // or if we want to create a record even with empty permissions
+    const assignment = new StagePermission({
+      userId,
+      stageId,
+      permissions: permissions || [], // Default to empty array if not provided
+      expiryDate,
+      remarks,
+      assignedBy: req.user._id,
+      isActive: true
+    });
+    
     await assignment.save();
-    await assignment.populate('userId stageId permissions');
+    
+    // Populate the assignment for response
+    await assignment.populate([
+      {
+        path: 'userId',
+        select: 'name email'
+      },
+      {
+        path: 'stageId',
+        select: 'name code'
+      },
+      {
+        path: 'permissions',
+        select: 'name resource action description'
+      },
+      {
+        path: 'assignedBy',
+        select: 'name email'
+      }
+    ]);
+    
+    console.log('Permission assignment created:', assignment);
     
     res.json({
       message: 'Permissions assigned successfully',
@@ -335,7 +404,10 @@ export const assignStagePermissions = async (req, res) => {
     });
   } catch (error) {
     console.error('Assign stage permissions error:', error);
-    res.status(500).json({ message: 'Failed to assign permissions' });
+    res.status(500).json({ 
+      message: 'Failed to assign permissions',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -343,27 +415,74 @@ export const revokeStagePermissions = async (req, res) => {
   try {
     const { userId, stageId, permissions } = req.body;
     
+    console.log('Revoking stage permissions:', {
+      userId,
+      stageId,
+      permissions
+    });
+    
+    // Validate required fields
+    if (!userId || !stageId) {
+      return res.status(400).json({ 
+        message: 'userId and stageId are required' 
+      });
+    }
+    
     if (permissions && permissions.length > 0) {
       // Revoke specific permissions
-      await StagePermission.updateOne(
-        { userId, stageId },
+      const result = await StagePermission.updateOne(
+        { userId, stageId, isActive: true },
         { $pull: { permissions: { $in: permissions } } }
       );
+      
+      console.log('Partial revoke result:', result);
+      
+      // Check if there are any permissions left
+      const updatedAssignment = await StagePermission.findOne({ userId, stageId });
+      if (updatedAssignment && updatedAssignment.permissions.length === 0) {
+        // If no permissions left, mark as inactive or delete
+        await StagePermission.deleteOne({ userId, stageId });
+      }
     } else {
       // Revoke all permissions for this user-stage
-      await StagePermission.deleteMany({ userId, stageId });
+      const result = await StagePermission.deleteMany({ userId, stageId });
+      console.log('Full revoke result:', result);
     }
     
     res.json({ message: 'Permissions revoked successfully' });
   } catch (error) {
     console.error('Revoke stage permissions error:', error);
-    res.status(500).json({ message: 'Failed to revoke permissions' });
+    res.status(500).json({ 
+      message: 'Failed to revoke permissions',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
 export const bulkAssignPermissions = async (req, res) => {
   try {
     const { assignments, overwrite = false } = req.body;
+    
+    console.log('Bulk assigning permissions:', {
+      assignmentsCount: assignments?.length,
+      overwrite,
+      assignedBy: req.user._id
+    });
+    
+    if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
+      return res.status(400).json({ 
+        message: 'Assignments array is required and cannot be empty' 
+      });
+    }
+    
+    // Validate all assignments
+    for (const assignment of assignments) {
+      if (!assignment.userId || !assignment.stageId) {
+        return res.status(400).json({ 
+          message: 'Each assignment must have userId and stageId' 
+        });
+      }
+    }
     
     if (overwrite) {
       // Remove existing assignments for affected user-stage combinations
@@ -377,11 +496,20 @@ export const bulkAssignPermissions = async (req, res) => {
     
     // Create new assignments
     const newAssignments = assignments.map(a => ({
-      ...a,
-      assignedBy: req.user._id
+      userId: a.userId,
+      stageId: a.stageId,
+      permissions: a.permissions || [],
+      expiryDate: a.expiryDate,
+      remarks: a.remarks,
+      assignedBy: req.user._id,
+      isActive: true
     }));
     
-    const results = await StagePermission.insertMany(newAssignments);
+    const results = await StagePermission.insertMany(newAssignments, { 
+      ordered: false // Continue on error
+    });
+    
+    console.log('Bulk assignment results:', results.length);
     
     res.json({
       message: `${results.length} permission assignments created successfully`,
@@ -389,22 +517,44 @@ export const bulkAssignPermissions = async (req, res) => {
     });
   } catch (error) {
     console.error('Bulk assign permissions error:', error);
-    res.status(500).json({ message: 'Failed to bulk assign permissions' });
+    
+    // Handle duplicate key errors gracefully
+    if (error.code === 11000) {
+      res.status(400).json({ 
+        message: 'Some user-stage combinations already exist. Use overwrite option to replace them.' 
+      });
+    } else {
+      res.status(500).json({ 
+        message: 'Failed to bulk assign permissions',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
   }
 };
+
 
 export const getUserStagePermissions = async (req, res) => {
   try {
     const { userId, stageId } = req.params;
     
-    const permissions = await StagePermission.findOne({ userId, stageId })
-      .populate('permissions')
-      .populate('stageId', 'name code');
+    console.log('Getting user stage permissions:', { userId, stageId });
+    
+    const permissions = await StagePermission.findOne({ 
+      userId, 
+      stageId,
+      isActive: true 
+    })
+      .populate('permissions', 'name resource action description')
+      .populate('stageId', 'name code')
+      .populate('assignedBy', 'name email');
     
     res.json({ permissions });
   } catch (error) {
     console.error('Get user stage permissions error:', error);
-    res.status(500).json({ message: 'Failed to fetch user permissions' });
+    res.status(500).json({ 
+      message: 'Failed to fetch user permissions',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -413,14 +563,30 @@ export const getStageUsers = async (req, res) => {
     const { stageId } = req.params;
     const { includePermissions = false } = req.query;
     
-    const assignments = await StagePermission.find({ stageId })
+    console.log('Getting stage users:', { stageId, includePermissions });
+    
+    let query = StagePermission.find({ 
+      stageId,
+      isActive: true 
+    })
       .populate('userId', 'name email')
-      .populate(includePermissions ? 'permissions' : '');
+      .populate('assignedBy', 'name email');
+    
+    if (includePermissions === 'true' || includePermissions === true) {
+      query = query.populate('permissions', 'name resource action description');
+    }
+    
+    const assignments = await query.sort({ createdAt: -1 });
+    
+    console.log('Found stage users:', assignments.length);
     
     res.json({ users: assignments });
   } catch (error) {
     console.error('Get stage users error:', error);
-    res.status(500).json({ message: 'Failed to fetch stage users' });
+    res.status(500).json({ 
+      message: 'Failed to fetch stage users',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 

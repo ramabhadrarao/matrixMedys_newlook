@@ -138,49 +138,67 @@ const WorkflowStageForm: React.FC = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  if (!formData.name.trim() || !formData.code.trim()) {
+    toast.error('Name and code are required');
+    return;
+  }
+
+  if (formData.allowedActions.length === 0) {
+    toast.error('At least one allowed action is required');
+    return;
+  }
+
+  try {
+    setSaving(true);
     
-    if (!formData.name.trim() || !formData.code.trim()) {
-      toast.error('Name and code are required');
-      return;
+    const submitData = {
+      name: formData.name.trim(),
+      code: formData.code.trim().toUpperCase(),
+      description: formData.description.trim(),
+      sequence: formData.sequence,
+      isActive: formData.isActive,
+      requiredPermissions: formData.requiredPermissions,
+      allowedActions: formData.allowedActions,
+      nextStages: formData.nextStages
+    };
+    
+    // DEBUG: Log the exact data being sent
+    console.log('=== SUBMIT DATA DEBUG ===');
+    console.log('Full submitData:', JSON.stringify(submitData, null, 2));
+    console.log('requiredPermissions type:', typeof submitData.requiredPermissions);
+    console.log('requiredPermissions value:', submitData.requiredPermissions);
+    console.log('requiredPermissions length:', submitData.requiredPermissions?.length);
+    console.log('allowedActions:', submitData.allowedActions);
+    console.log('nextStages:', submitData.nextStages);
+    console.log('=== END DEBUG ===');
+    
+    if (isEditing && id && id !== 'new') {
+      await workflowAPI.updateWorkflowStage(id, submitData);
+      toast.success('Workflow stage updated successfully');
+    } else {
+      await workflowAPI.createWorkflowStage(submitData);
+      toast.success('Workflow stage created successfully');
     }
-
-    if (formData.allowedActions.length === 0) {
-      toast.error('At least one allowed action is required');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      
-      const submitData = {
-        name: formData.name.trim(),
-        code: formData.code.trim().toUpperCase(),
-        description: formData.description.trim(),
-        sequence: formData.sequence,
-        isActive: formData.isActive,
-        requiredPermissions: formData.requiredPermissions,
-        allowedActions: formData.allowedActions,
-        nextStages: formData.nextStages
-      };
-      
-      if (isEditing && id && id !== 'new') {
-        await workflowAPI.updateWorkflowStage(id, submitData);
-        toast.success('Workflow stage updated successfully');
-      } else {
-        await workflowAPI.createWorkflowStage(submitData);
-        toast.success('Workflow stage created successfully');
-      }
-      
-      navigate('/workflow/stages');
-    } catch (error: any) {
-      console.error('Error saving workflow stage:', error);
-      toast.error(error.response?.data?.message || 'Failed to save workflow stage');
-    } finally {
-      setSaving(false);
-    }
-  };
-
+    
+    navigate('/workflow/stages');
+  } catch (error: any) {
+    console.error('Error saving workflow stage:', error);
+    
+    // DEBUG: Log the full error details
+    console.log('=== ERROR DEBUG ===');
+    console.log('Error message:', error.message);
+    console.log('Error response status:', error.response?.status);
+    console.log('Error response data:', error.response?.data);
+    console.log('Error response headers:', error.response?.headers);
+    console.log('=== END ERROR DEBUG ===');
+    
+    toast.error(error.response?.data?.message || 'Failed to save workflow stage');
+  } finally {
+    setSaving(false);
+  }
+};
   const addPermission = () => {
     if (newPermission && !formData.requiredPermissions.includes(newPermission)) {
       setFormData(prev => ({
