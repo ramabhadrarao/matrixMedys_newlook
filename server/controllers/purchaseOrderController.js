@@ -122,7 +122,15 @@ export const getPurchaseOrders = async (req, res) => {
     
     let query = {};
     
-    if (status) query.status = status;
+    // Handle multiple status values (comma-separated)
+    if (status) {
+      if (status.includes(',')) {
+        const statusArray = status.split(',').map(s => s.trim());
+        query.status = { $in: statusArray };
+      } else {
+        query.status = status;
+      }
+    }
     if (principal) query.principal = principal;
     
     if (fromDate || toDate) {

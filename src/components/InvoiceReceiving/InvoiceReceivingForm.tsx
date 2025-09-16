@@ -75,7 +75,7 @@ const InvoiceReceivingForm: React.FC = () => {
   const loadPurchaseOrderDetails = async (poId: string) => {
     try {
       const response = await purchaseOrderAPI.getPurchaseOrder(poId);
-      const po = response.data;
+      const po = response.purchaseOrder; // Fix: Access purchaseOrder property from response
       setSelectedPO(po);
       
       // Pre-populate form with PO data
@@ -83,7 +83,7 @@ const InvoiceReceivingForm: React.FC = () => {
         ...prev,
         purchaseOrder: po._id,
         supplier: po.supplier,
-        receivedProducts: po.productLines.map(line => ({
+        receivedProducts: po.productLines?.map(line => ({
           product: line.product,
           productName: line.productName,
           orderedQuantity: line.quantity,
@@ -96,7 +96,7 @@ const InvoiceReceivingForm: React.FC = () => {
           remarks: '',
           qcStatus: 'pending',
           qcRemarks: ''
-        }))
+        })) || []
       }));
     } catch (error) {
       toast.error('Failed to load purchase order details');
@@ -354,7 +354,7 @@ const InvoiceReceivingForm: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-blue-700 font-medium">Total Products:</span>
-                  <p className="text-blue-900">{selectedPO.productLines.length}</p>
+                  <p className="text-blue-900">{selectedPO.productLines?.length || 0}</p>
                 </div>
               </div>
             </div>
