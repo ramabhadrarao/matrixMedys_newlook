@@ -879,7 +879,7 @@ export const getPurchaseOrderStats = async (req, res) => {
 export const sendPurchaseOrderEmail = async (req, res) => {
   try {
     const { id } = req.params;
-    const { recipients, subject, message } = req.body;
+    const { recipientEmail } = req.body;
     
     const purchaseOrder = await PurchaseOrder.findById(id)
       .populate('principal')
@@ -890,18 +890,68 @@ export const sendPurchaseOrderEmail = async (req, res) => {
       return res.status(404).json({ message: 'Purchase order not found' });
     }
     
-    // Update email recipients if provided
-    if (recipients && recipients.length > 0) {
-      purchaseOrder.toEmails = recipients;
-      await purchaseOrder.save();
+    // Use provided recipient email or default to principal email
+    const emailRecipient = recipientEmail || purchaseOrder.principal?.email || 'contact@matrixpharma.com';
+    
+    const result = await sendPOEmail(purchaseOrder, emailRecipient);
+    
+    if (result.success) {
+      // Update PO status to 'ordered' after successful email sending
+      const orderedStage = await WorkflowStage.findOne({ code: 'ORDERED' });
+      if (orderedStage) {
+        purchaseOrder.status = 'ordered';
+        purchaseOrder.currentStage = orderedStage._id;
+        purchaseOrder.updatedBy = req.user._id;
+        
+        // Add to workflow history
+        purchaseOrder.workflowHistory.push({
+          stage: orderedStage._id,
+          action: 'ordered',
+          actionBy: req.user._id,
+          actionDate: new Date(),
+          remarks: 'Purchase order sent to supplier and status changed to ordered'
+        });
+        
+        await purchaseOrder.save();
+      }
+      
+      res.json({ 
+        message: 'Purchase order sent successfully and status updated to ordered',
+        success: true 
+      });
+    } else if (result.error === 'GMAIL_LIMIT_EXCEEDED') {
+      // Handle Gmail limit exceeded case
+      res.status(429).json({ 
+        message: result.message,
+        error: 'GMAIL_LIMIT_EXCEEDED',
+        retryAfter: result.retryAfter,
+        pdfPath: result.pdfPath,
+        success: false
+      });
+    } else {
+      res.status(500).json({ 
+        message: 'Failed to send purchase order email',
+        success: false 
+      });
     }
-    
-    await sendPOEmail(purchaseOrder, { subject, message });
-    
-    res.json({ message: 'Purchase order sent successfully' });
   } catch (error) {
     console.error('Send PO email error:', error);
-    res.status(500).json({ message: 'Failed to send purchase order email' });
+    
+    // Check if it's a Gmail limit error
+    if (error.code === 'EENVELOPE' && error.responseCode === 550) {
+      return res.status(429).json({ 
+        message: 'Gmail daily sending limit exceeded. Please try again after 24 hours.',
+        error: 'GMAIL_LIMIT_EXCEEDED',
+        retryAfter: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        success: false
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to send purchase order email',
+      error: error.message,
+      success: false 
+    });
   }
 };
 
