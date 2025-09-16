@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Workflow Roadmap - MatrixMedys</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px 0;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .workflow-overview {
+            background: #f8fafc;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 40px;
+            border-left: 5px solid #4f46e5;
+        }
+        
+        .workflow-overview h2 {
+            color: #4f46e5;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        
+        .stage-container {
+            display: grid;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .stage {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-left: 6px solid;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+        
+        .stage:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        
+        .stage.draft { border-left-color: #6b7280; }
+        .stage.pending { border-left-color: #f59e0b; }
+        .stage.approved { border-left-color: #10b981; }
+        .stage.ordered { border-left-color: #3b82f6; }
+        .stage.received { border-left-color: #8b5cf6; }
+        .stage.completed { border-left-color: #059669; }
+        
+        .stage-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .stage-number {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .stage-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .stage-status {
+            margin-left: auto;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .status-draft { background: #f3f4f6; color: #6b7280; }
+        .status-pending { background: #fef3c7; color: #d97706; }
+        .status-approved { background: #d1fae5; color: #059669; }
+        .status-ordered { background: #dbeafe; color: #2563eb; }
+        .status-received { background: #e0e7ff; color: #7c3aed; }
+        .status-completed { background: #d1fae5; color: #059669; }
+        
+        .stage-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+        
+        .frontend-actions, .backend-process {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .frontend-actions h4, .backend-process h4 {
+            color: #4f46e5;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .frontend-actions h4::before {
+            content: "🖥️";
+            margin-right: 8px;
+        }
+        
+        .backend-process h4::before {
+            content: "⚙️";
+            margin-right: 8px;
+        }
+        
+        .action-list {
+            list-style: none;
+        }
+        
+        .action-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+        }
+        
+        .action-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .action-list li::before {
+            content: "▶";
+            color: #4f46e5;
+            margin-right: 10px;
+            font-size: 0.8rem;
+        }
+        
+        .permissions {
+            background: #fef7ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #e879f9;
+        }
+        
+        .permissions h5 {
+            color: #a21caf;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        
+        .permission-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .permission-tag {
+            background: #fce7f3;
+            color: #be185d;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .workflow-flow {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .flow-arrow {
+            font-size: 2rem;
+            color: #4f46e5;
+            margin: 10px 0;
+        }
+        
+        .api-endpoints {
+            background: #f0f9ff;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 30px;
+            border: 1px solid #0ea5e9;
+        }
+        
+        .api-endpoints h3 {
+            color: #0369a1;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+        }
+        
+        .endpoint {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .endpoint-method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            margin-right: 10px;
+        }
+        
+        .method-get { background: #dcfce7; color: #166534; }
+        .method-post { background: #fef3c7; color: #92400e; }
+        .method-put { background: #dbeafe; color: #1e40af; }
+        .method-delete { background: #fee2e2; color: #dc2626; }
+        
+        .endpoint-url {
+            font-family: 'Courier New', monospace;
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .quick-start {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 40px;
+        }
+        
+        .quick-start h3 {
+            margin-bottom: 20px;
+            font-size: 1.6rem;
+        }
+        
+        .quick-start-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .quick-step {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .quick-step h4 {
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 30px;
+            background: #1f2937;
+            color: white;
+            border-radius: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .stage-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-start-steps {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Purchase Order Workflow Roadmap</h1>
+            <p>Complete guide from PO creation to completion in MatrixMedys system</p>
+        </div>
+
+        <div class="workflow-overview">
+            <h2>📋 Workflow Overview</h2>
+            <p>The Purchase Order workflow in MatrixMedys follows a structured approval process with multiple stages. Each stage has specific permissions, actions, and transitions that ensure proper authorization and tracking throughout the procurement process.</p>
+            
+            <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 8px;">
+                <strong>🎯 Key Features:</strong>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>Multi-level approval workflow</li>
+                    <li>Role-based permissions</li>
+                    <li>Real-time status tracking</li>
+                    <li>Email notifications</li>
+                    <li>PDF generation and download</li>
+                    <li>Audit trail with workflow history</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Stage 1: Draft -->
+        <div class="stage draft">
+            <div class="stage-header">
+                <div class="stage-number">1</div>
+                <div class="stage-title">Draft Stage</div>
+                <div class="stage-status status-draft">DRAFT</div>
+            </div>
+            
+            <div class="stage-content">
+                <div class="frontend-actions">
+                    <h4>Frontend Actions</h4>
+                    <ul class="action-list">
+                        <li>Navigate to Purchase Orders → Create New PO</li>
+                        <li>Select Principal from dropdown</li>
+                        <li>Auto-generate or enter PO Number</li>
+                        <li>Set PO Date</li>
+                        <li>Configure Bill To address (Branch)</li>
+                        <li>Configure Ship To address (Branch/Warehouse)</li>
+                        <li>Add products with quantities and prices</li>
+                        <li>Review calculated totals</li>
+                        <li>Save as Draft or Submit for Approval</li>
+                    </ul>
+                </div>
+                
+                <div class="backend-process">
+                    <h4>Backend Process</h4>
+                    <ul class="action-list">
+                        <li>Validate PO number uniqueness</li>
+                        <li>Create DRAFT workflow stage if not exists</li>
+                        <li>Calculate product totals and taxes</li>
+                        <li>Set currentStage to DRAFT</li>
+                        <li>Initialize workflow history</li>
+                        <li>Save PO with status 'draft'</li>
+                        <li>Return PO with populated references</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="permissions">
+                <h5>🔐 Required Permissions</h5>
+                <div class="permission-tags">
+                    <span class="permission-tag">po_create</span>
+                    <span class="permission-tag">po_view</span>
+                    <span class="permission-tag">po_edit</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="workflow-flow">
+            <div class="flow-arrow">⬇️</div>
+            <p><strong>User clicks "Submit for Approval"</strong></p>
+        </div>
+
+        <!-- Stage 2: Pending Approval -->
+        <div class="stage pending">
+            <div class="stage-header">
+                <div class="stage-number">2</div>
+                <div class="stage-title">Pending Approval</div>
+                <div class="stage-status status-pending">PENDING_APPROVAL</div>
+            </div>
+            
+            <div class="stage-content">
+                <div class="frontend-actions">
+                    <h4>Frontend Actions</h4>
+                    <ul class="action-list">
+                        <li>View PO in "Pending Approval" status</li>
+                        <li>Approver can review PO details</li>
+                        <li>Click "Approve" button</li>
+                        <li>Click "Reject" button (with remarks)</li>
+                        <li>Click "Return for Revision" (optional)</li>
+                        <li>View workflow history</li>
+                        <li>Download PDF for review</li>
+                    </ul>
+                </div>
+                
+                <div class="backend-process">
+                    <h4>Backend Process</h4>
+                    <ul class="action-list">
+                        <li>Transition from DRAFT to PENDING_APPROVAL</li>
+                        <li>Update workflow history</li>
+                        <li>Check user permissions for approval</li>
+                        <li>Validate allowed actions</li>
+                        <li>Send email notifications to approvers</li>
+                        <li>Update PO status and stage</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="permissions">
+                <h5>🔐 Required Permissions</h5>
+                <div class="permission-tags">
+                    <span class="permission-tag">po_approve_level1</span>
+                    <span class="permission-tag">po_reject</span>
+                    <span class="permission-tag">po_return</span>
+                    <span class="permission-tag">po_view</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="workflow-flow">
+            <div class="flow-arrow">⬇️</div>
+            <p><strong>Level 1 Approver approves</strong></p>
+        </div>
+
+        <!-- Stage 3: Approved L1 -->
+        <div class="stage approved">
+            <div class="stage-header">
+                <div class="stage-number">3</div>
+                <div class="stage-title">Level 1 Approved</div>
+                <div class="stage-status status-approved">APPROVED_L1</div>
+            </div>
+            
+            <div class="stage-content">
+                <div class="frontend-actions">
+                    <h4>Frontend Actions</h4>
+                    <ul class="action-list">
+                        <li>View PO in "Approved L1" status</li>
+                        <li>Level 2 approver reviews PO</li>
+                        <li>Click "Approve" for final approval</li>
+                        <li>Click "Reject" if issues found</li>
+                        <li>View approval history and comments</li>
+                        <li>Download approved PO PDF</li>
+                    </ul>
+                </div>
+                
+                <div class="backend-process">
+                    <h4>Backend Process</h4>
+                    <ul class="action-list">
+                        <li>Transition to APPROVED_L1 stage</li>
+                        <li>Update approvedBy field</li>
+                        <li>Record approval timestamp</li>
+                        <li>Add workflow history entry</li>
+                        <li>Check for Level 2 approval requirements</li>
+                        <li>Send notifications to next approvers</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="permissions">
+                <h5>🔐 Required Permissions</h5>
+                <div class="permission-tags">
+                    <span class="permission-tag">po_approve_level2</span>
+                    <span class="permission-tag">po_approve_final</span>
+                    <span class="permission-tag">po_reject</span>
+                    <span class="permission-tag">po_view</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="workflow-flow">
+            <div class="flow-arrow">⬇️</div>
+            <p><strong>Level 2 Approver gives final approval</strong></p>
+        </div>
+
+        <!-- Stage 4: Final Approved -->
+        <div class="stage approved">
+            <div class="stage-header">
+                <div class="stage-number">4</div>
+                <div class="stage-title">Final Approved</div>
+                <div class="stage-status status-approved">APPROVED_FINAL</div>
+            </div>
+            
+            <div class="stage-content">
+                <div class="frontend-actions">
+                    <h4>Frontend Actions</h4>
+                    <ul class="action-list">
+                        <li>View PO in "Final Approved" status</li>
+                        <li>Click "Send to Supplier" button</li>
+                        <li>Download final approved PO PDF</li>
+                        <li>Send PO via email to supplier</li>
+                        <li>Print PO for physical records</li>
+                        <li>View complete approval chain</li>
+                    </ul>
+                </div>
+                
+                <div class="backend-process">
+                    <h4>Backend Process</h4>
+                    <ul class="action-list">
+                        <li>Transition to APPROVED_FINAL stage</li>
+                        <li>Set final approvedBy and approvedDate</li>
+                        <li>Generate final PO PDF</li>
+                        <li>Prepare email with PO attachment</li>
+                        <li>Update workflow history</li>
+                        <li>Ready for ordering process</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="permissions">
+                <h5>🔐 Required Permissions</h5>
+                <div class="permission-tags">
+                    <span class="permission-tag">po_send</span>
+                    <span class="permission-tag">po_view</span>
+                    <span class="permission-tag">po_download</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="workflow-flow">
+            <div class="flow-arrow">⬇️</div>
+            <p><strong>PO sent to supplier and order placed</strong></p>
+        </div>
+
+        <!-- Stage 5: Ordered -->
+        <div class="stage ordered">
+            <div class="stage-header">
+                <div class="stage-number">5</div>
+                <div class="stage-title">Ordered</div>
+                <div class="stage-status status-ordered">ORDERED</div>
+            </div>
+            
+            <div class="stage-content">
+                <div class="frontend-actions">
+                    <h4>Frontend Actions</h4>
+                    <ul class="action-list">
+                        <li>View PO in "Ordered" status</li>
+                        <li>Track delivery status</li>
+                        <li>Receive products against PO</li>
+                        <li>Update received quantities</li>
+                        <li>Record partial receipts</li>
+                        <li>Generate receiving reports</li>
+                        <li>Initiate QC process</li>
+                    </ul>
+                </div>
+                
+                <div class="backend-process">
+                    <h4>Backend Process</h4>
+                    <ul class="action-list">
+                        <li>Transition to ORDERED stage</li>
+                        <li>Send PO email to supplier</li>
+                        <li>Initialize receiving tracking</li>
+                        <li>Set up delivery monitoring</li>
+                        <li>Prepare for receiving process</li>
+                        <li>Update inventory expectations</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="permissions">
+                <h5>🔐 Required Permissions</h5>
+                <div class="permission-tags">
+                    <span class="permission-tag">po_receive</span>
+                    <span class="permission-tag">po_view</span>
+                    <span class="permission-tag">inventory_update</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="workflow-flow">
+            <div class="flow-arrow">⬇️</div>
+            <p><strong>Products received and QC completed</strong></p>
+        </div>
+
+        <!-- Stage 6: Received & QC -->
+        <div class="stage received">
+            <div class="stage-header">
+                <div class="stage-number">6</div>
+                <div class="stage-title">Received & QC</div>
+                <div class="stage-status status-received">RECEIVED</div>
+            </div>
+            
+            <div class="stage-content">
+                <div class="frontend-actions">
+                    <h4>Frontend Actions</h4>
+                    <ul class="action-list">
+                        <li>View received quantities</li>
+                        <li>Perform quality checks</li>
+                        <li>Record QC results</li>
+                        <li>Approve/Reject QC</li>
+                        <li>Update inventory levels</li>
+                        <li>Generate receiving certificates</li>
+                        <li>Process invoice matching</li>
+                    </ul>
+                </div>
+                
+                <div class="backend-process">
+                    <h4>Backend Process</h4>
+                    <ul class="action-list">
+                        <li>Update received quantities</li>
+                        <li>Calculate backlog quantities</li>
+                        <li>Process QC workflow</li>
+                        <li>Update inventory records</li>
+                        <li>Generate receiving documents</li>
+                        <li>Prepare for completion</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="permissions">
+                <h5>🔐 Required Permissions</h5>
+                <div class="permission-tags">
+                    <span class="permission-tag">po_qc_check</span>
+                    <span class="permission-tag">po_qc_approve</span>
+                    <span class="permission-tag">inventory_update</span>
+                    <span class="permission-tag">po_complete</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="workflow-flow">
+            <div class="flow-arrow">⬇️</div>
+            <p><strong>All processes completed successfully</strong></p>
+        </div>
+
+        <!-- Stage 7: Completed -->
+        <div class="stage completed">
+            <div class="stage-header">
+                <div class="stage-number">7</div>
+                <div class="stage-title">Completed</div>
+                <div class="stage-status status-completed">COMPLETED</div>
+            </div>
+            
+            <div class="stage-content">
+                <div class="frontend-actions">
+                    <h4>Frontend Actions</h4>
+                    <ul class="action-list">
+                        <li>View completed PO summary</li>
+                        <li>Generate final reports</li>
+                        <li>Archive PO documents</li>
+                        <li>View complete audit trail</li>
+                        <li>Export completion certificates</li>
+                        <li>Close PO process</li>
+                    </ul>
+                </div>
+                
+                <div class="backend-process">
+                    <h4>Backend Process</h4>
+                    <ul class="action-list">
+                        <li>Mark PO as completed</li>
+                        <li>Finalize all quantities</li>
+                        <li>Complete workflow history</li>
+                        <li>Update inventory status</li>
+                        <li>Generate completion reports</li>
+                        <li>Archive PO data</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="permissions">
+                <h5>🔐 Required Permissions</h5>
+                <div class="permission-tags">
+                    <span class="permission-tag">po_view</span>
+                    <span class="permission-tag">reports_generate</span>
+                    <span class="permission-tag">po_archive</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Endpoints -->
+        <div class="api-endpoints">
+            <h3>🔌 Key API Endpoints</h3>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-post">POST</span>
+                <span class="endpoint-url">/api/purchase-orders</span>
+                <p>Create new purchase order</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-get">GET</span>
+                <span class="endpoint-url">/api/purchase-orders</span>
+                <p>Get purchase orders with filtering</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-get">GET</span>
+                <span class="endpoint-url">/api/purchase-orders/:id</span>
+                <p>Get single purchase order details</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-put">PUT</span>
+                <span class="endpoint-url">/api/purchase-orders/:id</span>
+                <p>Update purchase order (draft stage only)</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-post">POST</span>
+                <span class="endpoint-url">/api/purchase-orders/:id/approve</span>
+                <p>Approve purchase order to next stage</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-post">POST</span>
+                <span class="endpoint-url">/api/purchase-orders/:id/reject</span>
+                <p>Reject purchase order with remarks</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-post">POST</span>
+                <span class="endpoint-url">/api/purchase-orders/:id/cancel</span>
+                <p>Cancel purchase order</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-get">GET</span>
+                <span class="endpoint-url">/api/purchase-orders/:id/download</span>
+                <p>Download purchase order PDF</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="endpoint-method method-post">POST</span>
+                <span class="endpoint-url">/api/purchase-orders/:id/send-email</span>
+                <p>Send purchase order via email</p>
+            </div>
+        </div>
+
+        <!-- Quick Start Guide -->
+        <div class="quick-start">
+            <h3>🚀 Quick Start Guide</h3>
+            <div class="quick-start-steps">
+                <div class="quick-step">
+                    <h4>1. Access System</h4>
+                    <p>Navigate to http://localhost:5173 and login with appropriate permissions</p>
+                </div>
+                
+                <div class="quick-step">
+                    <h4>2. Create PO</h4>
+                    <p>Go to Purchase Orders → Create New PO and fill in all required details</p>
+                </div>
+                
+                <div class="quick-step">
+                    <h4>3. Submit for Approval</h4>
+                    <p>Review PO details and click "Submit for Approval" to start workflow</p>
+                </div>
+                
+                <div class="quick-step">
+                    <h4>4. Track Progress</h4>
+                    <p>Monitor PO status through the workflow stages until completion</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <h3>📚 Additional Resources</h3>
+            <p>For technical support or workflow customization, refer to the system documentation or contact the development team.</p>
+            <p style="margin-top: 15px; opacity: 0.8;">
+                <strong>Frontend:</strong> http://localhost:5173 | 
+                <strong>Backend:</strong> http://localhost:5000 | 
+                <strong>Generated:</strong> <span id="currentDate"></span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Set current date
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString();
+        
+        // Add smooth scrolling for better UX
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>

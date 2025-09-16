@@ -6,6 +6,7 @@ import WorkflowStage from '../models/WorkflowStage.js';
 import WorkflowTransition from '../models/WorkflowTransition.js';
 import User from '../models/User.js';
 import UserPermission from '../models/UserPermission.js';
+import StagePermission from '../models/StagePermission.js';
 
 dotenv.config();
 
@@ -145,24 +146,24 @@ const workflowStages = [
   }
 ];
 
-// Workflow transitions
+// Workflow transitions - Updated to match actual stage codes
 const workflowTransitions = [
   // From DRAFT
-  { fromStage: 'DRAFT', toStage: 'PENDING_APPROVAL_L1', action: 'approve', requiredFields: [] },
+  { fromStage: 'DRAFT', toStage: 'PENDING_APPROVAL', action: 'approve', requiredFields: [] },
   { fromStage: 'DRAFT', toStage: 'CANCELLED', action: 'cancel', requiredFields: ['remarks'] },
   
-  // From PENDING_APPROVAL_L1
-  { fromStage: 'PENDING_APPROVAL_L1', toStage: 'PENDING_APPROVAL_L2', action: 'approve', requiredFields: [] },
-  { fromStage: 'PENDING_APPROVAL_L1', toStage: 'DRAFT', action: 'return', requiredFields: ['remarks'] },
-  { fromStage: 'PENDING_APPROVAL_L1', toStage: 'CANCELLED', action: 'reject', requiredFields: ['remarks'] },
+  // From PENDING_APPROVAL
+  { fromStage: 'PENDING_APPROVAL', toStage: 'APPROVED_L1', action: 'approve', requiredFields: [] },
+  { fromStage: 'PENDING_APPROVAL', toStage: 'DRAFT', action: 'return', requiredFields: ['remarks'] },
+  { fromStage: 'PENDING_APPROVAL', toStage: 'CANCELLED', action: 'reject', requiredFields: ['remarks'] },
   
-  // From PENDING_APPROVAL_L2
-  { fromStage: 'PENDING_APPROVAL_L2', toStage: 'APPROVED_FINAL', action: 'approve', requiredFields: [] },
-  { fromStage: 'PENDING_APPROVAL_L2', toStage: 'PENDING_APPROVAL_L1', action: 'return', requiredFields: ['remarks'] },
-  { fromStage: 'PENDING_APPROVAL_L2', toStage: 'CANCELLED', action: 'reject', requiredFields: ['remarks'] },
+  // From APPROVED_L1
+  { fromStage: 'APPROVED_L1', toStage: 'APPROVED_FINAL', action: 'approve', requiredFields: [] },
+  { fromStage: 'APPROVED_L1', toStage: 'PENDING_APPROVAL', action: 'return', requiredFields: ['remarks'] },
+  { fromStage: 'APPROVED_L1', toStage: 'CANCELLED', action: 'reject', requiredFields: ['remarks'] },
   
   // From APPROVED_FINAL
-  { fromStage: 'APPROVED_FINAL', toStage: 'ORDERED', action: 'send', requiredFields: [] },
+  { fromStage: 'APPROVED_FINAL', toStage: 'ORDERED', action: 'approve', requiredFields: [] },
   { fromStage: 'APPROVED_FINAL', toStage: 'CANCELLED', action: 'cancel', requiredFields: ['remarks'] },
   
   // From ORDERED
@@ -177,8 +178,8 @@ const workflowTransitions = [
   { fromStage: 'RECEIVED', toStage: 'QC_PENDING', action: 'qc_check', requiredFields: [] },
   
   // From QC_PENDING
-  { fromStage: 'QC_PENDING', toStage: 'QC_PASSED', action: 'qc_check', requiredFields: ['qc_results'] },
-  { fromStage: 'QC_PENDING', toStage: 'QC_FAILED', action: 'qc_check', requiredFields: ['qc_results'] },
+  { fromStage: 'QC_PENDING', toStage: 'QC_PASSED', action: 'approve', requiredFields: ['qc_results'] },
+  { fromStage: 'QC_PENDING', toStage: 'QC_FAILED', action: 'reject', requiredFields: ['qc_results'] },
   
   // From QC_PASSED
   { fromStage: 'QC_PASSED', toStage: 'COMPLETED', action: 'complete', requiredFields: [] },
@@ -190,7 +191,8 @@ const workflowTransitions = [
 
 async function setupWorkflowSystem() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/Matryx_Medizys_17062025';
+    await mongoose.connect(mongoUri);
     console.log('🔌 Connected to MongoDB');
     
     // Step 1: Create permissions
@@ -244,28 +246,42 @@ async function setupWorkflowSystem() {
       const fromStageId = stageMap.get(transition.fromStage);
       const toStageId = stageMap.get(transition.toStage);
       
+      console.log(`Processing transition: ${transition.fromStage} -> ${transition.toStage} (${transition.action})`);
+      console.log(`  fromStageId: ${fromStageId}, toStageId: ${toStageId}`);
+      
       if (fromStageId && toStageId) {
-        await WorkflowTransition.findOneAndUpdate(
-          {
-            fromStage: fromStageId,
-            toStage: toStageId,
-            action: transition.action
-          },
-          {
-            ...transition,
-            fromStage: fromStageId,
-            toStage: toStageId
-          },
-          { upsert: true, new: true }
-        );
-        
-        // Track next stages for each stage
-        if (!nextStagesMap.has(transition.fromStage)) {
-          nextStagesMap.set(transition.fromStage, []);
+        try {
+          const result = await WorkflowTransition.findOneAndUpdate(
+            {
+              fromStage: fromStageId,
+              toStage: toStageId,
+              action: transition.action
+            },
+            {
+              ...transition,
+              fromStage: fromStageId,
+              toStage: toStageId
+            },
+            { upsert: true, new: true }
+          );
+          
+          // Ensure the document is saved
+          await result.save();
+          
+          console.log(`  ✅ Created/Updated transition: ${result._id}`);
+          
+          // Track next stages for each stage
+          if (!nextStagesMap.has(transition.fromStage)) {
+            nextStagesMap.set(transition.fromStage, []);
+          }
+          nextStagesMap.get(transition.fromStage).push(toStageId);
+          
+          console.log(`  ✅ ${transition.fromStage} → ${transition.toStage} (${transition.action})`);
+        } catch (error) {
+          console.error(`  ❌ Error creating transition: ${error.message}`);
         }
-        nextStagesMap.get(transition.fromStage).push(toStageId);
-        
-        console.log(`  ✅ ${transition.fromStage} → ${transition.toStage} (${transition.action})`);
+      } else {
+        console.log(`  ⚠️  Missing stage IDs for ${transition.fromStage} -> ${transition.toStage}`);
       }
     }
     
@@ -368,7 +384,81 @@ async function setupWorkflowSystem() {
       }
     }
     
-    // Step 6: Summary
+    // Step 6: Create stage permissions for sample users
+    console.log('\n🔐 Setting up stage permissions...');
+    
+    // Define stage-user mappings
+    const stageUserMappings = [
+      {
+        userEmail: 'purchase@matrixmedys.com',
+        stageCodes: ['DRAFT'],
+        permissions: ['po_view', 'po_create', 'po_edit']
+      },
+      {
+        userEmail: 'approver1@matrixmedys.com',
+        stageCodes: ['PENDING_APPROVAL'],
+        permissions: ['po_view', 'po_approve_level1', 'po_reject', 'po_return']
+      },
+      {
+        userEmail: 'approver2@matrixmedys.com',
+        stageCodes: ['APPROVED_L1'],
+        permissions: ['po_view', 'po_approve_level2', 'po_approve_final', 'po_reject']
+      },
+      {
+        userEmail: 'warehouse@matrixmedys.com',
+        stageCodes: ['ORDERED', 'RECEIVED'],
+        permissions: ['po_view', 'po_receive', 'invoice_receiving_create']
+      },
+      {
+        userEmail: 'qc@matrixmedys.com',
+        stageCodes: ['QC_PENDING', 'QC_PASSED', 'QC_FAILED'],
+        permissions: ['po_view', 'po_qc_check', 'po_qc_approve', 'po_qc_reject']
+      }
+    ];
+    
+    for (const mapping of stageUserMappings) {
+      const user = await User.findOne({ email: mapping.userEmail });
+      if (!user) {
+        console.log(`  ⚠️  User not found: ${mapping.userEmail}`);
+        continue;
+      }
+      
+      for (const stageCode of mapping.stageCodes) {
+        const stageId = stageMap.get(stageCode);
+        if (!stageId) {
+          console.log(`  ⚠️  Stage not found: ${stageCode}`);
+          continue;
+        }
+        
+        // Get permission IDs
+        const permissionIds = mapping.permissions
+          .map(permName => createdPermissions.get(permName))
+          .filter(Boolean);
+        
+        if (permissionIds.length === 0) {
+          console.log(`  ⚠️  No valid permissions found for ${mapping.userEmail} in ${stageCode}`);
+          continue;
+        }
+        
+        // Create or update stage permission
+        const stagePermission = await StagePermission.findOneAndUpdate(
+          { userId: user._id, stageId },
+          {
+            userId: user._id,
+            stageId,
+            permissions: permissionIds,
+            assignedBy: adminUser ? adminUser._id : user._id,
+            isActive: true,
+            remarks: `Auto-assigned during setup for ${stageCode} stage`
+          },
+          { upsert: true, new: true }
+        );
+        
+        console.log(`  ✅ Assigned ${permissionIds.length} permissions to ${user.name} for ${stageCode} stage`);
+      }
+    }
+    
+    // Step 7: Summary
     console.log('\n📊 Setup Summary:');
     console.log(`  ✅ ${workflowPermissions.length} permissions created`);
     console.log(`  ✅ ${workflowStages.length} workflow stages created`);
