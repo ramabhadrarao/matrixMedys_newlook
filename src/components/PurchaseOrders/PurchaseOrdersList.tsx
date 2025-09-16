@@ -18,6 +18,9 @@ import {
   Download,
   Send,
   Printer,
+  CheckCircle2,
+  ShoppingCart,
+  Shield,
   MoreVertical
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -44,11 +47,18 @@ const PurchaseOrdersList: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [principals, setPrincipals] = useState<any[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [workflowLoading, setWorkflowLoading] = useState<string | null>(null);
   
   const canCreate = hasPermission('purchase_orders', 'create');
   const canUpdate = hasPermission('purchase_orders', 'update');
   const canApprove = hasPermission('po_workflow', 'approve_level1');
+  const canApproveFinal = hasPermission('po_workflow', 'approve_final');
   const canReject = hasPermission('po_workflow', 'reject');
+  const canSubmitForApproval = hasPermission('po_workflow', 'submit');
+  const canMarkOrdered = hasPermission('po_workflow', 'mark_ordered');
+  const canMarkReceived = hasPermission('po_workflow', 'mark_received');
+  const canQCApprove = hasPermission('po_workflow', 'qc_approve');
+  const canComplete = hasPermission('po_workflow', 'complete');
   const canCancel = hasPermission('po_workflow', 'cancel');
 
   const statusOptions = [
@@ -79,6 +89,106 @@ const PurchaseOrdersList: React.FC = () => {
     } catch (error) {
       console.error('Error fetching principals:', error);
     }
+  };
+
+  const handleWorkflowTransition = async (poId: string, action: string) => {
+    try {
+      setWorkflowLoading(`${action}-${poId}`);
+      
+      // Call the workflow API based on action
+      let response;
+      switch (action) {
+        case 'submit_for_approval':
+          response = await purchaseOrderAPI.submitForApproval(poId);
+          break;
+        case 'approve_level1':
+          response = await purchaseOrderAPI.approveLevel1(poId);
+          break;
+        case 'approve_final':
+          response = await purchaseOrderAPI.approveFinal(poId);
+          break;
+        case 'reject':
+          response = await purchaseOrderAPI.rejectPO(poId);
+          break;
+        case 'mark_ordered':
+          response = await purchaseOrderAPI.markOrdered(poId);
+          break;
+        case 'mark_received':
+          response = await purchaseOrderAPI.markReceived(poId);
+          break;
+        case 'qc_approve':
+          response = await purchaseOrderAPI.qcApprove(poId);
+          break;
+        case 'complete':
+          response = await purchaseOrderAPI.completePO(poId);
+          break;
+        default:
+          throw new Error(`Unknown workflow action: ${action}`);
+      }
+      
+      if (response.success) {
+        toast.success(response.message || `${action.replace('_', ' ')} successful`);
+        fetchPurchaseOrders(); // Refresh the list
+      } else {
+        toast.error(response.message || `Failed to ${action.replace('_', ' ')}`);
+      }
+    } catch (error: any) {
+      console.error(`Error in workflow transition ${action}:`, error);
+      toast.error(error.message || `Failed to ${action.replace('_', ' ')}`);
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  const getAvailableWorkflowActions = (po: any) => {
+    const currentStage = po.currentStage?.code || 'DRAFT';
+    const actions = [];
+
+    switch (currentStage) {
+      case 'DRAFT':
+        if (canSubmitForApproval) {
+          actions.push({ action: 'submit_for_approval', label: 'Submit for Approval', icon: 'Send', color: 'blue' });
+        }
+        break;
+      case 'PENDING_APPROVAL':
+        if (canApprove) {
+          actions.push({ action: 'approve_level1', label: 'Approve L1', icon: 'CheckCircle', color: 'green' });
+        }
+        if (canReject) {
+          actions.push({ action: 'reject', label: 'Reject', icon: 'XCircle', color: 'red' });
+        }
+        break;
+      case 'APPROVED_L1':
+        if (canApproveFinal) {
+          actions.push({ action: 'approve_final', label: 'Final Approve', icon: 'CheckCircle2', color: 'green' });
+        }
+        if (canReject) {
+          actions.push({ action: 'reject', label: 'Reject', icon: 'XCircle', color: 'red' });
+        }
+        break;
+      case 'APPROVED_FINAL':
+        if (canMarkOrdered) {
+          actions.push({ action: 'mark_ordered', label: 'Mark Ordered', icon: 'ShoppingCart', color: 'purple' });
+        }
+        break;
+      case 'ORDERED':
+        if (canMarkReceived) {
+          actions.push({ action: 'mark_received', label: 'Mark Received', icon: 'Package', color: 'indigo' });
+        }
+        break;
+      case 'RECEIVED':
+        if (canQCApprove) {
+          actions.push({ action: 'qc_approve', label: 'QC Approve', icon: 'Shield', color: 'orange' });
+        }
+        break;
+      case 'QC_APPROVED':
+        if (canComplete) {
+          actions.push({ action: 'complete', label: 'Complete', icon: 'CheckCircle', color: 'emerald' });
+        }
+        break;
+    }
+
+    return actions;
   };
 
   const fetchPurchaseOrders = async () => {
@@ -222,6 +332,35 @@ const PurchaseOrdersList: React.FC = () => {
 
   const getStatusLabel = (status: string) => {
     return purchaseOrderAPI.getStatusLabel(status);
+  };
+
+  const getWorkflowStageBadge = (stageCode: string) => {
+    switch (stageCode) {
+      case 'DRAFT':
+        return 'bg-gray-100 text-gray-800';
+      case 'PENDING_APPROVAL':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'APPROVED_L1':
+        return 'bg-blue-100 text-blue-800';
+      case 'APPROVED_FINAL':
+        return 'bg-green-100 text-green-800';
+      case 'ORDERED':
+        return 'bg-purple-100 text-purple-800';
+      case 'RECEIVED':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'QC_PENDING':
+        return 'bg-orange-100 text-orange-800';
+      case 'QC_APPROVED':
+        return 'bg-emerald-100 text-emerald-800';
+      case 'COMPLETED':
+        return 'bg-green-100 text-green-800';
+      case 'REJECTED':
+        return 'bg-red-100 text-red-800';
+      case 'CANCELLED':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
@@ -400,6 +539,9 @@ const PurchaseOrdersList: React.FC = () => {
                       Amount
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stage
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -453,6 +595,13 @@ const PurchaseOrdersList: React.FC = () => {
                             {po.products.length} item(s)
                           </div>
                         )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getWorkflowStageBadge(po.currentStage?.code || 'DRAFT')}`}>
+                            {po.currentStage?.name || 'Draft'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(po.status || 'draft')}`}>
@@ -551,6 +700,45 @@ const PurchaseOrdersList: React.FC = () => {
                               <Download className="w-4 h-4" />
                             )}
                           </button>
+
+                          {/* Workflow Transition Buttons */}
+                          {getAvailableWorkflowActions(po).map((workflowAction) => {
+                            const IconComponent = {
+                              Send,
+                              CheckCircle,
+                              CheckCircle2,
+                              XCircle,
+                              ShoppingCart,
+                              Package,
+                              Shield
+                            }[workflowAction.icon] || CheckCircle;
+
+                            const colorClasses = {
+                              blue: 'text-blue-600 hover:text-blue-900 border-blue-600',
+                              green: 'text-green-600 hover:text-green-900 border-green-600',
+                              red: 'text-red-600 hover:text-red-900 border-red-600',
+                              purple: 'text-purple-600 hover:text-purple-900 border-purple-600',
+                              indigo: 'text-indigo-600 hover:text-indigo-900 border-indigo-600',
+                              orange: 'text-orange-600 hover:text-orange-900 border-orange-600',
+                              emerald: 'text-emerald-600 hover:text-emerald-900 border-emerald-600'
+                            }[workflowAction.color] || 'text-gray-600 hover:text-gray-900 border-gray-600';
+
+                            return (
+                              <button
+                                key={workflowAction.action}
+                                onClick={() => handleWorkflowTransition(po._id, workflowAction.action)}
+                                disabled={workflowLoading === `${workflowAction.action}-${po._id}`}
+                                className={`${colorClasses} p-1 rounded disabled:opacity-50`}
+                                title={workflowAction.label}
+                              >
+                                {workflowLoading === `${workflowAction.action}-${po._id}` ? (
+                                  <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${colorClasses.split(' ')[2]}`}></div>
+                                ) : (
+                                  <IconComponent className="w-4 h-4" />
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       </td>
                     </motion.tr>

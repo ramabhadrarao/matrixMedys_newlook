@@ -297,6 +297,22 @@ export const purchaseOrderAPI = {
 
   // ===== WORKFLOW ACTIONS =====
 
+  // Submit purchase order for approval
+  submitForApproval: async (id: string, remarks?: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    try {
+      console.log('Submitting purchase order for approval:', id, { remarks });
+      const response = await api.post(`/purchase-orders/${id}/submit-for-approval`, { remarks });
+      console.log('Submit for approval API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting purchase order for approval:', error);
+      throw error;
+    }
+  },
+
   // Approve purchase order
   approvePurchaseOrder: async (id: string, remarks?: string): Promise<{
     message: string;
@@ -341,6 +357,112 @@ export const purchaseOrderAPI = {
       return response.data;
     } catch (error) {
       console.error('Error cancelling purchase order:', error);
+      throw error;
+    }
+  },
+
+  // ===== ADDITIONAL WORKFLOW ACTIONS =====
+
+  // Level 1 Approval
+  approveLevel1: async (id: string, remarks?: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    try {
+      console.log('Approving purchase order level 1:', id, { remarks });
+      const response = await api.post(`/purchase-orders/${id}/approve-level1`, { remarks });
+      console.log('Approve L1 API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error approving purchase order level 1:', error);
+      throw error;
+    }
+  },
+
+  // Final Approval
+  approveFinal: async (id: string, remarks?: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    try {
+      console.log('Final approving purchase order:', id, { remarks });
+      const response = await api.post(`/purchase-orders/${id}/approve-final`, { remarks });
+      console.log('Final approve API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error final approving purchase order:', error);
+      throw error;
+    }
+  },
+
+  // Reject PO (alias for consistency)
+  rejectPO: async (id: string, remarks: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    return purchaseOrderAPI.rejectPurchaseOrder(id, remarks);
+  },
+
+  // Mark as Ordered
+  markOrdered: async (id: string, remarks?: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    try {
+      console.log('Marking purchase order as ordered:', id, { remarks });
+      const response = await api.post(`/purchase-orders/${id}/mark-ordered`, { remarks });
+      console.log('Mark ordered API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error marking purchase order as ordered:', error);
+      throw error;
+    }
+  },
+
+  // Mark as Received
+  markReceived: async (id: string, remarks?: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    try {
+      console.log('Marking purchase order as received:', id, { remarks });
+      const response = await api.post(`/purchase-orders/${id}/mark-received`, { remarks });
+      console.log('Mark received API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error marking purchase order as received:', error);
+      throw error;
+    }
+  },
+
+  // QC Approve
+  qcApprove: async (id: string, remarks?: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    try {
+      console.log('QC approving purchase order:', id, { remarks });
+      const response = await api.post(`/purchase-orders/${id}/qc-approve`, { remarks });
+      console.log('QC approve API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error QC approving purchase order:', error);
+      throw error;
+    }
+  },
+
+  // Complete PO
+  completePO: async (id: string, remarks?: string): Promise<{
+    message: string;
+    purchaseOrder: PurchaseOrder;
+  }> => {
+    try {
+      console.log('Completing purchase order:', id, { remarks });
+      const response = await api.post(`/purchase-orders/${id}/complete`, { remarks });
+      console.log('Complete PO API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error completing purchase order:', error);
       throw error;
     }
   },

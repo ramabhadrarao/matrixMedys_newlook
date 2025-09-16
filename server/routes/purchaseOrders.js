@@ -9,6 +9,7 @@ import {
   getPurchaseOrder,
   createPurchaseOrder,
   updatePurchaseOrder,
+  submitForApproval,
   approvePurchaseOrder,
   rejectPurchaseOrder,
   cancelPurchaseOrder,
@@ -149,6 +150,15 @@ router.delete('/:id',
 );
 
 // ===== WORKFLOW ACTION ROUTES =====
+
+// Submit purchase order for approval
+router.post('/:id/submit-for-approval', 
+  authenticate, 
+  checkPermission('po_workflow', 'submit'), 
+  workflowActionValidation, 
+  validate, 
+  submitForApproval
+);
 
 // Approve purchase order
 router.post('/:id/approve', 

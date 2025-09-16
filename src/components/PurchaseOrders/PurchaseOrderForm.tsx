@@ -35,10 +35,15 @@ const PurchaseOrderForm: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
+  
+  // Permission checks
+  const canUpdate = hasPermission('purchase_orders', 'update');
+  const canSubmitForApproval = hasPermission('po_workflow', 'submit');
   
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [submittingForApproval, setSubmittingForApproval] = useState(false);
   const [principals, setPrincipals] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -106,6 +111,9 @@ const PurchaseOrderForm: React.FC = () => {
     terms: '',
     notes: ''
   });
+
+  // Purchase Order State
+  const [purchaseOrderData, setPurchaseOrderData] = useState<any>(null);
 
   // Calculated Values
   const [calculations, setCalculations] = useState({
@@ -197,6 +205,9 @@ const PurchaseOrderForm: React.FC = () => {
       setLoading(true);
       const response = await purchaseOrderAPI.getPurchaseOrder(poId);
       const po = response.purchaseOrder;
+      
+      // Store the full PO data for workflow information
+      setPurchaseOrderData(po);
       
       // Map the backend data to form structure
       setFormData({
@@ -483,6 +494,48 @@ const PurchaseOrderForm: React.FC = () => {
     }
   };
 
+  const handleSubmitForApproval = async () => {
+    // Validation
+    if (!formData.principal) {
+      toast.error('Please select a principal');
+      return;
+    }
+    
+    if (!formData.billToBranch) {
+      toast.error('Please select billing branch');
+      return;
+    }
+    
+    if (!formData.shipToBranch && !formData.shipToWarehouse) {
+      toast.error('Please select shipping location');
+      return;
+    }
+    
+    if (formData.products.length === 0) {
+      toast.error('Please add at least one product');
+      return;
+    }
+
+    try {
+      setSubmittingForApproval(true);
+      
+      if (!isEdit || !id) {
+        toast.error('Purchase order must be saved before submitting for approval');
+        return;
+      }
+      
+      const response = await purchaseOrderAPI.submitForApproval(id);
+      toast.success(response.message || 'Purchase order submitted for approval successfully');
+      navigate('/purchase-orders');
+    } catch (error: any) {
+      console.error('Submit for approval error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to submit purchase order for approval';
+      toast.error(errorMessage);
+    } finally {
+      setSubmittingForApproval(false);
+    }
+  };
+
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -540,7 +593,7 @@ const PurchaseOrderForm: React.FC = () => {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving}
+            disabled={saving || submittingForApproval || (isEdit && !canUpdate)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
           >
             {saving ? (
@@ -555,6 +608,27 @@ const PurchaseOrderForm: React.FC = () => {
               </>
             )}
           </button>
+          
+          {/* Submit for Approval Button - Only show for draft POs in edit mode */}
+          {isEdit && purchaseOrderData?.currentStage?.code === 'DRAFT' && canSubmitForApproval && (
+            <button
+              onClick={handleSubmitForApproval}
+              disabled={saving || submittingForApproval}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+            >
+              {submittingForApproval ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Submit for Approval
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

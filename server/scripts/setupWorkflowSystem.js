@@ -19,6 +19,7 @@ const workflowPermissions = [
   { name: 'po_delete', description: 'Delete purchase orders', resource: 'purchase_orders', action: 'delete' },
   
   // Workflow Actions
+  { name: 'po_submit', description: 'Submit PO for approval', resource: 'po_workflow', action: 'submit' },
   { name: 'po_approve_level1', description: 'Approve PO - Level 1', resource: 'po_workflow', action: 'approve_level1' },
   { name: 'po_approve_level2', description: 'Approve PO - Level 2', resource: 'po_workflow', action: 'approve_level2' },
   { name: 'po_approve_final', description: 'Final PO Approval', resource: 'po_workflow', action: 'approve_final' },
@@ -327,7 +328,7 @@ async function setupWorkflowSystem() {
         name: 'Purchase Manager',
         email: 'purchase@matrixmedys.com',
         password: 'password123',
-        permissions: ['po_view', 'po_create', 'po_edit']
+        permissions: ['po_view', 'po_create', 'po_edit', 'po_submit']
       },
       {
         name: 'Approver Level 1',

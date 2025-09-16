@@ -433,6 +433,70 @@ export const updatePurchaseOrder = async (req, res) => {
 };
 
 // Workflow Actions
+
+// Submit purchase order for approval
+export const submitForApproval = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body;
+    
+    const purchaseOrder = await PurchaseOrder.findById(id)
+      .populate('currentStage');
+    
+    if (!purchaseOrder) {
+      return res.status(404).json({ message: 'Purchase order not found' });
+    }
+    
+    const currentStage = purchaseOrder.currentStage;
+    
+    // Check if PO is in draft stage
+    if (currentStage.code !== 'DRAFT') {
+      return res.status(400).json({ 
+        message: 'Purchase order can only be submitted from draft stage' 
+      });
+    }
+    
+    // Get pending approval stage
+    const pendingApprovalStage = await WorkflowStage.findOne({ code: 'PENDING_APPROVAL' });
+    if (!pendingApprovalStage) {
+      return res.status(404).json({ message: 'Pending approval stage not found' });
+    }
+    
+    // Update purchase order
+    purchaseOrder.status = 'pending_approval';
+    purchaseOrder.currentStage = pendingApprovalStage._id;
+    purchaseOrder.updatedBy = req.user.id;
+    
+    // Add to workflow history
+    purchaseOrder.workflowHistory.push({
+      stage: pendingApprovalStage._id,
+      action: 'submit_for_approval',
+      actionBy: req.user.id,
+      actionDate: new Date(),
+      remarks: remarks || 'Submitted for approval'
+    });
+    
+    await purchaseOrder.save();
+    
+    // Populate for response
+    await purchaseOrder.populate([
+      { path: 'principal', select: 'name email mobile gstNumber' },
+      { path: 'currentStage' },
+      { path: 'workflowHistory.stage', select: 'name code' },
+      { path: 'workflowHistory.actionBy', select: 'name email' }
+    ]);
+    
+    res.json({
+      message: 'Purchase order submitted for approval successfully',
+      purchaseOrder
+    });
+    
+  } catch (error) {
+    console.error('Submit for approval error:', error);
+    res.status(500).json({ message: 'Failed to submit purchase order for approval' });
+  }
+};
+
 export const approvePurchaseOrder = async (req, res) => {
   try {
     const { id } = req.params;
