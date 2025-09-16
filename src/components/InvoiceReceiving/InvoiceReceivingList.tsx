@@ -1,4 +1,4 @@
-// src/components/InvoiceReceiving/InvoiceReceivingList.tsx
+// src/components/InvoiceReceiving/InvoiceReceivingList.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -7,13 +7,16 @@ import {
   Filter,
   Download,
   Eye,
+  Edit,
   CheckCircle,
   XCircle,
   Clock,
   Package,
   FileText,
   Calendar,
-  User
+  User,
+  Building2,
+  Truck
 } from 'lucide-react';
 import { invoiceReceivingAPI, InvoiceReceiving, InvoiceReceivingFilters } from '../../services/invoiceReceivingAPI';
 import { useAuthStore } from '../../store/authStore';
@@ -27,13 +30,14 @@ const InvoiceReceivingList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   
   const [filters, setFilters] = useState<InvoiceReceivingFilters>({
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || '',
     qcStatus: searchParams.get('qcStatus') || '',
-    poNumber: searchParams.get('po') || '',
+    purchaseOrder: searchParams.get('po') || '',
     dateFrom: searchParams.get('dateFrom') || '',
     dateTo: searchParams.get('dateTo') || '',
     page: parseInt(searchParams.get('page') || '1'),
@@ -57,11 +61,24 @@ const InvoiceReceivingList: React.FC = () => {
     try {
       setLoading(true);
       const response = await invoiceReceivingAPI.getInvoiceReceivings(filters);
-      setInvoiceReceivings(response.data.invoiceReceivings);
-      setTotalCount(response.data.totalCount);
-      setCurrentPage(response.data.currentPage);
+      
+      // Handle the nested data structure
+      const receivingsData = response.data;
+      setInvoiceReceivings(receivingsData.invoiceReceivings || []);
+      setTotalCount(receivingsData.totalCount || 0);
+      setCurrentPage(receivingsData.currentPage || filters.page || 1);
+      
+      const limit = filters.limit || 10;
+      const totalPgs = Math.ceil((receivingsData.totalCount || 0) / limit);
+      setTotalPages(totalPgs);
+      
     } catch (error: any) {
+      console.error('Error loading invoice receivings:', error);
       toast.error('Failed to load invoice receivings');
+      setInvoiceReceivings([]);
+      setTotalCount(0);
+      setCurrentPage(1);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -84,7 +101,7 @@ const InvoiceReceivingList: React.FC = () => {
       search: '',
       status: '',
       qcStatus: '',
-      poNumber: '',
+      purchaseOrder: '',
       dateFrom: '',
       dateTo: '',
       page: 1,
@@ -93,35 +110,11 @@ const InvoiceReceivingList: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'bg-gray-100 text-gray-800';
-      case 'submitted':
-        return 'bg-blue-100 text-blue-800';
-      case 'qc_pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'qc_passed':
-        return 'bg-green-100 text-green-800';
-      case 'qc_failed':
-        return 'bg-red-100 text-red-800';
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    return invoiceReceivingAPI.getStatusBadgeColor(status);
   };
 
   const getQCStatusColor = (qcStatus: string) => {
-    switch (qcStatus) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'passed':
-        return 'bg-green-100 text-green-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    return invoiceReceivingAPI.getQCStatusBadgeColor(qcStatus);
   };
 
   const getStatusIcon = (status: string) => {
@@ -131,10 +124,9 @@ const InvoiceReceivingList: React.FC = () => {
       case 'submitted':
       case 'qc_pending':
         return Clock;
-      case 'qc_passed':
       case 'completed':
         return CheckCircle;
-      case 'qc_failed':
+      case 'rejected':
         return XCircle;
       default:
         return FileText;
@@ -142,21 +134,20 @@ const InvoiceReceivingList: React.FC = () => {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    return invoiceReceivingAPI.formatDate(date);
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
+    return invoiceReceivingAPI.formatCurrency(amount);
   };
 
-  const totalPages = Math.ceil(totalCount / filters.limit);
+  const getStatusLabel = (status: string) => {
+    return invoiceReceivingAPI.getStatusLabel(status);
+  };
+
+  const getQCStatusLabel = (qcStatus: string) => {
+    return invoiceReceivingAPI.getQCStatusLabel(qcStatus);
+  };
 
   return (
     <div className="space-y-6">
@@ -169,7 +160,7 @@ const InvoiceReceivingList: React.FC = () => {
           </p>
         </div>
         
-        {hasPermission('invoice_receiving:create') && (
+        {hasPermission('invoice_receiving', 'create') && (
           <Link
             to="/invoice-receiving/new"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -228,9 +219,8 @@ const InvoiceReceivingList: React.FC = () => {
                   <option value="draft">Draft</option>
                   <option value="submitted">Submitted</option>
                   <option value="qc_pending">QC Pending</option>
-                  <option value="qc_passed">QC Passed</option>
-                  <option value="qc_failed">QC Failed</option>
                   <option value="completed">Completed</option>
+                  <option value="rejected">Rejected</option>
                 </select>
               </div>
               
@@ -247,6 +237,8 @@ const InvoiceReceivingList: React.FC = () => {
                   <option value="pending">Pending</option>
                   <option value="passed">Passed</option>
                   <option value="failed">Failed</option>
+                  <option value="partial">Partial Pass</option>
+                  <option value="not_required">Not Required</option>
                 </select>
               </div>
               
@@ -302,7 +294,7 @@ const InvoiceReceivingList: React.FC = () => {
                 ? 'Try adjusting your search criteria'
                 : 'Get started by creating a new invoice receiving'}
             </p>
-            {hasPermission('invoice_receiving:create') && (
+            {hasPermission('invoice_receiving', 'create') && (
               <div className="mt-6">
                 <Link
                   to="/invoice-receiving/new"
@@ -316,8 +308,8 @@ const InvoiceReceivingList: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Table */}
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -329,6 +321,9 @@ const InvoiceReceivingList: React.FC = () => {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Received Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Products
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -365,12 +360,16 @@ const InvoiceReceivingList: React.FC = () => {
                         
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {receiving.purchaseOrder?.poNumber || 'N/A'}
+                            {typeof receiving.purchaseOrder === 'object' 
+                              ? receiving.purchaseOrder.poNumber 
+                              : 'N/A'}
                           </div>
-                          {receiving.purchaseOrder?.supplier && (
-                            <div className="text-sm text-gray-500">
-                              {receiving.purchaseOrder.supplier}
-                            </div>
+                          {typeof receiving.purchaseOrder === 'object' && receiving.purchaseOrder.status && (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              getStatusColor(receiving.purchaseOrder.status)
+                            }`}>
+                              {getStatusLabel(receiving.purchaseOrder.status)}
+                            </span>
                           )}
                         </td>
                         
@@ -388,12 +387,21 @@ const InvoiceReceivingList: React.FC = () => {
                         </td>
                         
                         <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {receiving.receivedProducts?.length || 0} items
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Total: {receiving.receivedProducts?.reduce((sum, p) => sum + p.receivedQuantity, 0) || 0}
+                          </div>
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <StatusIcon className="w-4 h-4 mr-2 text-gray-400" />
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               getStatusColor(receiving.status)
                             }`}>
-                              {receiving.status.replace('_', ' ').toUpperCase()}
+                              {getStatusLabel(receiving.status)}
                             </span>
                           </div>
                         </td>
@@ -403,10 +411,12 @@ const InvoiceReceivingList: React.FC = () => {
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               getQCStatusColor(receiving.qcStatus)
                             }`}>
-                              {receiving.qcStatus.toUpperCase()}
+                              {getQCStatusLabel(receiving.qcStatus)}
                             </span>
+                          ) : receiving.qcRequired ? (
+                            <span className="text-gray-400 text-sm">Pending</span>
                           ) : (
-                            <span className="text-gray-400 text-sm">-</span>
+                            <span className="text-gray-400 text-sm">Not Required</span>
                           )}
                         </td>
                         
@@ -420,18 +430,18 @@ const InvoiceReceivingList: React.FC = () => {
                               <Eye className="w-4 h-4" />
                             </Link>
                             
-                            {hasPermission('invoice_receiving:update') && 
+                            {hasPermission('invoice_receiving', 'update') && 
                              (receiving.status === 'draft' || receiving.status === 'submitted') && (
                               <Link
                                 to={`/invoice-receiving/${receiving._id}/edit`}
                                 className="text-green-600 hover:text-green-900 p-1 rounded transition-colors"
                                 title="Edit"
                               >
-                                <FileText className="w-4 h-4" />
+                                <Edit className="w-4 h-4" />
                               </Link>
                             )}
                             
-                            {hasPermission('invoice_receiving:download') && (
+                            {hasPermission('invoice_receiving', 'view') && (
                               <button
                                 className="text-gray-600 hover:text-gray-900 p-1 rounded transition-colors"
                                 title="Download"
@@ -448,12 +458,123 @@ const InvoiceReceivingList: React.FC = () => {
               </table>
             </div>
 
+            {/* Mobile Cards */}
+            <div className="lg:hidden divide-y divide-gray-200">
+              {invoiceReceivings.map((receiving) => (
+                <div key={receiving._id} className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="flex items-center">
+                        <FileText className="w-4 h-4 text-gray-400 mr-2" />
+                        <span className="text-sm font-medium text-gray-900">
+                          {receiving.invoiceNumber}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {formatDate(receiving.receivedDate)}
+                      </div>
+                    </div>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      getStatusColor(receiving.status)
+                    }`}>
+                      {getStatusLabel(receiving.status)}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="text-sm">
+                      <span className="text-gray-500">Supplier:</span>
+                      <span className="ml-2 text-gray-900">{receiving.supplier}</span>
+                    </div>
+                    
+                    <div className="text-sm">
+                      <span className="text-gray-500">PO Number:</span>
+                      <span className="ml-2 text-gray-900">
+                        {typeof receiving.purchaseOrder === 'object' 
+                          ? receiving.purchaseOrder.poNumber 
+                          : 'N/A'}
+                      </span>
+                    </div>
+                    
+                    {receiving.invoiceAmount && (
+                      <div className="text-sm">
+                        <span className="text-gray-500">Amount:</span>
+                        <span className="ml-2 font-medium text-gray-900">
+                          {formatCurrency(receiving.invoiceAmount)}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="text-sm">
+                      <span className="text-gray-500">Products:</span>
+                      <span className="ml-2 text-gray-900">
+                        {receiving.receivedProducts?.length || 0} items
+                      </span>
+                    </div>
+                    
+                    <div className="text-sm">
+                      <span className="text-gray-500">QC Status:</span>
+                      {receiving.qcStatus ? (
+                        <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          getQCStatusColor(receiving.qcStatus)
+                        }`}>
+                          {getQCStatusLabel(receiving.qcStatus)}
+                        </span>
+                      ) : (
+                        <span className="ml-2 text-gray-400">
+                          {receiving.qcRequired ? 'Pending' : 'Not Required'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {receiving.receivedBy && (
+                      <div className="text-sm">
+                        <span className="text-gray-500">Received By:</span>
+                        <span className="ml-2 text-gray-900">{receiving.receivedBy.name}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Link
+                      to={`/invoice-receiving/${receiving._id}`}
+                      className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                    >
+                      View Details
+                    </Link>
+                    
+                    <div className="flex items-center space-x-2">
+                      {hasPermission('invoice_receiving', 'update') && 
+                       (receiving.status === 'draft' || receiving.status === 'submitted') && (
+                        <Link
+                          to={`/invoice-receiving/${receiving._id}/edit`}
+                          className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Link>
+                      )}
+                      
+                      {hasPermission('invoice_receiving', 'view') && (
+                        <button
+                          className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-50"
+                          title="Download"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-6 py-3 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-700">
-                    Showing {((currentPage - 1) * filters.limit) + 1} to {Math.min(currentPage * filters.limit, totalCount)} of {totalCount} results
+                    Showing {((currentPage - 1) * (filters.limit || 10)) + 1} to {Math.min(currentPage * (filters.limit || 10), totalCount)} of {totalCount} results
                   </div>
                   
                   <div className="flex items-center space-x-2">

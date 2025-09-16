@@ -1,4 +1,4 @@
-// src/services/invoiceReceivingAPI.ts
+// src/services/invoiceReceivingAPI.ts - COMPLETE FIXED VERSION
 import api from './api';
 import { useAuthStore } from '../store/authStore';
 
@@ -7,15 +7,20 @@ export interface ReceivedProduct {
   product: string;
   productCode?: string;
   productName?: string;
-  orderedQty: number;
-  receivedQty: number;
+  orderedQuantity: number;
+  receivedQuantity: number;
   foc?: number;
   unitPrice?: number;
-  batchNo?: string;
-  mfgDate?: string;
-  expDate?: string;
+  unit?: string;
+  batchNumber?: string;
+  manufacturingDate?: string;
+  expiryDate?: string;
   status: 'received' | 'backlog' | 'damaged' | 'rejected';
   remarks?: string;
+  qcStatus?: 'pending' | 'passed' | 'failed' | 'not_required';
+  qcRemarks?: string;
+  qcBy?: string;
+  qcDate?: string;
 }
 
 export interface InvoiceDocument {
@@ -30,6 +35,7 @@ export interface InvoiceDocument {
     _id: string;
     name: string;
   };
+  url?: string;
 }
 
 export interface InvoiceReceiving {
@@ -37,19 +43,23 @@ export interface InvoiceReceiving {
   purchaseOrder: {
     _id: string;
     poNumber: string;
-  } | string;
+    status: string;
+    supplier?: string;
+  };
   invoiceNumber: string;
   invoiceDate: string;
-  invoiceAmount: number;
+  invoiceAmount?: number;
+  supplier: string;
   dueDate?: string;
   receivedDate: string;
   receivedBy: {
     _id: string;
     name: string;
   };
-  products: ReceivedProduct[];
+  receivedProducts: ReceivedProduct[];
   documents: InvoiceDocument[];
-  qcStatus: 'pending' | 'in_progress' | 'passed' | 'failed' | 'partial_pass';
+  qcStatus?: 'pending' | 'in_progress' | 'passed' | 'failed' | 'partial_pass' | 'not_required';
+  qcRequired: boolean;
   qcDate?: string;
   qcBy?: {
     _id: string;
@@ -57,6 +67,7 @@ export interface InvoiceReceiving {
   };
   qcRemarks?: string;
   status: 'draft' | 'submitted' | 'qc_pending' | 'completed' | 'rejected';
+  notes?: string;
   createdBy: {
     _id: string;
     name: string;
@@ -75,28 +86,18 @@ export interface InvoiceReceivingFormData {
   purchaseOrder: string;
   invoiceNumber: string;
   invoiceDate: string;
-  invoiceAmount: number;
+  invoiceAmount?: number;
+  supplier: string;
   dueDate?: string;
-  receivedDate?: string;
-  products: Array<{
-    product: string;
-    productCode?: string;
-    productName?: string;
-    orderedQty: number;
-    receivedQty: number;
-    foc?: number;
-    unitPrice?: number;
-    batchNo?: string;
-    mfgDate?: string;
-    expDate?: string;
-    status?: 'received' | 'backlog' | 'damaged' | 'rejected';
-    remarks?: string;
-  }>;
+  receivedDate: string;
+  receivedProducts: ReceivedProduct[];
   documents?: File[];
+  notes?: string;
+  qcRequired?: boolean;
 }
 
 export interface QCCheckData {
-  qcStatus: 'passed' | 'failed' | 'partial_pass';
+  qcStatus: 'passed' | 'failed' | 'partial';
   qcRemarks: string;
   productQCResults?: Array<{
     productId: string;
@@ -109,14 +110,25 @@ export interface InvoiceReceivingFilters {
   purchaseOrder?: string;
   status?: string;
   qcStatus?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
+}
+
+export interface QCUpdateData {
+  productIndex: number;
+  qcStatus: 'passed' | 'failed' | 'pending';
+  qcRemarks?: string;
+  qcBy?: string;
+  qcDate?: string;
 }
 
 // Helper function for file uploads with progress
 const createFormDataRequest = async (
   url: string,
-  data: InvoiceReceivingFormData | FormData,
+  data: FormData,
   method: 'POST' | 'PUT' = 'POST',
   onProgress?: (progress: number) => void
 ) => {
@@ -173,37 +185,21 @@ const createFormDataRequest = async (
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     }
 
-    let requestData: FormData;
-    if (data instanceof FormData) {
-      requestData = data;
-    } else {
-      requestData = new FormData();
-      
-      // Add regular fields
-      Object.keys(data).forEach(key => {
-        const value = (data as any)[key];
-        if (value !== undefined && value !== null) {
-          if (key === 'documents' && Array.isArray(value)) {
-            value.forEach((file: File) => {
-              requestData.append('documents', file);
-            });
-          } else if (key === 'products' && Array.isArray(value)) {
-            requestData.append('products', JSON.stringify(value));
-          } else {
-            requestData.append(key, value.toString());
-          }
-        }
-      });
-    }
-
-    xhr.send(requestData);
+    xhr.send(data);
   });
 };
 
 // Invoice & Receiving API Service
 export const invoiceReceivingAPI = {
   // Get all invoice receivings
-  getInvoiceReceivings: async (filters?: InvoiceReceivingFilters): Promise<{ invoiceReceivings: InvoiceReceiving[] }> => {
+  getInvoiceReceivings: async (filters?: InvoiceReceivingFilters): Promise<{ 
+    data: { 
+      invoiceReceivings: InvoiceReceiving[]; 
+      totalCount?: number; 
+      currentPage?: number; 
+      totalPages?: number 
+    } 
+  }> => {
     try {
       console.log('Fetching invoice receivings:', filters);
       const response = await api.get('/invoice-receiving', { params: filters });
@@ -216,7 +212,7 @@ export const invoiceReceivingAPI = {
   },
 
   // Get single invoice receiving
-  getInvoiceReceiving: async (id: string): Promise<{ invoiceReceiving: InvoiceReceiving }> => {
+  getInvoiceReceiving: async (id: string): Promise<{ data: InvoiceReceiving }> => {
     try {
       console.log('Fetching invoice receiving:', id);
       const response = await api.get(`/invoice-receiving/${id}`);
@@ -232,22 +228,32 @@ export const invoiceReceivingAPI = {
   createInvoiceReceiving: async (
     data: InvoiceReceivingFormData,
     onProgress?: (progress: number) => void
-  ): Promise<{ message: string; invoiceReceiving: InvoiceReceiving }> => {
+  ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
       console.log('Creating invoice receiving:', data);
       
-      if (data.documents && data.documents.length > 0) {
-        // Use FormData for file upload
-        const response = await createFormDataRequest('/invoice-receiving', data, 'POST', onProgress);
-        console.log('Create invoice receiving response:', response);
-        return response;
-      } else {
-        // Regular JSON request
-        const { documents, ...invoiceData } = data;
-        const response = await api.post('/invoice-receiving', invoiceData);
-        console.log('Create invoice receiving response:', response.data);
-        return response.data;
-      }
+      // Always use FormData for consistency
+      const formData = new FormData();
+      
+      // Add regular fields
+      Object.keys(data).forEach(key => {
+        const value = (data as any)[key];
+        if (value !== undefined && value !== null) {
+          if (key === 'documents' && Array.isArray(value)) {
+            value.forEach((file: File) => {
+              formData.append('documents', file);
+            });
+          } else if (key === 'receivedProducts' && Array.isArray(value)) {
+            formData.append('receivedProducts', JSON.stringify(value));
+          } else {
+            formData.append(key, value.toString());
+          }
+        }
+      });
+      
+      const response = await createFormDataRequest('/invoice-receiving', formData, 'POST', onProgress);
+      console.log('Create invoice receiving response:', response);
+      return response;
     } catch (error) {
       console.error('Error creating invoice receiving:', error);
       throw error;
@@ -259,13 +265,33 @@ export const invoiceReceivingAPI = {
     id: string,
     data: Partial<InvoiceReceivingFormData>,
     onProgress?: (progress: number) => void
-  ): Promise<{ message: string; invoiceReceiving: InvoiceReceiving }> => {
+  ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
       console.log('Updating invoice receiving:', id, data);
       
-      if (data.documents && data.documents.length > 0) {
+      // Check if we have files to upload
+      const hasFiles = data.documents && data.documents.length > 0;
+      
+      if (hasFiles) {
         // Use FormData for file upload
-        const response = await createFormDataRequest(`/invoice-receiving/${id}`, data as InvoiceReceivingFormData, 'PUT', onProgress);
+        const formData = new FormData();
+        
+        Object.keys(data).forEach(key => {
+          const value = (data as any)[key];
+          if (value !== undefined && value !== null) {
+            if (key === 'documents' && Array.isArray(value)) {
+              value.forEach((file: File) => {
+                formData.append('documents', file);
+              });
+            } else if (key === 'receivedProducts' && Array.isArray(value)) {
+              formData.append('receivedProducts', JSON.stringify(value));
+            } else {
+              formData.append(key, value.toString());
+            }
+          }
+        });
+        
+        const response = await createFormDataRequest(`/invoice-receiving/${id}`, formData, 'PUT', onProgress);
         console.log('Update invoice receiving response:', response);
         return response;
       } else {
@@ -282,7 +308,7 @@ export const invoiceReceivingAPI = {
   },
 
   // Submit to QC
-  submitToQC: async (id: string): Promise<{ message: string; invoiceReceiving: InvoiceReceiving }> => {
+  submitToQC: async (id: string): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
       console.log('Submitting to QC:', id);
       const response = await api.post(`/invoice-receiving/${id}/submit-qc`);
@@ -295,7 +321,7 @@ export const invoiceReceivingAPI = {
   },
 
   // Perform QC check
-  performQCCheck: async (id: string, data: QCCheckData): Promise<{ message: string; invoiceReceiving: InvoiceReceiving }> => {
+  performQCCheck: async (id: string, data: QCCheckData): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
       console.log('Performing QC check:', id, data);
       const response = await api.post(`/invoice-receiving/${id}/qc-check`, data);
@@ -303,6 +329,19 @@ export const invoiceReceivingAPI = {
       return response.data;
     } catch (error) {
       console.error('Error performing QC check:', error);
+      throw error;
+    }
+  },
+
+  // Update individual product QC status
+  updateQCStatus: async (id: string, data: QCUpdateData): Promise<{ message: string; data: InvoiceReceiving }> => {
+    try {
+      console.log('Updating QC status:', id, data);
+      const response = await api.put(`/invoice-receiving/${id}/qc-status`, data);
+      console.log('Update QC status response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating QC status:', error);
       throw error;
     }
   },
@@ -321,7 +360,7 @@ export const invoiceReceivingAPI = {
   },
 
   // Get invoice receivings by PO
-  getByPurchaseOrder: async (purchaseOrderId: string): Promise<{ invoiceReceivings: InvoiceReceiving[] }> => {
+  getByPurchaseOrder: async (purchaseOrderId: string): Promise<{ data: { invoiceReceivings: InvoiceReceiving[] } }> => {
     try {
       const response = await api.get('/invoice-receiving', { 
         params: { purchaseOrder: purchaseOrderId } 
@@ -341,16 +380,18 @@ export const invoiceReceivingAPI = {
       totalDamaged: number;
       totalRejected: number;
       totalBacklog: number;
+      qcStatus: string;
     }> = {};
 
     invoiceReceivings.forEach(receiving => {
-      receiving.products.forEach(product => {
+      receiving.receivedProducts.forEach(product => {
         if (!productReceivingSummary[product.product]) {
           productReceivingSummary[product.product] = {
             totalReceived: 0,
             totalDamaged: 0,
             totalRejected: 0,
-            totalBacklog: 0
+            totalBacklog: 0,
+            qcStatus: 'pending'
           };
         }
 
@@ -358,22 +399,114 @@ export const invoiceReceivingAPI = {
         
         switch (product.status) {
           case 'received':
-            summary.totalReceived += product.receivedQty;
+            summary.totalReceived += product.receivedQuantity;
             break;
           case 'damaged':
-            summary.totalDamaged += product.receivedQty;
+            summary.totalDamaged += product.receivedQuantity;
             break;
           case 'rejected':
-            summary.totalRejected += product.receivedQty;
+            summary.totalRejected += product.receivedQuantity;
             break;
           case 'backlog':
-            summary.totalBacklog += product.receivedQty;
+            summary.totalBacklog += product.receivedQuantity;
             break;
+        }
+
+        // Update QC status based on product QC status
+        if (product.qcStatus) {
+          if (summary.qcStatus === 'pending' || product.qcStatus === 'failed') {
+            summary.qcStatus = product.qcStatus;
+          }
         }
       });
     });
 
     return productReceivingSummary;
+  },
+
+  // Helper methods
+  formatCurrency: (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
+  },
+
+  formatDate: (date: string | Date): string => {
+    return new Date(date).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  },
+
+  getStatusBadgeColor: (status: string): string => {
+    switch (status) {
+      case 'draft':
+        return 'bg-gray-100 text-gray-800';
+      case 'submitted':
+        return 'bg-blue-100 text-blue-800';
+      case 'qc_pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  },
+
+  getQCStatusBadgeColor: (qcStatus: string): string => {
+    switch (qcStatus) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'passed':
+        return 'bg-green-100 text-green-800';
+      case 'failed':
+        return 'bg-red-100 text-red-800';
+      case 'partial':
+        return 'bg-orange-100 text-orange-800';
+      case 'not_required':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  },
+
+  getStatusLabel: (status: string): string => {
+    switch (status) {
+      case 'draft':
+        return 'Draft';
+      case 'submitted':
+        return 'Submitted';
+      case 'qc_pending':
+        return 'QC Pending';
+      case 'completed':
+        return 'Completed';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  },
+
+  getQCStatusLabel: (qcStatus: string): string => {
+    switch (qcStatus) {
+      case 'pending':
+        return 'Pending';
+      case 'passed':
+        return 'Passed';
+      case 'failed':
+        return 'Failed';
+      case 'partial':
+        return 'Partial Pass';
+      case 'not_required':
+        return 'Not Required';
+      default:
+        return qcStatus?.charAt(0).toUpperCase() + qcStatus?.slice(1) || 'Unknown';
+    }
   }
 };
 

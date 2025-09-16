@@ -1,4 +1,4 @@
-// src/components/InvoiceReceiving/InvoiceReceivingDetails.tsx
+// src/components/InvoiceReceiving/InvoiceReceivingDetails.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -20,21 +20,23 @@ import {
   Mail,
   Truck,
   ClipboardCheck,
-  MessageSquare
+  MessageSquare,
+  Send
 } from 'lucide-react';
-import { invoiceReceivingAPI, InvoiceReceiving } from '../../services/invoiceReceivingAPI';
+import { invoiceReceivingAPI, InvoiceReceiving, QCUpdateData } from '../../services/invoiceReceivingAPI';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
 const InvoiceReceivingDetails: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [receiving, setReceiving] = useState<InvoiceReceiving | null>(null);
   const [activeTab, setActiveTab] = useState('details');
   const [qcModalOpen, setQcModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [submittingQC, setSubmittingQC] = useState(false);
   const [qcData, setQcData] = useState({
     status: 'pending' as 'pending' | 'passed' | 'failed',
     remarks: '',
@@ -65,16 +67,7 @@ const InvoiceReceivingDetails: React.FC = () => {
     if (!receiving) return;
 
     try {
-      const updatedProducts = [...receiving.receivedProducts];
-      updatedProducts[productIndex] = {
-        ...updatedProducts[productIndex],
-        qcStatus: qcData.status,
-        qcRemarks: qcData.remarks,
-        qcBy: qcData.qcBy,
-        qcDate: qcData.qcDate
-      };
-
-      await invoiceReceivingAPI.updateQCStatus(receiving._id, {
+      const response = await invoiceReceivingAPI.updateQCStatus(receiving._id, {
         productIndex,
         qcStatus: qcData.status,
         qcRemarks: qcData.remarks,
@@ -82,11 +75,7 @@ const InvoiceReceivingDetails: React.FC = () => {
         qcDate: qcData.qcDate
       });
 
-      setReceiving(prev => prev ? {
-        ...prev,
-        receivedProducts: updatedProducts
-      } : null);
-
+      setReceiving(response.data);
       setQcModalOpen(false);
       setSelectedProduct(null);
       setQcData({
@@ -99,6 +88,21 @@ const InvoiceReceivingDetails: React.FC = () => {
       toast.success('QC status updated successfully');
     } catch (error: any) {
       toast.error('Failed to update QC status');
+    }
+  };
+
+  const handleSubmitToQC = async () => {
+    if (!receiving) return;
+
+    try {
+      setSubmittingQC(true);
+      const response = await invoiceReceivingAPI.submitToQC(receiving._id);
+      setReceiving(response.data);
+      toast.success('Successfully submitted to QC');
+    } catch (error: any) {
+      toast.error('Failed to submit to QC');
+    } finally {
+      setSubmittingQC(false);
     }
   };
 
@@ -145,42 +149,39 @@ const InvoiceReceivingDetails: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'received':
-      case 'qc_passed':
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'partial_received':
-      case 'qc_pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'qc_failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    return invoiceReceivingAPI.getStatusBadgeColor(status);
+  };
+
+  const getQCStatusColor = (qcStatus: string) => {
+    return invoiceReceivingAPI.getQCStatusBadgeColor(qcStatus);
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return invoiceReceivingAPI.formatDate(date);
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
+    return invoiceReceivingAPI.formatCurrency(amount);
+  };
+
+  const getStatusLabel = (status: string) => {
+    return invoiceReceivingAPI.getStatusLabel(status);
+  };
+
+  const getQCStatusLabel = (qcStatus: string) => {
+    return invoiceReceivingAPI.getQCStatusLabel(qcStatus);
   };
 
   const canPerformQC = () => {
-    return user?.permissions?.includes('qc_management') || user?.role === 'admin';
+    return hasPermission('invoice_receiving', 'qc_check') || user?.role === 'admin';
   };
 
   const canEdit = () => {
-    return user?.permissions?.includes('invoice_receiving_edit') || user?.role === 'admin';
+    return hasPermission('invoice_receiving', 'update') || user?.role === 'admin';
+  };
+
+  const canSubmitQC = () => {
+    return hasPermission('invoice_receiving', 'qc_submit') || user?.role === 'admin';
   };
 
   if (loading) {
@@ -220,7 +221,7 @@ const InvoiceReceivingDetails: React.FC = () => {
                 getStatusColor(receiving.status)
               }`}>
                 {getStatusIcon(receiving.status)}
-                <span className="ml-1 capitalize">{receiving.status.replace('_', ' ')}</span>
+                <span className="ml-1">{getStatusLabel(receiving.status)}</span>
               </span>
               
               <span className="text-gray-500 text-sm">
@@ -231,13 +232,28 @@ const InvoiceReceivingDetails: React.FC = () => {
         </div>
         
         <div className="flex space-x-3">
-          {canEdit() && (
-            <button
-              onClick={() => navigate(`/invoice-receiving/${receiving._id}/edit`)}
+          {canEdit() && (receiving.status === 'draft' || receiving.status === 'submitted') && (
+            <Link
+              to={`/invoice-receiving/${receiving._id}/edit`}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit
+            </Link>
+          )}
+
+          {canSubmitQC() && receiving.status === 'draft' && receiving.qcRequired && (
+            <button
+              onClick={handleSubmitToQC}
+              disabled={submittingQC}
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {submittingQC ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              {submittingQC ? 'Submitting...' : 'Submit to QC'}
             </button>
           )}
           
@@ -317,6 +333,11 @@ const InvoiceReceivingDetails: React.FC = () => {
                   </div>
                   
                   <div className="flex justify-between">
+                    <span className="text-gray-600">Supplier:</span>
+                    <span className="font-medium">{receiving.supplier}</span>
+                  </div>
+                  
+                  <div className="flex justify-between">
                     <span className="text-gray-600">QC Required:</span>
                     <span className="font-medium">
                       {receiving.qcRequired ? 'Yes' : 'No'}
@@ -335,32 +356,45 @@ const InvoiceReceivingDetails: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">PO Number:</span>
-                    <span className="font-medium">{receiving.purchaseOrder.poNumber}</span>
+                    <span className="font-medium">
+                      {typeof receiving.purchaseOrder === 'object' 
+                        ? receiving.purchaseOrder.poNumber 
+                        : 'N/A'}
+                    </span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600">PO Status:</span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      getStatusColor(receiving.purchaseOrder.status)
+                      typeof receiving.purchaseOrder === 'object' && receiving.purchaseOrder.status
+                        ? getStatusColor(receiving.purchaseOrder.status)
+                        : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {receiving.purchaseOrder.status.replace('_', ' ')}
+                      {typeof receiving.purchaseOrder === 'object' && receiving.purchaseOrder.status
+                        ? getStatusLabel(receiving.purchaseOrder.status)
+                        : 'N/A'}
                     </span>
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Supplier:</span>
-                    <span className="font-medium">{receiving.supplier}</span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Products:</span>
                     <span className="font-medium">{receiving.receivedProducts.length}</span>
                   </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Received By:</span>
+                    <span className="font-medium">{receiving.receivedBy?.name || 'N/A'}</span>
+                  </div>
                 </div>
                 
                 <button
-                  onClick={() => navigate(`/purchase-orders/${receiving.purchaseOrder._id}`)}
+                  onClick={() => {
+                    if (typeof receiving.purchaseOrder === 'object') {
+                      navigate(`/purchase-orders/${receiving.purchaseOrder._id}`);
+                    }
+                  }}
                   className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-800 text-sm"
+                  disabled={typeof receiving.purchaseOrder !== 'object'}
                 >
                   <Eye className="w-4 h-4 mr-1" />
                   View Purchase Order
@@ -416,6 +450,7 @@ const InvoiceReceivingDetails: React.FC = () => {
                     <tr key={index}>
                       <td className="px-4 py-4">
                         <div className="font-medium text-gray-900">{product.productName}</div>
+                        <div className="text-sm text-gray-500">Code: {product.productCode}</div>
                         <div className="text-sm text-gray-500">Unit: {product.unit}</div>
                         <div className="text-sm text-gray-500">₹{product.unitPrice}</div>
                       </td>
@@ -444,8 +479,8 @@ const InvoiceReceivingDetails: React.FC = () => {
                       <td className="px-4 py-4">
                         <div className="flex items-center space-x-2">
                           {getQCStatusIcon(product.qcStatus || 'pending')}
-                          <span className="text-sm capitalize">
-                            {(product.qcStatus || 'pending').replace('_', ' ')}
+                          <span className="text-sm">
+                            {getQCStatusLabel(product.qcStatus || 'pending')}
                           </span>
                         </div>
                         {product.qcBy && (
@@ -456,6 +491,11 @@ const InvoiceReceivingDetails: React.FC = () => {
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
                         {product.remarks || '-'}
+                        {product.qcRemarks && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            QC: {product.qcRemarks}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -488,8 +528,10 @@ const InvoiceReceivingDetails: React.FC = () => {
                         
                         <div className="flex items-center space-x-2 mt-2">
                           {getQCStatusIcon(product.qcStatus || 'pending')}
-                          <span className="text-sm font-medium capitalize">
-                            {(product.qcStatus || 'pending').replace('_', ' ')}
+                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                            getQCStatusColor(product.qcStatus || 'pending')
+                          }`}>
+                            {getQCStatusLabel(product.qcStatus || 'pending')}
                           </span>
                         </div>
                         
@@ -506,7 +548,7 @@ const InvoiceReceivingDetails: React.FC = () => {
                         )}
                       </div>
                       
-                      {canPerformQC() && (
+                      {canPerformQC() && (receiving.status === 'submitted' || receiving.status === 'qc_pending') && (
                         <button
                           onClick={() => openQCModal(product, index)}
                           className="ml-4 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
@@ -548,19 +590,23 @@ const InvoiceReceivingDetails: React.FC = () => {
                     
                     <div className="mt-3 flex space-x-2">
                       <button
-                        onClick={() => window.open(doc.url, '_blank')}
+                        onClick={() => doc.url && window.open(doc.url, '_blank')}
                         className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                        disabled={!doc.url}
                       >
                         View
                       </button>
                       <button
                         onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = doc.url;
-                          link.download = doc.originalName || `document-${index + 1}`;
-                          link.click();
+                          if (doc.url) {
+                            const link = document.createElement('a');
+                            link.href = doc.url;
+                            link.download = doc.originalName || `document-${index + 1}`;
+                            link.click();
+                          }
                         }}
                         className="flex-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                        disabled={!doc.url}
                       >
                         Download
                       </button>

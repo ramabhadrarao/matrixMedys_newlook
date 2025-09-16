@@ -1,4 +1,4 @@
-// src/components/InvoiceReceiving/InvoiceReceivingForm.tsx
+// src/components/InvoiceReceiving/InvoiceReceivingForm.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -33,6 +33,7 @@ const InvoiceReceivingForm: React.FC = () => {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [formData, setFormData] = useState<InvoiceReceivingFormData>({
     purchaseOrder: preSelectedPO || '',
@@ -66,7 +67,7 @@ const InvoiceReceivingForm: React.FC = () => {
         status: 'ordered,partial_received',
         limit: 100
       });
-      setPurchaseOrders(response.data.purchaseOrders);
+      setPurchaseOrders(response.purchaseOrders || []);
     } catch (error) {
       toast.error('Failed to load purchase orders');
     }
@@ -75,27 +76,29 @@ const InvoiceReceivingForm: React.FC = () => {
   const loadPurchaseOrderDetails = async (poId: string) => {
     try {
       const response = await purchaseOrderAPI.getPurchaseOrder(poId);
-      const po = response.purchaseOrder; // Fix: Access purchaseOrder property from response
+      const po = response.purchaseOrder;
       setSelectedPO(po);
       
       // Pre-populate form with PO data
       setFormData(prev => ({
         ...prev,
         purchaseOrder: po._id,
-        supplier: po.supplier,
-        receivedProducts: po.productLines?.map(line => ({
+        supplier: po.principal?.name || '',
+        receivedProducts: po.products?.map(line => ({
           product: line.product,
           productName: line.productName,
+          productCode: line.productCode || '',
           orderedQuantity: line.quantity,
           receivedQuantity: 0,
-          unit: line.unit,
+          unit: line.unit || 'PCS',
           batchNumber: '',
           expiryDate: '',
           manufacturingDate: '',
           unitPrice: line.unitPrice,
           remarks: '',
           qcStatus: 'pending',
-          qcRemarks: ''
+          qcRemarks: '',
+          status: 'received'
         })) || []
       }));
     } catch (error) {
@@ -110,7 +113,9 @@ const InvoiceReceivingForm: React.FC = () => {
       const receiving = response.data;
       
       setFormData({
-        purchaseOrder: receiving.purchaseOrder._id,
+        purchaseOrder: typeof receiving.purchaseOrder === 'object' 
+          ? receiving.purchaseOrder._id 
+          : receiving.purchaseOrder,
         invoiceNumber: receiving.invoiceNumber,
         invoiceDate: receiving.invoiceDate ? 
           new Date(receiving.invoiceDate).toISOString().split('T')[0] : '',
@@ -124,7 +129,7 @@ const InvoiceReceivingForm: React.FC = () => {
         qcRequired: receiving.qcRequired !== false
       });
       
-      setSelectedPO(receiving.purchaseOrder);
+      setSelectedPO(typeof receiving.purchaseOrder === 'object' ? receiving.purchaseOrder : null);
     } catch (error: any) {
       toast.error('Failed to load invoice receiving');
       navigate('/invoice-receiving');
@@ -167,10 +172,15 @@ const InvoiceReceivingForm: React.FC = () => {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     setUploadedFiles(prev => [...prev, ...files]);
+    setFormData(prev => ({ ...prev, documents: [...(prev.documents || []), ...files] }));
   };
 
   const removeFile = (index: number) => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setFormData(prev => ({
+      ...prev,
+      documents: prev.documents?.filter((_, i) => i !== index) || []
+    }));
   };
 
   const validateForm = (): boolean => {
@@ -190,6 +200,10 @@ const InvoiceReceivingForm: React.FC = () => {
 
     if (!formData.receivedDate) {
       newErrors.receivedDate = 'Received date is required';
+    }
+
+    if (!formData.supplier.trim()) {
+      newErrors.supplier = 'Supplier is required';
     }
 
     if (formData.receivedProducts.length === 0) {
@@ -220,37 +234,32 @@ const InvoiceReceivingForm: React.FC = () => {
 
     try {
       setSaving(true);
+      setUploadProgress(0);
       
-      // Create FormData for file upload
-      const submitData = new FormData();
-      
-      // Add form fields
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key === 'receivedProducts' || key === 'documents') {
-          submitData.append(key, JSON.stringify(value));
-        } else {
-          submitData.append(key, value.toString());
-        }
-      });
-      
-      // Add uploaded files
-      uploadedFiles.forEach(file => {
-        submitData.append('files', file);
-      });
+      const submitData = { ...formData };
       
       if (isEdit && id) {
-        await invoiceReceivingAPI.updateInvoiceReceiving(id, submitData);
+        const response = await invoiceReceivingAPI.updateInvoiceReceiving(
+          id, 
+          submitData, 
+          (progress) => setUploadProgress(progress)
+        );
         toast.success('Invoice receiving updated successfully');
       } else {
-        await invoiceReceivingAPI.createInvoiceReceiving(submitData);
+        const response = await invoiceReceivingAPI.createInvoiceReceiving(
+          submitData,
+          (progress) => setUploadProgress(progress)
+        );
         toast.success('Invoice receiving created successfully');
       }
       
       navigate('/invoice-receiving');
     } catch (error: any) {
+      console.error('Save error:', error);
       toast.error(error.response?.data?.message || 'Failed to save invoice receiving');
     } finally {
       setSaving(false);
+      setUploadProgress(0);
     }
   };
 
@@ -260,6 +269,10 @@ const InvoiceReceivingForm: React.FC = () => {
 
   const calculateTotalOrdered = () => {
     return formData.receivedProducts.reduce((sum, product) => sum + product.orderedQuantity, 0);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return invoiceReceivingAPI.formatCurrency(amount);
   };
 
   if (loading) {
@@ -316,7 +329,7 @@ const InvoiceReceivingForm: React.FC = () => {
                 <option value="">Select a purchase order</option>
                 {purchaseOrders.map(po => (
                   <option key={po._id} value={po._id}>
-                    {po.poNumber} - {po.supplier}
+                    {po.poNumber} - {po.principal?.name}
                   </option>
                 ))}
               </select>
@@ -327,16 +340,21 @@ const InvoiceReceivingForm: React.FC = () => {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Supplier
+                Supplier *
               </label>
               <input
                 type="text"
                 value={formData.supplier}
                 onChange={(e) => handleInputChange('supplier', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.supplier ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder="Supplier name"
-                readOnly
+                readOnly={!!selectedPO}
               />
+              {errors.supplier && (
+                <p className="text-red-600 text-sm mt-1">{errors.supplier}</p>
+              )}
             </div>
           </div>
           
@@ -354,7 +372,7 @@ const InvoiceReceivingForm: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-blue-700 font-medium">Total Products:</span>
-                  <p className="text-blue-900">{selectedPO.productLines?.length || 0}</p>
+                  <p className="text-blue-900">{selectedPO.products?.length || 0}</p>
                 </div>
               </div>
             </div>
@@ -472,8 +490,9 @@ const InvoiceReceivingForm: React.FC = () => {
                   {formData.receivedProducts.map((product, index) => (
                     <tr key={index}>
                       <td className="px-4 py-2">
-                        <div className="font-medium">{product.productName}</div>
-                        <div className="text-sm text-gray-500">Unit: {product.unit}</div>
+                        <div className="font-medium text-sm">{product.productName}</div>
+                        <div className="text-xs text-gray-500">{product.productCode}</div>
+                        <div className="text-xs text-gray-500">Unit: {product.unit}</div>
                       </td>
                       <td className="px-4 py-2">
                         <div className="font-medium">{product.orderedQuantity}</div>
@@ -559,7 +578,11 @@ const InvoiceReceivingForm: React.FC = () => {
                 <div className="space-y-2">
                   {uploadedFiles.map((file, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-sm text-gray-700">{file.name}</span>
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm text-gray-700">{file.name}</span>
+                        <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => removeFile(index)}
@@ -611,6 +634,22 @@ const InvoiceReceivingForm: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Upload Progress */}
+        {saving && uploadProgress > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Uploading...</span>
+              <span className="text-sm text-gray-600">{uploadProgress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
 
         {/* Form Actions */}
         <div className="flex justify-end space-x-4">
