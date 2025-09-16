@@ -1,4 +1,4 @@
-// src/components/Workflow/WorkflowStageForm.tsx
+// src/components/Workflow/WorkflowStageForm.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -85,7 +85,7 @@ const WorkflowStageForm: React.FC = () => {
 
   useEffect(() => {
     loadAvailableStages();
-    if (isEditing) {
+    if (isEditing && id && id !== 'new') {
       loadStage();
     }
   }, [id, isEditing]);
@@ -93,8 +93,11 @@ const WorkflowStageForm: React.FC = () => {
   const loadAvailableStages = async () => {
     try {
       const response = await workflowAPI.getWorkflowStages();
-      setAvailableStages(response.data);
+      console.log('Available stages response:', response);
+      const stagesData = response.stages || response.data?.stages || [];
+      setAvailableStages(Array.isArray(stagesData) ? stagesData : []);
     } catch (error: any) {
+      console.error('Error loading available stages:', error);
       toast.error('Failed to load available stages');
     }
   };
@@ -105,20 +108,28 @@ const WorkflowStageForm: React.FC = () => {
     try {
       setLoading(true);
       const response = await workflowAPI.getWorkflowStage(id);
-      const stage = response.data;
+      console.log('Stage response:', response);
+      const stage = response.stage || response.data?.stage;
       
-      setFormData({
-        name: stage.name,
-        code: stage.code,
-        description: stage.description || '',
-        sequence: stage.sequence,
-        isActive: stage.isActive,
-        requiredPermissions: stage.requiredPermissions || [],
-        nextStages: stage.nextStages || [],
-        allowedActions: stage.allowedActions || [],
-        autoTransitionRules: stage.autoTransitionRules || []
-      });
+      if (stage) {
+        setFormData({
+          name: stage.name || '',
+          code: stage.code || '',
+          description: stage.description || '',
+          sequence: stage.sequence || 1,
+          isActive: stage.isActive !== undefined ? stage.isActive : true,
+          requiredPermissions: stage.requiredPermissions?.map((p: any) => 
+            typeof p === 'string' ? p : p._id || p.name
+          ) || [],
+          nextStages: stage.nextStages?.map((s: any) => 
+            typeof s === 'string' ? s : s._id || s.code
+          ) || [],
+          allowedActions: stage.allowedActions || [],
+          autoTransitionRules: stage.autoTransitionRules || []
+        });
+      }
     } catch (error: any) {
+      console.error('Error loading workflow stage:', error);
       toast.error('Failed to load workflow stage');
       navigate('/workflow/stages');
     } finally {
@@ -134,19 +145,36 @@ const WorkflowStageForm: React.FC = () => {
       return;
     }
 
+    if (formData.allowedActions.length === 0) {
+      toast.error('At least one allowed action is required');
+      return;
+    }
+
     try {
       setSaving(true);
       
-      if (isEditing) {
-        await workflowAPI.updateWorkflowStage(id!, formData);
+      const submitData = {
+        name: formData.name.trim(),
+        code: formData.code.trim().toUpperCase(),
+        description: formData.description.trim(),
+        sequence: formData.sequence,
+        isActive: formData.isActive,
+        requiredPermissions: formData.requiredPermissions,
+        allowedActions: formData.allowedActions,
+        nextStages: formData.nextStages
+      };
+      
+      if (isEditing && id && id !== 'new') {
+        await workflowAPI.updateWorkflowStage(id, submitData);
         toast.success('Workflow stage updated successfully');
       } else {
-        await workflowAPI.createWorkflowStage(formData);
+        await workflowAPI.createWorkflowStage(submitData);
         toast.success('Workflow stage created successfully');
       }
       
       navigate('/workflow/stages');
     } catch (error: any) {
+      console.error('Error saving workflow stage:', error);
       toast.error(error.response?.data?.message || 'Failed to save workflow stage');
     } finally {
       setSaving(false);
@@ -205,7 +233,10 @@ const WorkflowStageForm: React.FC = () => {
   };
 
   const canManageWorkflow = () => {
-    return user?.permissions?.includes('workflow_management') || user?.role === 'admin';
+    return user?.permissions?.includes('workflow_management') || 
+           user?.permissions?.includes('workflow_stages:create') ||
+           user?.permissions?.includes('workflow_stages:update') ||
+           user?.role === 'admin';
   };
 
   if (!canManageWorkflow()) {
@@ -214,6 +245,12 @@ const WorkflowStageForm: React.FC = () => {
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
         <p className="text-gray-500">You don't have permission to manage workflow stages.</p>
+        <button
+          onClick={() => navigate('/workflow/stages')}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Back to Stages
+        </button>
       </div>
     );
   }
@@ -276,9 +313,12 @@ const WorkflowStageForm: React.FC = () => {
               <input
                 type="text"
                 value={formData.code}
-                onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toLowerCase().replace(/\s+/g, '_') }))}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_') 
+                }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter stage code"
+                placeholder="Enter stage code (e.g., DRAFT, REVIEW)"
                 required
               />
             </div>
@@ -320,6 +360,65 @@ const WorkflowStageForm: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter stage description"
             />
+          </div>
+        </div>
+
+        {/* Allowed Actions */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <Settings className="w-5 h-5 mr-2" />
+            Allowed Actions *
+          </h3>
+          
+          <div className="space-y-4">
+            <div className="flex space-x-2">
+              <select
+                value={newAction}
+                onChange={(e) => setNewAction(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select action to add</option>
+                {availableActions
+                  .filter(action => !formData.allowedActions.includes(action))
+                  .map(action => (
+                    <option key={action} value={action}>
+                      {action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </option>
+                  ))
+                }
+              </select>
+              
+              <button
+                type="button"
+                onClick={addAction}
+                disabled={!newAction}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              {formData.allowedActions.map(action => (
+                <span
+                  key={action}
+                  className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800"
+                >
+                  {action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  <button
+                    type="button"
+                    onClick={() => removeAction(action)}
+                    className="ml-2 text-purple-600 hover:text-purple-800"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            
+            {formData.allowedActions.length === 0 && (
+              <p className="text-sm text-red-600">At least one action is required</p>
+            )}
           </div>
         </div>
 
@@ -433,63 +532,8 @@ const WorkflowStageForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Allowed Actions */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Settings className="w-5 h-5 mr-2" />
-            Allowed Actions
-          </h3>
-          
-          <div className="space-y-4">
-            <div className="flex space-x-2">
-              <select
-                value={newAction}
-                onChange={(e) => setNewAction(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select action to add</option>
-                {availableActions
-                  .filter(action => !formData.allowedActions.includes(action))
-                  .map(action => (
-                    <option key={action} value={action}>
-                      {action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </option>
-                  ))
-                }
-              </select>
-              
-              <button
-                type="button"
-                onClick={addAction}
-                disabled={!newAction}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              {formData.allowedActions.map(action => (
-                <span
-                  key={action}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800"
-                >
-                  {action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  <button
-                    type="button"
-                    onClick={() => removeAction(action)}
-                    className="ml-2 text-purple-600 hover:text-purple-800"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* Form Actions */}
-        <div className="flex justify-end space-x-4">
+        <div className="flex justify-end space-x-4 pb-6">
           <button
             type="button"
             onClick={() => navigate('/workflow/stages')}
@@ -500,7 +544,7 @@ const WorkflowStageForm: React.FC = () => {
           
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || formData.allowedActions.length === 0}
             className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? (

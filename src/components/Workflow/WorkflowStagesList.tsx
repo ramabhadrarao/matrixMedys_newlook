@@ -1,4 +1,4 @@
-// src/components/Workflow/WorkflowStagesList.tsx
+// src/components/Workflow/WorkflowStagesList.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { workflowAPI, WorkflowStage } from '../../services/workflowAPI';
 import { useAuthStore } from '../../store/authStore';
+import UserAssignmentModal from './UserAssignmentModal';
 import toast from 'react-hot-toast';
 
 const WorkflowStagesList: React.FC = () => {
@@ -26,6 +27,8 @@ const WorkflowStagesList: React.FC = () => {
   const [filterType, setFilterType] = useState('all');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<WorkflowStage | null>(null);
+  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadStages();
@@ -35,11 +38,15 @@ const WorkflowStagesList: React.FC = () => {
     try {
       setLoading(true);
       const response = await workflowAPI.getWorkflowStages();
-      // FIX: Access the stages property from the response
-      setStages(response.stages || []); // Use response.stages instead of response.data
+      console.log('Workflow stages API response:', response);
+      
+      // FIX: Properly access the stages property from the response
+      const stagesData = response.stages || response.data?.stages || [];
+      setStages(Array.isArray(stagesData) ? stagesData : []);
     } catch (error: any) {
       toast.error('Failed to load workflow stages');
       console.error('Error loading stages:', error);
+      setStages([]); // Set empty array as fallback
     } finally {
       setLoading(false);
     }
@@ -59,7 +66,22 @@ const WorkflowStagesList: React.FC = () => {
     }
   };
 
-  // Add defensive check for stages array
+  const handleOpenAssignmentModal = (stageId: string, stageName: string) => {
+    setSelectedStage({ id: stageId, name: stageName });
+    setAssignmentModalOpen(true);
+  };
+
+  const handleCloseAssignmentModal = () => {
+    setAssignmentModalOpen(false);
+    setSelectedStage(null);
+  };
+
+  const handleAssignmentUpdate = () => {
+    // Optionally reload stages or show a success message
+    toast.success('Stage assignments updated');
+  };
+
+  // Add defensive check for stages array before filtering
   const filteredStages = (stages || []).filter(stage => {
     const matchesSearch = stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          stage.code.toLowerCase().includes(searchTerm.toLowerCase());
@@ -250,13 +272,13 @@ const WorkflowStagesList: React.FC = () => {
                     {canManageWorkflow() && (
                       <td className="px-6 py-4 text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            to={`/workflow/stages/${stage._id}/permissions`}
+                          <button
+                            onClick={() => handleOpenAssignmentModal(stage._id, stage.name)}
                             className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                            title="Manage Permissions"
+                            title="Manage User Assignments"
                           >
                             <Users className="w-4 h-4" />
-                          </Link>
+                          </button>
                           
                           <Link
                             to={`/workflow/stages/${stage._id}/edit`}
@@ -320,6 +342,17 @@ const WorkflowStagesList: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* User Assignment Modal */}
+      {assignmentModalOpen && selectedStage && (
+        <UserAssignmentModal
+          isOpen={assignmentModalOpen}
+          onClose={handleCloseAssignmentModal}
+          stageId={selectedStage.id}
+          stageName={selectedStage.name}
+          onAssignmentUpdate={handleAssignmentUpdate}
+        />
       )}
     </div>
   );

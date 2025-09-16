@@ -1,4 +1,4 @@
-// src/services/workflowAPI.ts
+// src/services/workflowAPI.ts - COMPLETE UPDATED VERSION
 import api from './api';
 
 // Interfaces
@@ -392,6 +392,58 @@ export const workflowAPI = {
     }
   },
 
+  // ===== MISSING METHODS FOR USER ASSIGNMENT =====
+
+  // Get stage assignments (alias for getStageUsers)
+  getStageAssignments: async (stageId: string): Promise<{ users: StagePermission[] }> => {
+    return workflowAPI.getStageUsers(stageId, true);
+  },
+
+  // Update stage assignments (bulk update method)
+  updateStageAssignments: async (stageId: string, data: { userIds: string[] }): Promise<{ message: string }> => {
+    try {
+      console.log('Updating stage assignments for stage:', stageId, data);
+      
+      // First, get current assignments
+      const currentResponse = await workflowAPI.getStageUsers(stageId, true);
+      const currentUserIds = currentResponse.users
+        .filter(user => user.isActive)
+        .map(user => typeof user.userId === 'string' ? user.userId : user.userId._id);
+      
+      // Find users to assign and revoke
+      const usersToAssign = data.userIds.filter(userId => !currentUserIds.includes(userId));
+      const usersToRevoke = currentUserIds.filter(userId => !data.userIds.includes(userId));
+      
+      // Create assignment operations
+      const assignments = usersToAssign.map(userId => ({
+        userId,
+        stageId,
+        permissions: [], // Default empty permissions, can be configured later
+      }));
+      
+      // Execute bulk assignment if there are new users
+      if (assignments.length > 0) {
+        await workflowAPI.bulkAssignPermissions({
+          assignments,
+          overwrite: false
+        });
+      }
+      
+      // Revoke permissions for removed users
+      for (const userId of usersToRevoke) {
+        await workflowAPI.revokeStagePermissions({
+          userId,
+          stageId
+        });
+      }
+      
+      return { message: 'Stage assignments updated successfully' };
+    } catch (error) {
+      console.error('Error updating stage assignments:', error);
+      throw error;
+    }
+  },
+
   // ===== WORKFLOW OPERATIONS =====
   
   // Validate workflow action
@@ -403,6 +455,23 @@ export const workflowAPI = {
       return response.data;
     } catch (error) {
       console.error('Error validating workflow action:', error);
+      throw error;
+    }
+  },
+
+  // Execute workflow transition (for TransitionModal)
+  executeTransition: async (formData: FormData): Promise<{ message: string }> => {
+    try {
+      console.log('Executing workflow transition');
+      const response = await api.post('/workflow/execute-transition', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log('Execute transition response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error executing transition:', error);
       throw error;
     }
   },

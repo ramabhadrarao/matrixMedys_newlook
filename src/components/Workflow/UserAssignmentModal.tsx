@@ -1,4 +1,4 @@
-// src/components/Workflow/UserAssignmentModal.tsx
+// src/components/Workflow/UserAssignmentModal.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -24,12 +24,26 @@ interface UserAssignmentModalProps {
   onAssignmentUpdate?: () => void;
 }
 
-interface StageAssignment {
-  userId: string;
-  user: UserType;
-  assignedAt: string;
-  assignedBy: string;
+interface StageUser {
+  _id: string;
+  userId: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  stageId: string;
+  permissions: Array<{
+    _id: string;
+    name: string;
+    resource: string;
+    action: string;
+  }>;
   isActive: boolean;
+  assignedBy: {
+    _id: string;
+    name: string;
+  };
+  createdAt: string;
 }
 
 const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
@@ -40,16 +54,16 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
   onAssignmentUpdate
 }) => {
   const [users, setUsers] = useState<UserType[]>([]);
-  const [assignments, setAssignments] = useState<StageAssignment[]>([]);
+  const [stageUsers, setStageUsers] = useState<StageUser[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && stageId) {
       loadUsers();
-      loadAssignments();
+      loadStageUsers();
     }
   }, [isOpen, stageId]);
 
@@ -58,28 +72,32 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
       setLoading(true);
       const response = await usersAPI.getUsers({ 
         page: 1, 
-        limit: 100, 
-        status: 'active' 
+        limit: 100
       });
-      setUsers(response.data.users);
+      console.log('Users response:', response.data);
+      setUsers(response.data.users || []);
     } catch (error: any) {
+      console.error('Error loading users:', error);
       toast.error('Failed to load users');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadAssignments = async () => {
+  const loadStageUsers = async () => {
     try {
-      const response = await workflowAPI.getStageAssignments(stageId);
-      setAssignments(response.data);
+      const response = await workflowAPI.getStageUsers(stageId, true);
+      console.log('Stage users response:', response);
+      const stageUsersList = response.users || [];
+      setStageUsers(stageUsersList);
       
       // Set currently assigned users as selected
-      const assignedUserIds = response.data
-        .filter((assignment: StageAssignment) => assignment.isActive)
-        .map((assignment: StageAssignment) => assignment.userId);
+      const assignedUserIds = stageUsersList
+        .filter((assignment: StageUser) => assignment.isActive)
+        .map((assignment: StageUser) => assignment.userId._id);
       setSelectedUsers(new Set(assignedUserIds));
     } catch (error: any) {
+      console.error('Error loading stage users:', error);
       toast.error('Failed to load stage assignments');
     }
   };
@@ -98,11 +116,50 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
     try {
       setSaving(true);
       
-      const assignmentData = {
-        userIds: Array.from(selectedUsers)
-      };
+      // Get currently assigned user IDs
+      const currentlyAssigned = stageUsers
+        .filter(su => su.isActive)
+        .map(su => su.userId._id);
       
-      await workflowAPI.updateStageAssignments(stageId, assignmentData);
+      const selectedArray = Array.from(selectedUsers);
+      
+      // Find users to assign (newly selected)
+      const usersToAssign = selectedArray.filter(userId => 
+        !currentlyAssigned.includes(userId)
+      );
+      
+      // Find users to revoke (previously assigned but not selected)
+      const usersToRevoke = currentlyAssigned.filter(userId => 
+        !selectedArray.includes(userId)
+      );
+      
+      // Process assignments and revocations
+      const promises: Promise<any>[] = [];
+      
+      // Assign new users
+      usersToAssign.forEach(userId => {
+        promises.push(
+          workflowAPI.assignStagePermissions({
+            userId,
+            stageId,
+            permissions: [], // You may want to set default permissions here
+          })
+        );
+      });
+      
+      // Revoke users
+      usersToRevoke.forEach(userId => {
+        promises.push(
+          workflowAPI.revokeStagePermissions({
+            userId,
+            stageId
+          })
+        );
+      });
+      
+      // Execute all operations
+      await Promise.all(promises);
+      
       toast.success('User assignments updated successfully');
       
       if (onAssignmentUpdate) {
@@ -111,6 +168,7 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
       
       onClose();
     } catch (error: any) {
+      console.error('Error updating assignments:', error);
       toast.error('Failed to update user assignments');
     } finally {
       setSaving(false);
@@ -126,8 +184,8 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
   });
 
   const getAssignmentInfo = (userId: string) => {
-    return assignments.find(assignment => 
-      assignment.userId === userId && assignment.isActive
+    return stageUsers.find(su => 
+      su.userId._id === userId && su.isActive
     );
   };
 
@@ -161,7 +219,7 @@ const UserAssignmentModal: React.FC<UserAssignmentModalProps> = ({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search users by name, email, or role..."
+              placeholder="Search users by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
