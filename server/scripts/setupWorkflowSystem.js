@@ -346,13 +346,13 @@ async function setupWorkflowSystem() {
         name: 'Warehouse Manager',
         email: 'warehouse@matrixmedys.com',
         password: 'password123',
-        permissions: ['po_view', 'po_receive', 'invoice_receiving_create']
+        permissions: ['po_view', 'po_receive', 'invoice_receiving_view', 'invoice_receiving_create', 'invoice_receiving_update', 'invoice_receiving_qc_submit']
       },
       {
         name: 'QC Manager',
         email: 'qc@matrixmedys.com',
         password: 'password123',
-        permissions: ['po_view', 'po_qc_check', 'po_qc_approve', 'po_qc_reject']
+        permissions: ['po_view', 'po_qc_check', 'po_qc_approve', 'po_qc_reject', 'invoice_receiving_view', 'invoice_receiving_qc_check', 'invoice_receiving_qc_approve', 'invoice_receiving_qc_reject']
       }
     ];
     
@@ -408,12 +408,12 @@ async function setupWorkflowSystem() {
       {
         userEmail: 'warehouse@matrixmedys.com',
         stageCodes: ['ORDERED', 'RECEIVED'],
-        permissions: ['po_view', 'po_receive', 'invoice_receiving_create']
+        permissions: ['po_view', 'po_receive', 'invoice_receiving_view', 'invoice_receiving_create', 'invoice_receiving_update', 'invoice_receiving_qc_submit']
       },
       {
         userEmail: 'qc@matrixmedys.com',
         stageCodes: ['QC_PENDING', 'QC_PASSED', 'QC_FAILED'],
-        permissions: ['po_view', 'po_qc_check', 'po_qc_approve', 'po_qc_reject']
+        permissions: ['po_view', 'po_qc_check', 'po_qc_approve', 'po_qc_reject', 'invoice_receiving_view', 'invoice_receiving_qc_check', 'invoice_receiving_qc_approve', 'invoice_receiving_qc_reject']
       }
     ];
     

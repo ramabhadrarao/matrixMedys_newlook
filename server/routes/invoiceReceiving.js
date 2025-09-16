@@ -25,11 +25,11 @@ const invoiceValidation = [
 ];
 
 // Routes
-router.get('/', authenticate, checkPermission('po_receiving', 'receive'), getInvoiceReceivings);
+router.get('/', authenticate, checkPermission('invoice_receiving', 'view'), getInvoiceReceivings);
 
 router.post('/', 
   authenticate, 
-  checkPermission('po_receiving', 'receive'),
+  checkPermission('invoice_receiving', 'create'),
   uploadMixedFiles,
   handleUploadError,
   invoiceValidation,
@@ -39,13 +39,13 @@ router.post('/',
 
 router.post('/:id/submit-qc', 
   authenticate, 
-  checkPermission('po_receiving', 'receive'), 
+  checkPermission('invoice_receiving', 'qc_submit'), 
   submitToQC
 );
 
 router.post('/:id/qc-check', 
   authenticate, 
-  checkPermission('po_receiving', 'qc_check'), 
+  checkPermission('invoice_receiving', 'qc_check'), 
   performQCCheck
 );
 

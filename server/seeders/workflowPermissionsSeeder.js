@@ -55,10 +55,12 @@ const workflowPermissions = [
 { name: 'workflow_stages_delete', description: 'Delete workflow stages', resource: 'workflow_stages', action: 'delete' },
 { name: 'workflow_stages_view', description: 'View workflow stages', resource: 'workflow_stages', action: 'view' },
 // Missing invoice receiving permissions
+{ name: 'invoice_receiving_view', description: 'View invoice receiving records', resource: 'invoice_receiving', action: 'view' },
 { name: 'invoice_receiving_create', description: 'Create invoice receiving records', resource: 'invoice_receiving', action: 'create' },
 { name: 'invoice_receiving_update', description: 'Update invoice receiving records', resource: 'invoice_receiving', action: 'update' },
 { name: 'invoice_receiving_delete', description: 'Delete invoice receiving records', resource: 'invoice_receiving', action: 'delete' },
 { name: 'invoice_receiving_qc_submit', description: 'Submit for QC', resource: 'invoice_receiving', action: 'qc_submit' },
+{ name: 'invoice_receiving_qc_check', description: 'Perform QC check', resource: 'invoice_receiving', action: 'qc_check' },
 { name: 'invoice_receiving_qc_approve', description: 'Approve QC results', resource: 'invoice_receiving', action: 'qc_approve' },
 { name: 'invoice_receiving_qc_reject', description: 'Reject QC results', resource: 'invoice_receiving', action: 'qc_reject' },
 // Missing workflow reporting permissions
