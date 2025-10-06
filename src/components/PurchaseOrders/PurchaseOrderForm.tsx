@@ -410,20 +410,30 @@ const PurchaseOrderForm: React.FC = () => {
   };
 
   const handleAddProduct = (product: any) => {
+    const unitPrice = product.dealerPrice || 0;
+    const quantity = 1;
+    const foc = 0;
+    const discount = 0;
+    
+    // Calculate initial totalCost
+    const effectiveQty = quantity - foc;
+    const baseAmount = effectiveQty * unitPrice;
+    const totalCost = Math.max(0, baseAmount - discount);
+    
     const newProduct: ProductLine = {
       _id: Math.random().toString(),
       product: product._id,
       productCode: product.code,
       productName: product.name,
       description: product.specification || '',
-      unitPrice: product.dealerPrice || 0,
-      quantity: 1,
-      foc: 0,
-      discount: 0,
+      unitPrice: unitPrice,
+      quantity: quantity,
+      foc: foc,
+      discount: discount,
       discountType: 'percentage',
       unit: product.unit,
       gstRate: product.gstPercentage,
-      totalCost: 0,
+      totalCost: totalCost,
       remarks: ''
     };
     
@@ -442,6 +452,23 @@ const PurchaseOrderForm: React.FC = () => {
       ...updatedProducts[index],
       [field]: value
     };
+    
+    // Calculate totalCost for the updated product line
+    const product = updatedProducts[index];
+    const effectiveQty = (product.quantity || 0) - (product.foc || 0);
+    const baseAmount = effectiveQty * (product.unitPrice || 0);
+    
+    let discount = 0;
+    if (product.discount && product.discount > 0) {
+      if (product.discountType === 'percentage') {
+        discount = (baseAmount * product.discount) / 100;
+      } else {
+        discount = product.discount;
+      }
+    }
+    
+    updatedProducts[index].totalCost = Math.max(0, baseAmount - discount);
+    
     setFormData(prev => ({ ...prev, products: updatedProducts }));
   };
 
