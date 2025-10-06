@@ -13,11 +13,14 @@ export const createInvoiceReceiving = async (req, res) => {
       dueDate,
       receivedDate,
       receivedProducts,
+      products, // Also check for products field
       notes,
       qcRequired = true
     } = req.body;
     
     console.log('Creating invoice receiving with data:', req.body);
+    console.log('receivedProducts:', receivedProducts);
+    console.log('products:', products);
     
     // Validate PO exists and is in correct status
     const po = await PurchaseOrder.findById(purchaseOrder);
@@ -31,15 +34,18 @@ export const createInvoiceReceiving = async (req, res) => {
       });
     }
     
-    // Parse receivedProducts if it's a string (from FormData)
-    let productsArray = receivedProducts;
-    if (typeof receivedProducts === 'string') {
+    // Parse products data - check both receivedProducts and products fields
+    let productsArray = products || receivedProducts;
+    if (typeof productsArray === 'string') {
       try {
-        productsArray = JSON.parse(receivedProducts);
+        productsArray = JSON.parse(productsArray);
       } catch (e) {
+        console.error('Error parsing products data:', e);
         return res.status(400).json({ message: 'Invalid products data format' });
       }
     }
+    
+    console.log('Parsed productsArray:', productsArray);
     
     // Validate received products - allow zero quantities but require products array
     if (!productsArray || !Array.isArray(productsArray)) {

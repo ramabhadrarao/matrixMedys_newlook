@@ -244,7 +244,7 @@ export const invoiceReceivingAPI = {
               formData.append('documents', file);
             });
           } else if (key === 'receivedProducts' && Array.isArray(value)) {
-            formData.append('receivedProducts', JSON.stringify(value));
+            formData.append('products', JSON.stringify(value));
           } else {
             formData.append(key, value.toString());
           }
