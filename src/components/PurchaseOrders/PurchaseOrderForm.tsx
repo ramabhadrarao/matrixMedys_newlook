@@ -11,6 +11,7 @@ import { purchaseOrderAPI } from '../../services/purchaseOrderAPI';
 import { principalAPI } from '../../services/principalAPI';
 import { branchAPI } from '../../services/branchAPI';
 import { warehouseAPI } from '../../services/warehouseAPI';
+import { hospitalAPI } from '../../services/hospitalAPI';
 import { productAPI } from '../../services/productAPI';
 import { useAuthStore } from '../../store/authStore';
 
@@ -47,6 +48,7 @@ const PurchaseOrderForm: React.FC = () => {
   const [principals, setPrincipals] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [hospitals, setHospitals] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
   
@@ -70,7 +72,10 @@ const PurchaseOrderForm: React.FC = () => {
     poDate: new Date().toISOString().split('T')[0],
     
     // Bill To
+    billToType: 'branch',
     billToBranch: '',
+    billToWarehouse: '',
+    billToHospital: '',
     billTo: {
       branchWarehouse: '',
       name: 'MATRYX MEDISYS PRIVATE LIMITED',
@@ -143,10 +148,24 @@ const PurchaseOrderForm: React.FC = () => {
   }, [formData.principal]);
 
   useEffect(() => {
-    if (formData.billToBranch) {
-      updateBillToDetails();
+    if (formData.billToBranch && formData.billToType === 'branch') {
+      updateBillToDetails('branch');
+    } else if (formData.billToBranch && formData.billToType === 'warehouse') {
+      loadWarehouses(formData.billToBranch);
     }
-  }, [formData.billToBranch]);
+  }, [formData.billToBranch, formData.billToType]);
+
+  useEffect(() => {
+    if (formData.billToWarehouse && formData.billToType === 'warehouse') {
+      updateBillToDetails('warehouse');
+    }
+  }, [formData.billToWarehouse, formData.billToType]);
+
+  useEffect(() => {
+    if (formData.billToHospital && formData.billToType === 'hospital') {
+      updateBillToDetails('hospital');
+    }
+  }, [formData.billToHospital, formData.billToType]);
 
   useEffect(() => {
     if (formData.shipToBranch && formData.shipToType === 'branch') {
@@ -168,13 +187,15 @@ const PurchaseOrderForm: React.FC = () => {
   const loadMasterData = async () => {
     try {
       setLoading(true);
-      const [principalsRes, branchesRes] = await Promise.all([
+      const [principalsRes, branchesRes, hospitalsRes] = await Promise.all([
         principalAPI.getPrincipals({ limit: 100 }),
-        branchAPI.getBranches({ limit: 100 })
+        branchAPI.getBranches({ limit: 100 }),
+        hospitalAPI.getHospitals({ limit: 100 })
       ]);
       
       setPrincipals(principalsRes.data.principals || []);
       setBranches(branchesRes.data.branches || []);
+      setHospitals(hospitalsRes.data.hospitals || []);
     } catch (error) {
       toast.error('Failed to load master data');
     } finally {
@@ -293,20 +314,52 @@ const PurchaseOrderForm: React.FC = () => {
     }
   };
 
-  const updateBillToDetails = () => {
-    const branch = branches.find(b => b._id === formData.billToBranch);
-    if (branch) {
-      setFormData(prev => ({
-        ...prev,
-        billTo: {
-          branchWarehouse: branch.name,
-          name: 'MATRYX MEDISYS PRIVATE LIMITED',
-          address: `${branch.gstAddress}, ${branch.city}, ${branch.state?.name || ''} - ${branch.pincode}`,
-          gstin: branch.gstNumber,
-          drugLicense: branch.drugLicenseNumber,
-          phone: branch.phone
-        }
-      }));
+  const updateBillToDetails = (type: 'branch' | 'warehouse' | 'hospital') => {
+    if (type === 'branch') {
+      const branch = branches.find(b => b._id === formData.billToBranch);
+      if (branch) {
+        setFormData(prev => ({
+          ...prev,
+          billTo: {
+            branchWarehouse: branch.name,
+            name: 'MATRYX MEDISYS PRIVATE LIMITED',
+            address: `${branch.gstAddress}, ${branch.city}, ${branch.state?.name || ''} - ${branch.pincode}`,
+            gstin: branch.gstNumber,
+            drugLicense: branch.drugLicenseNumber,
+            phone: branch.phone
+          }
+        }));
+      }
+    } else if (type === 'warehouse') {
+      const warehouse = warehouses.find(w => w._id === formData.billToWarehouse);
+      if (warehouse) {
+        setFormData(prev => ({
+          ...prev,
+          billTo: {
+            branchWarehouse: warehouse.name,
+            name: warehouse.name,
+            address: `${warehouse.address}, ${warehouse.district} - ${warehouse.pincode}`,
+            gstin: warehouse.gstNumber || '',
+            drugLicense: warehouse.drugLicenseNumber || '',
+            phone: warehouse.phone || ''
+          }
+        }));
+      }
+    } else if (type === 'hospital') {
+      const hospital = hospitals.find(h => h._id === formData.billToHospital);
+      if (hospital) {
+        setFormData(prev => ({
+          ...prev,
+          billTo: {
+            branchWarehouse: hospital.name,
+            name: hospital.name,
+            address: `${hospital.gstAddress}, ${hospital.city}, ${hospital.state?.name || ''} - ${hospital.pincode}`,
+            gstin: hospital.gstNumber,
+            drugLicense: '',
+            phone: hospital.phone
+          }
+        }));
+      }
     }
   };
 
@@ -685,30 +738,227 @@ const PurchaseOrderForm: React.FC = () => {
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Branch *
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Bill To Type *
               </label>
-              <select
-                value={formData.billToBranch}
-                onChange={(e) => setFormData(prev => ({ ...prev, billToBranch: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select Branch</option>
-                {branches.map(branch => (
-                  <option key={branch._id} value={branch._id}>
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-3 gap-3">
+                <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.billToType === 'branch' 
+                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}>
+                  <input
+                    type="radio"
+                    value="branch"
+                    checked={formData.billToType === 'branch'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      billToType: 'branch',
+                      billToWarehouse: '', // Clear warehouse selection
+                      billToHospital: '', // Clear hospital selection
+                      billTo: { branchWarehouse: '', name: '', address: '', gstin: '', drugLicense: '', phone: '' }
+                    }))}
+                    className="sr-only"
+                  />
+                  <div className="text-center">
+                    <div className="font-medium">Branch</div>
+                    <div className="text-xs text-gray-500">Bill to branch</div>
+                  </div>
+                </label>
+                <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.billToType === 'warehouse' 
+                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}>
+                  <input
+                    type="radio"
+                    value="warehouse"
+                    checked={formData.billToType === 'warehouse'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      billToType: 'warehouse',
+                      billToBranch: '', // Clear branch selection
+                      billToHospital: '', // Clear hospital selection
+                      billTo: { branchWarehouse: '', name: '', address: '', gstin: '', drugLicense: '', phone: '' }
+                    }))}
+                    className="sr-only"
+                  />
+                  <div className="text-center">
+                    <div className="font-medium">Warehouse</div>
+                    <div className="text-xs text-gray-500">Bill to warehouse</div>
+                  </div>
+                </label>
+                <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.billToType === 'hospital' 
+                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}>
+                  <input
+                    type="radio"
+                    value="hospital"
+                    checked={formData.billToType === 'hospital'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      billToType: 'hospital',
+                      billToBranch: '', // Clear branch selection
+                      billToWarehouse: '', // Clear warehouse selection
+                      billTo: { branchWarehouse: '', name: '', address: '', gstin: '', drugLicense: '', phone: '' }
+                    }))}
+                    className="sr-only"
+                  />
+                  <div className="text-center">
+                    <div className="font-medium">Hospital</div>
+                    <div className="text-xs text-gray-500">Bill to hospital</div>
+                  </div>
+                </label>
+              </div>
             </div>
             
+            {formData.billToType === 'branch' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Branch *
+                </label>
+                <select
+                  value={formData.billToBranch}
+                  onChange={(e) => setFormData(prev => ({ ...prev, billToBranch: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Choose a branch for billing...</option>
+                  {branches.map(branch => (
+                    <option key={branch._id} value={branch._id}>
+                      {branch.name} - {branch.city}, {branch.state?.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : formData.billToType === 'warehouse' ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Branch (to load warehouses) *
+                  </label>
+                  <select
+                    value={formData.billToBranch}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      billToBranch: e.target.value,
+                      billToWarehouse: '', // Clear warehouse when branch changes
+                      billTo: { branchWarehouse: '', name: '', address: '', gstin: '', drugLicense: '', phone: '' }
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Choose a branch first...</option>
+                    {branches.map(branch => (
+                      <option key={branch._id} value={branch._id}>
+                        {branch.name} - {branch.city}, {branch.state?.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Warehouse *
+                  </label>
+                  <select
+                    value={formData.billToWarehouse}
+                    onChange={(e) => setFormData(prev => ({ ...prev, billToWarehouse: e.target.value }))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      !formData.billToBranch 
+                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' 
+                        : 'border-gray-300'
+                    }`}
+                    disabled={!formData.billToBranch}
+                  >
+                    <option value="">
+                      {!formData.billToBranch ? 'Select a branch first...' : 'Choose a warehouse...'}
+                    </option>
+                    {warehouses.map(warehouse => (
+                      <option key={warehouse._id} value={warehouse._id}>
+                        {warehouse.name} - {warehouse.district}
+                      </option>
+                    ))}
+                  </select>
+                  {!formData.billToBranch && (
+                    <div className="flex items-center mt-2 text-xs text-amber-600">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      Please select a branch first to load available warehouses
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Hospital *
+                </label>
+                <select
+                  value={formData.billToHospital}
+                  onChange={(e) => setFormData(prev => ({ ...prev, billToHospital: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Choose a hospital for billing...</option>
+                  {hospitals.map(hospital => (
+                    <option key={hospital._id} value={hospital._id}>
+                      {hospital.name} - {hospital.city}, {hospital.state?.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
             {formData.billTo.name && (
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="font-medium text-gray-900">{formData.billTo.name}</div>
-                <div className="text-sm text-gray-600">{formData.billTo.address}</div>
-                <div className="text-sm text-gray-600">GSTIN: {formData.billTo.gstin}</div>
-                <div className="text-sm text-gray-600">DL No: {formData.billTo.drugLicense}</div>
-                <div className="text-sm text-gray-600">Phone: {formData.billTo.phone}</div>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2">
+                      <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <div className="font-medium text-gray-900">{formData.billTo.name}</div>
+                    </div>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <div className="flex items-start">
+                        <svg className="w-4 h-4 mr-2 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        </svg>
+                        <span>{formData.billTo.address}</span>
+                      </div>
+                      {formData.billTo.gstin && (
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>GSTIN: {formData.billTo.gstin}</span>
+                        </div>
+                      )}
+                      {formData.billTo.drugLicense && (
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>DL No: {formData.billTo.drugLicense}</span>
+                        </div>
+                      )}
+                      {formData.billTo.phone && (
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          <span>{formData.billTo.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="ml-3">
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      ✓ Selected
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -722,29 +972,53 @@ const PurchaseOrderForm: React.FC = () => {
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 Ship To Type *
               </label>
-              <div className="flex space-x-4">
-                <label className="flex items-center">
+              <div className="grid grid-cols-2 gap-3">
+                <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.shipToType === 'branch' 
+                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}>
                   <input
                     type="radio"
                     value="branch"
                     checked={formData.shipToType === 'branch'}
-                    onChange={(e) => setFormData(prev => ({ ...prev, shipToType: 'branch' }))}
-                    className="mr-2"
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      shipToType: 'branch',
+                      shipToWarehouse: '', // Clear warehouse selection
+                      shipTo: { branchWarehouse: '', name: '', address: '', gstin: '', drugLicense: '', phone: '' }
+                    }))}
+                    className="sr-only"
                   />
-                  Branch
+                  <div className="text-center">
+                    <div className="font-medium">Branch</div>
+                    <div className="text-xs text-gray-500">Ship directly to branch</div>
+                  </div>
                 </label>
-                <label className="flex items-center">
+                <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.shipToType === 'warehouse' 
+                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}>
                   <input
                     type="radio"
                     value="warehouse"
                     checked={formData.shipToType === 'warehouse'}
-                    onChange={(e) => setFormData(prev => ({ ...prev, shipToType: 'warehouse' }))}
-                    className="mr-2"
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      shipToType: 'warehouse',
+                      shipToBranch: '', // Clear branch selection
+                      shipTo: { branchWarehouse: '', name: '', address: '', gstin: '', drugLicense: '', phone: '' }
+                    }))}
+                    className="sr-only"
                   />
-                  Warehouse
+                  <div className="text-center">
+                    <div className="font-medium">Warehouse</div>
+                    <div className="text-xs text-gray-500">Ship to warehouse</div>
+                  </div>
                 </label>
               </div>
             </div>
@@ -759,45 +1033,124 @@ const PurchaseOrderForm: React.FC = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, shipToBranch: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="">Select Branch</option>
+                  <option value="">Choose a branch for shipping...</option>
                   {branches.map(branch => (
                     <option key={branch._id} value={branch._id}>
-                      {branch.name}
+                      {branch.name} - {branch.city}, {branch.state?.name}
                     </option>
                   ))}
                 </select>
               </div>
             ) : (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Warehouse *
-                </label>
-                <select
-                  value={formData.shipToWarehouse}
-                  onChange={(e) => setFormData(prev => ({ ...prev, shipToWarehouse: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={!formData.shipToBranch}
-                >
-                  <option value="">Select Warehouse</option>
-                  {warehouses.map(warehouse => (
-                    <option key={warehouse._id} value={warehouse._id}>
-                      {warehouse.name}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Branch (to load warehouses) *
+                  </label>
+                  <select
+                    value={formData.shipToBranch}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      shipToBranch: e.target.value,
+                      shipToWarehouse: '', // Clear warehouse when branch changes
+                      shipTo: { branchWarehouse: '', name: '', address: '', gstin: '', drugLicense: '', phone: '' }
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Choose a branch first...</option>
+                    {branches.map(branch => (
+                      <option key={branch._id} value={branch._id}>
+                        {branch.name} - {branch.city}, {branch.state?.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Warehouse *
+                  </label>
+                  <select
+                    value={formData.shipToWarehouse}
+                    onChange={(e) => setFormData(prev => ({ ...prev, shipToWarehouse: e.target.value }))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      !formData.shipToBranch 
+                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' 
+                        : 'border-gray-300'
+                    }`}
+                    disabled={!formData.shipToBranch}
+                  >
+                    <option value="">
+                      {!formData.shipToBranch ? 'Select a branch first...' : 'Choose a warehouse...'}
                     </option>
-                  ))}
-                </select>
-                {!formData.shipToBranch && (
-                  <p className="text-xs text-gray-500 mt-1">Select a branch first to load warehouses</p>
-                )}
+                    {warehouses.map(warehouse => (
+                      <option key={warehouse._id} value={warehouse._id}>
+                        {warehouse.name} - {warehouse.district}
+                      </option>
+                    ))}
+                  </select>
+                  {!formData.shipToBranch && (
+                    <div className="flex items-center mt-2 text-xs text-amber-600">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      Please select a branch first to load available warehouses
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             
             {formData.shipTo.name && (
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="font-medium text-gray-900">{formData.shipTo.name}</div>
-                <div className="text-sm text-gray-600">{formData.shipTo.address}</div>
-                <div className="text-sm text-gray-600">GSTIN: {formData.shipTo.gstin}</div>
-                <div className="text-sm text-gray-600">DL No: {formData.shipTo.drugLicense}</div>
-                <div className="text-sm text-gray-600">Phone: {formData.shipTo.phone}</div>
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2">
+                      <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <div className="font-medium text-gray-900">{formData.shipTo.name}</div>
+                    </div>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <div className="flex items-start">
+                        <svg className="w-4 h-4 mr-2 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        </svg>
+                        <span>{formData.shipTo.address}</span>
+                      </div>
+                      {formData.shipTo.gstin && (
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>GSTIN: {formData.shipTo.gstin}</span>
+                        </div>
+                      )}
+                      {formData.shipTo.drugLicense && (
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>DL No: {formData.shipTo.drugLicense}</span>
+                        </div>
+                      )}
+                      {formData.shipTo.phone && (
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          <span>{formData.shipTo.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="ml-3">
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      ✓ Selected
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

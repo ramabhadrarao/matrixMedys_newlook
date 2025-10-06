@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Endpoints Documentation - Matrix Pharma</title>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/icons-sprite.svg" rel="preload" as="image">
+    <style>
+        .method-get { color: #10b981; font-weight: 600; }
+        .method-post { color: #3b82f6; font-weight: 600; }
+        .method-put { color: #f59e0b; font-weight: 600; }
+        .method-delete { color: #ef4444; font-weight: 600; }
+        .endpoint-card { margin-bottom: 1rem; }
+        .endpoint-url { background: #f8fafc; padding: 0.5rem; border-radius: 0.375rem; font-family: monospace; }
+        .auth-required { color: #dc2626; font-size: 0.875rem; }
+        .permission-badge { font-size: 0.75rem; }
+        pre { background: #1f2937; color: #f9fafb; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        .toc { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+        .section-header { border-left: 4px solid #3b82f6; padding-left: 1rem; margin: 2rem 0 1rem 0; }
+        .badge-method { padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-get { background: #dcfce7; color: #166534; }
+        .badge-post { background: #dbeafe; color: #1e40af; }
+        .badge-put { background: #fef3c7; color: #92400e; }
+        .badge-delete { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="page-wrapper">
+            <!-- Header -->
+            <div class="page-header d-print-none">
+                <div class="container-xl">
+                    <div class="row g-2 align-items-center">
+                        <div class="col">
+                            <h2 class="page-title">API Endpoints Documentation</h2>
+                            <div class="text-muted mt-1">Complete service API reference for frontend developers</div>
+                        </div>
+                        <div class="col-auto ms-auto d-print-none">
+                            <div class="btn-list">
+                                <span class="badge bg-blue-lt">Base URL: http://69.62.73.201:5000/api</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page body -->
+            <div class="page-body">
+                <div class="container-xl">
+                    <div class="row">
+                        <!-- Table of Contents -->
+                        <div class="col-3">
+                            <div class="card toc">
+                                <div class="card-header">
+                                    <h3 class="card-title">Table of Contents</h3>
+                                </div>
+                                <div class="card-body">
+                                    <nav class="nav nav-pills flex-column">
+                                        <a class="nav-link" href="#authentication">Authentication</a>
+                                        <a class="nav-link" href="#dashboard">Dashboard</a>
+                                        <a class="nav-link" href="#states">States</a>
+                                        <a class="nav-link" href="#users">Users</a>
+                                        <a class="nav-link" href="#permissions">Permissions</a>
+                                        <a class="nav-link" href="#portfolios">Portfolios</a>
+                                        <a class="nav-link" href="#hospitals">Hospitals</a>
+                                        <a class="nav-link" href="#doctors">Doctors</a>
+                                        <a class="nav-link" href="#principals">Principals</a>
+                                        <a class="nav-link" href="#categories">Categories</a>
+                                        <a class="nav-link" href="#products">Products</a>
+                                        <a class="nav-link" href="#purchase-orders">Purchase Orders</a>
+                                        <a class="nav-link" href="#invoice-receiving">Invoice Receiving</a>
+                                        <a class="nav-link" href="#branches">Branches</a>
+                                        <a class="nav-link" href="#warehouses">Warehouses</a>
+                                        <a class="nav-link" href="#workflow">Workflow</a>
+                                        <a class="nav-link" href="#files">File Management</a>
+                                    </nav>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/states/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update state</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">states_update</span></p>
+                                    <div class="endpoint-url">/api/states/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "Maharashtra Updated",
+  "code": "MH",
+  "country": "India",
+  "population": 112374333,
+  "area": 307713,
+  "capital": "Mumbai"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/states/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete state</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">states_delete</span></p>
+                                    <div class="endpoint-url">/api/states/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Content -->
+                        <div class="col-9">
+                            <!-- Authentication Section -->
+                            <div id="authentication" class="section-header">
+                                <h2>Authentication</h2>
+                                <p class="text-muted">User authentication and authorization endpoints</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/auth/register</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Register a new user</p>
+                                    <p><strong>Authentication:</strong> None required</p>
+                                    <div class="endpoint-url">/api/auth/register</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "password123"
+}</pre>
+                                    <h5 class="mt-3">Response:</h5>
+                                    <pre>{
+  "message": "User registered successfully",
+  "user": { "id": "...", "name": "...", "email": "..." },
+  "permissions": [...],
+  "tokens": {
+    "accessToken": "...",
+    "refreshToken": "..."
+  }
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/auth/login</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Login user</p>
+                                    <p><strong>Authentication:</strong> None required</p>
+                                    <div class="endpoint-url">/api/auth/login</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "email": "john@example.com",
+  "password": "password123"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/auth/refresh-token</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Refresh access token</p>
+                                    <div class="endpoint-url">/api/auth/refresh-token</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "refreshToken": "..."
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/auth/logout</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Logout user</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/auth/logout</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/auth/profile</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get user profile</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/auth/profile</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/auth/change-password</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Change user password</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/auth/change-password</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "currentPassword": "oldpassword",
+  "newPassword": "newpassword123"
+}</pre>
+                                </div>
+                            </div>
+
+                            <!-- Dashboard Section -->
+                            <div id="dashboard" class="section-header">
+                                <h2>Dashboard</h2>
+                                <p class="text-muted">Dashboard statistics and recent activity</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/dashboard/stats</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get dashboard statistics</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/dashboard/stats</div>
+                                    <p class="text-muted mt-2">Returns dashboard cards and statistics based on user permissions</p>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/dashboard/activity</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get recent activity</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/dashboard/activity?limit=10</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>limit</code> - Number of activities to return (default: 10)</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- States Section -->
+                            <div id="states" class="section-header">
+                                <h2>States</h2>
+                                <p class="text-muted">Indian states management</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/states</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all states with pagination</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">states_view</span></p>
+                                    <div class="endpoint-url">/api/states?page=1&limit=10&search=maharashtra</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>page</code> - Page number (default: 1)</li>
+                                        <li><code>limit</code> - Items per page (default: 10)</li>
+                                        <li><code>search</code> - Search by name, code, or country</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/states/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single state by ID</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">states_view</span></p>
+                                    <div class="endpoint-url">/api/states/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/states</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new state</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">states_create</span></p>
+                                    <div class="endpoint-url">/api/states</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "Maharashtra",
+  "code": "MH",
+  "country": "India",
+  "population": 112374333,
+  "area": 307713,
+  "capital": "Mumbai"
+}</pre>
+                                </div>
+                            </div>
+
+                            <!-- Users Section -->
+                            <div id="users" class="section-header">
+                                <h2>Users</h2>
+                                <p class="text-muted">User management and permissions</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/users</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all users with pagination</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">users_view</span></p>
+                                    <div class="endpoint-url">/api/users?page=1&limit=10&search=john</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/users</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new user</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">users_create</span></p>
+                                    <div class="endpoint-url">/api/users</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "password123",
+  "isActive": true
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/users/:id/permissions</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update user permissions</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">users_update</span></p>
+                                    <div class="endpoint-url">/api/users/64a7b8c9d1e2f3g4h5i6j7k8/permissions</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "permissions": [
+    "64a7b8c9d1e2f3g4h5i6j7k8",
+    "64a7b8c9d1e2f3g4h5i6j7k9"
+  ]
+}</pre>
+                                </div>
+                            </div>
+
+                            <!-- Hospitals Section -->
+                            <div id="hospitals" class="section-header">
+                                <h2>Hospitals</h2>
+                                <p class="text-muted">Hospital management with documents and contacts</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/hospitals</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all hospitals with pagination and search</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">hospitals_view</span></p>
+                                    <div class="endpoint-url">/api/hospitals?page=1&limit=10&search=apollo</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/hospitals</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new hospital with document upload</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">hospitals_create</span></p>
+                                    <p><strong>Content-Type:</strong> multipart/form-data</p>
+                                    <div class="endpoint-url">/api/hospitals</div>
+                                    <h5 class="mt-3">Form Data:</h5>
+                                    <pre>name: Apollo Hospital
+email: apollo@example.com
+phone: 9876543210
+gstNumber: 27AAAAA0000A1Z5
+panNumber: AAAAA0000A
+gstAddress: Mumbai, Maharashtra
+city: Mumbai
+state: 64a7b8c9d1e2f3g4h5i6j7k8
+pincode: 400001
+documents: [files]
+fileTypes: ['agreement', 'license']
+descriptions: ['Agreement copy', 'Medical license']</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:hospitalId/contacts</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create hospital contact</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">hospitals_create</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/contacts</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "departmentName": "Administration",
+  "personName": "John Admin",
+  "email": "admin@hospital.com",
+  "phone": "9876543210",
+  "address": "Hospital Address",
+  "location": "Mumbai",
+  "pincode": "400001"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single hospital by ID</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">hospitals_view</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update hospital with document upload</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">hospitals_update</span></p>
+                                    <p><strong>Content-Type:</strong> multipart/form-data</p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                    <h5 class="mt-3">Form Data:</h5>
+                                    <pre>name: Apollo Hospital Updated
+email: apollo.updated@example.com
+phone: 9876543210
+gstNumber: 27AAAAA0000A1Z5
+panNumber: AAAAA0000A
+gstAddress: Mumbai, Maharashtra
+city: Mumbai
+state: 64a7b8c9d1e2f3g4h5i6j7k8
+pincode: 400001
+documents: [files]
+fileTypes: ['agreement', 'license']
+descriptions: ['Updated agreement', 'Updated license']</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete hospital</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">hospitals_delete</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:id/documents</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Add document to hospital</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">hospitals_update</span></p>
+                                    <p><strong>Content-Type:</strong> multipart/form-data</p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/documents</div>
+                                    <h5 class="mt-3">Form Data:</h5>
+                                    <pre>document: [file]
+fileType: agreement
+description: Hospital agreement document</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:id/documents/:documentId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update hospital document metadata</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">hospitals_update</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/documents/64a7b8c9d1e2f3g4h5i6j7k9</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "fileType": "license",
+  "description": "Updated medical license"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:id/documents/:documentId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete hospital document</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">hospitals_update</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/documents/64a7b8c9d1e2f3g4h5i6j7k9</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:hospitalId/contacts</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all contacts for a hospital</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">hospitals_view</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/contacts</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:hospitalId/contacts/:contactId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update hospital contact</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">hospitals_update</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/contacts/64a7b8c9d1e2f3g4h5i6j7k9</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "departmentName": "Updated Administration",
+  "personName": "John Admin Updated",
+  "email": "admin.updated@hospital.com",
+  "phone": "9876543210",
+  "address": "Updated Hospital Address",
+  "location": "Mumbai",
+  "pincode": "400001"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:hospitalId/contacts/:contactId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete hospital contact</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">hospitals_delete</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/contacts/64a7b8c9d1e2f3g4h5i6j7k9</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/hospitals/:id/file</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete hospital file (legacy endpoint)</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">hospitals_update</span></p>
+                                    <div class="endpoint-url">/api/hospitals/64a7b8c9d1e2f3g4h5i6j7k8/file</div>
+                                    <p><em>Note: This is a legacy endpoint for backward compatibility</em></p>
+                                </div>
+                            </div>
+
+                            <!-- Doctors Section -->
+                            <div id="doctors" class="section-header">
+                                <h2>Doctors</h2>
+                                <p class="text-muted">Doctor management with portfolios and attachments</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/doctors</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all doctors with filtering</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">doctors_view</span></p>
+                                    <div class="endpoint-url">/api/doctors?page=1&limit=10&search=smith&portfolio=64a7b8c9&hospital=64a7b8c9</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>portfolio</code> - Filter by portfolio ID</li>
+                                        <li><code>hospital</code> - Filter by hospital ID</li>
+                                        <li><code>search</code> - Search by name, email, location</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/doctors</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new doctor with attachments</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">doctors_create</span></p>
+                                    <p><strong>Content-Type:</strong> multipart/form-data</p>
+                                    <div class="endpoint-url">/api/doctors</div>
+                                    <h5 class="mt-3">Form Data:</h5>
+                                    <pre>name: Dr. John Smith
+email: drsmith@example.com
+phone: 9876543210
+portfolio: ["64a7b8c9d1e2f3g4h5i6j7k8"]
+hospitals: ["64a7b8c9d1e2f3g4h5i6j7k9"]
+location: Mumbai
+targets: [{"month": "january", "target": 10000, "year": 2024}]
+attachments: [files]
+fileTypes: ['license', 'certificate']
+descriptions: ['Medical license', 'Specialty certificate']</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/doctors/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single doctor by ID</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">doctors_view</span></p>
+                                    <div class="endpoint-url">/api/doctors/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/doctors/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update doctor with attachments</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">doctors_update</span></p>
+                                    <p><strong>Content-Type:</strong> multipart/form-data</p>
+                                    <div class="endpoint-url">/api/doctors/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                    <h5 class="mt-3">Form Data:</h5>
+                                    <pre>name: Dr. John Smith Updated
+email: drsmith.updated@example.com
+phone: 9876543210
+portfolio: ["64a7b8c9d1e2f3g4h5i6j7k8"]
+hospitals: ["64a7b8c9d1e2f3g4h5i6j7k9"]
+location: Mumbai
+targets: [{"month": "january", "target": 15000, "year": 2024}]
+attachments: [files]
+fileTypes: ['license', 'certificate']
+descriptions: ['Updated medical license', 'New certificate']</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/doctors/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete doctor</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">doctors_delete</span></p>
+                                    <div class="endpoint-url">/api/doctors/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/doctors/:id/attachments</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Add attachment to doctor</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">doctors_update</span></p>
+                                    <p><strong>Content-Type:</strong> multipart/form-data</p>
+                                    <div class="endpoint-url">/api/doctors/64a7b8c9d1e2f3g4h5i6j7k8/attachments</div>
+                                    <h5 class="mt-3">Form Data:</h5>
+                                    <pre>attachment: [file]
+fileType: license
+description: Medical license document</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/doctors/:id/attachments/:attachmentId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete doctor attachment</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">doctors_update</span></p>
+                                    <div class="endpoint-url">/api/doctors/64a7b8c9d1e2f3g4h5i6j7k8/attachments/64a7b8c9d1e2f3g4h5i6j7k9</div>
+                                </div>
+                            </div>
+
+                            <!-- Principals Section -->
+                            <div id="principals" class="section-header">
+                                <h2>Principals</h2>
+                                <p class="text-muted">Principal companies management</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/principals</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all principals with filtering</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">principals_view</span></p>
+                                    <div class="endpoint-url">/api/principals?page=1&limit=10&search=company&portfolio=64a7b8c9</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/principals</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new principal with documents</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">principals_create</span></p>
+                                    <p><strong>Content-Type:</strong> multipart/form-data</p>
+                                    <div class="endpoint-url">/api/principals</div>
+                                    <h5 class="mt-3">Form Data:</h5>
+                                    <pre>name: ABC Pharma Ltd
+email: contact@abcpharma.com
+mobile: 9876543210
+gstNumber: 27ABCDE1234F1Z5
+panNumber: ABCDE1234F
+portfolio: ["64a7b8c9d1e2f3g4h5i6j7k8"]
+addresses: [{"title": "Head Office", "city": "Mumbai", "state": "64a7b8c9", "pincode": "400001"}]
+documents: [files]
+documentNames: ["License", "Registration"]
+hasValidities: [true, false]
+startDates: ["2024-01-01"]
+endDates: ["2025-01-01"]</pre>
+                                </div>
+                            </div>
+
+                            <!-- Permissions Section -->
+                            <div id="permissions" class="section-header">
+                                <h2>Permissions</h2>
+                                <p class="text-muted">System permissions management</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/permissions</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all permissions with pagination</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/permissions?page=1&limit=10&search=users</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>page</code> - Page number (default: 1)</li>
+                                        <li><code>limit</code> - Items per page (default: 10)</li>
+                                        <li><code>search</code> - Search by name, resource, or action</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/permissions/stats</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get permission statistics</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">users_view</span></p>
+                                    <div class="endpoint-url">/api/permissions/stats</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/permissions/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single permission by ID</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/permissions/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/permissions</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new permission</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">users_create</span></p>
+                                    <div class="endpoint-url">/api/permissions</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "products_view",
+  "description": "View products",
+  "resource": "products",
+  "action": "view"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/permissions/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update permission</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">users_update</span></p>
+                                    <div class="endpoint-url">/api/permissions/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "products_view_updated",
+  "description": "View products with updated description",
+  "resource": "products",
+  "action": "view"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/permissions/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete permission</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">users_delete</span></p>
+                                    <div class="endpoint-url">/api/permissions/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <!-- Portfolios Section -->
+                            <div id="portfolios" class="section-header">
+                                <h2>Portfolios</h2>
+                                <p class="text-muted">Medical specializations and portfolio management</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/portfolios</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all portfolios with pagination</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/portfolios?page=1&limit=10&search=cardiology</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>page</code> - Page number (default: 1)</li>
+                                        <li><code>limit</code> - Items per page (default: 10)</li>
+                                        <li><code>search</code> - Search by name or description</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/portfolios/stats</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get portfolio statistics</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">portfolios_view</span></p>
+                                    <div class="endpoint-url">/api/portfolios/stats</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/portfolios/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single portfolio by ID</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/portfolios/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/portfolios</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new portfolio</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">portfolios_create</span></p>
+                                    <div class="endpoint-url">/api/portfolios</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "Cardiology",
+  "description": "Heart and cardiovascular specialization"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/portfolios/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update portfolio</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">portfolios_update</span></p>
+                                    <div class="endpoint-url">/api/portfolios/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "Cardiology Updated",
+  "description": "Heart and cardiovascular specialization - updated"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/portfolios/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete portfolio</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">portfolios_delete</span></p>
+                                    <div class="endpoint-url">/api/portfolios/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <!-- Categories Section -->
+                            <div id="categories" class="section-header">
+                                <h2>Categories</h2>
+                                <p class="text-muted">Product categories with hierarchical structure</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/categories</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get categories with filtering</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">categories_view</span></p>
+                                    <div class="endpoint-url">/api/categories?principal=64a7b8c9&portfolio=64a7b8c9&parent=root&flat=false</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>principal</code> - Filter by principal ID</li>
+                                        <li><code>portfolio</code> - Filter by portfolio ID</li>
+                                        <li><code>parent</code> - Filter by parent category ('root' for top level)</li>
+                                        <li><code>flat</code> - Return flat array (true) or tree structure (false)</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/categories</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new category</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">categories_create</span></p>
+                                    <div class="endpoint-url">/api/categories</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "name": "Antibiotics",
+  "description": "Antibiotic medicines",
+  "principal": "64a7b8c9d1e2f3g4h5i6j7k8",
+  "portfolio": "64a7b8c9d1e2f3g4h5i6j7k9",
+  "parent": "64a7b8c9d1e2f3g4h5i6j7k0",
+  "sortOrder": 1
+}</pre>
+                                </div>
+                            </div>
+
+                            <!-- Products Section -->
+                            <div id="products" class="section-header">
+                                <h2>Products</h2>
+                                <p class="text-muted">Product catalog management</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/products</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all products with filtering</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">products_view</span></p>
+                                    <div class="endpoint-url">/api/products?page=1&limit=10&search=paracetamol&category=64a7b8c9&includeSubcategories=true</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>category</code> - Filter by category ID</li>
+                                        <li><code>principal</code> - Filter by principal ID</li>
+                                        <li><code>portfolio</code> - Filter by portfolio ID</li>
+                                        <li><code>includeSubcategories</code> - Include products from subcategories</li>
+                                        <li><code>search</code> - Search by name, code, or specification</li>
+                                        <li><code>page</code> - Page number (default: 1)</li>
+                                        <li><code>limit</code> - Items per page (default: 10)</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/products/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single product by ID</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">products_view</span></p>
+                                    <div class="endpoint-url">/api/products/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/products/category/:categoryId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get products by category</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">products_view</span></p>
+                                    <div class="endpoint-url">/api/products/category/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/products</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new product with file upload</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">products_create</span></p>
+                                    <div class="endpoint-url">/api/products</div>
+                                    <h5 class="mt-3">Request Body (multipart/form-data):</h5>
+                                    <pre>{
+  "name": "Paracetamol 500mg",
+  "code": "PAR500",
+  "category": "64a7b8c9d1e2f3g4h5i6j7k8",
+  "gstPercentage": 12,
+  "specification": "500mg tablets",
+  "unit": "BOX",
+  "hsnCode": "30049099",
+  "barcode": "1234567890123",
+  "remarks": "Common pain reliever",
+  "documents": [File objects]
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/products/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update existing product</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">products_update</span></p>
+                                    <div class="endpoint-url">/api/products/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/products/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete product</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">products_delete</span></p>
+                                    <div class="endpoint-url">/api/products/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/products/:id/documents</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Add document to product</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">products_update</span></p>
+                                    <div class="endpoint-url">/api/products/64a7b8c9d1e2f3g4h5i6j7k8/documents</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/products/:id/documents/:documentId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete product document</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">products_update</span></p>
+                                    <div class="endpoint-url">/api/products/64a7b8c9d1e2f3g4h5i6j7k8/documents/64a7b8c9d1e2f3g4h5i6j7k9</div>
+                                </div>
+                            </div>
+
+                            <!-- Purchase Orders Section -->
+                            <div id="purchase-orders" class="section-header">
+                                <h2>Purchase Orders</h2>
+                                <p class="text-muted">Purchase order management with workflow integration</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/purchase-orders</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all purchase orders with filtering</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">po_view</span></p>
+                                    <div class="endpoint-url">/api/purchase-orders?page=1&limit=10&status=draft&principal=64a7b8c9&search=PO001</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>status</code> - Filter by status (draft, submitted, approved, etc.)</li>
+                                        <li><code>principal</code> - Filter by principal ID</li>
+                                        <li><code>createdBy</code> - Filter by creator user ID</li>
+                                        <li><code>dateFrom</code> - Filter from date (YYYY-MM-DD)</li>
+                                        <li><code>dateTo</code> - Filter to date (YYYY-MM-DD)</li>
+                                        <li><code>search</code> - Search by PO number or description</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/purchase-orders/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single purchase order by ID</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">po_view</span></p>
+                                    <div class="endpoint-url">/api/purchase-orders/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/purchase-orders</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new purchase order</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">po_create</span></p>
+                                    <div class="endpoint-url">/api/purchase-orders</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "principal": "64a7b8c9d1e2f3g4h5i6j7k8",
+  "poDate": "2024-01-15",
+  "deliveryDate": "2024-02-15",
+  "billingAddress": {
+    "branchWarehouse": "64a7b8c9d1e2f3g4h5i6j7k8",
+    "name": "Main Branch",
+    "address": "123 Main St, City",
+    "gstin": "27ABCDE1234F1Z5",
+    "drugLicense": "DL123456"
+  },
+  "shippingAddress": {
+    "branchWarehouse": "64a7b8c9d1e2f3g4h5i6j7k8",
+    "name": "Warehouse A",
+    "address": "456 Storage Ave, City"
+  },
+  "productLines": [
+    {
+      "product": "64a7b8c9d1e2f3g4h5i6j7k8",
+      "quantity": 100,
+      "unitPrice": 25.50,
+      "foc": 5,
+      "discount": 10,
+      "discountType": "percentage",
+      "gstRate": 12
+    }
+  ],
+  "terms": "Net 30 days",
+  "remarks": "Urgent delivery required"
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/purchase-orders/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update purchase order (draft only)</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">po_update</span></p>
+                                    <div class="endpoint-url">/api/purchase-orders/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/purchase-orders/:id/workflow</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Perform workflow action on purchase order</p>
+                                    <p><strong>Permission:</strong> Based on workflow stage</p>
+                                    <div class="endpoint-url">/api/purchase-orders/64a7b8c9d1e2f3g4h5i6j7k8/workflow</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "action": "approve",
+  "remarks": "Approved for processing"
+}</pre>
+                                    <p><strong>Available Actions:</strong> approve, reject, return, cancel, receive, qc_check, complete</p>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-delete">DELETE</span>
+                                    <span class="ms-2 fw-bold">/purchase-orders/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Delete purchase order (draft only)</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-red-lt permission-badge">po_delete</span></p>
+                                    <div class="endpoint-url">/api/purchase-orders/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <!-- Invoice Receiving Section -->
+                            <div id="invoice-receiving" class="section-header">
+                                <h2>Invoice Receiving</h2>
+                                <p class="text-muted">Invoice receiving management with QC workflow</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/invoice-receiving</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all invoice receivings with filtering</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">invoice_receiving:view</span></p>
+                                    <div class="endpoint-url">/api/invoice-receiving?page=1&limit=10&status=received&qcStatus=pending</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>purchaseOrder</code> - Filter by purchase order ID</li>
+                                        <li><code>status</code> - Filter by status</li>
+                                        <li><code>qcStatus</code> - Filter by QC status</li>
+                                        <li><code>search</code> - Search by invoice number</li>
+                                        <li><code>dateFrom</code> - Filter from date</li>
+                                        <li><code>dateTo</code> - Filter to date</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/invoice-receiving/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get single invoice receiving by ID</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">invoice_receiving:view</span></p>
+                                    <div class="endpoint-url">/api/invoice-receiving/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/invoice-receiving</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new invoice receiving</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">invoice_receiving:create</span></p>
+                                    <div class="endpoint-url">/api/invoice-receiving</div>
+                                    <h5 class="mt-3">Request Body (multipart/form-data):</h5>
+                                    <pre>{
+  "purchaseOrder": "64a7b8c9d1e2f3g4h5i6j7k8",
+  "invoiceNumber": "INV-2024-001",
+  "invoiceDate": "2024-01-15",
+  "invoiceAmount": 25000,
+  "supplier": "ABC Pharmaceuticals",
+  "receivedDate": "2024-01-16",
+  "receivedProducts": [
+    {
+      "product": "64a7b8c9d1e2f3g4h5i6j7k8",
+      "orderedQuantity": 100,
+      "receivedQuantity": 95,
+      "foc": 5,
+      "batchNumber": "BATCH001",
+      "manufacturingDate": "2024-01-01",
+      "expiryDate": "2026-01-01",
+      "status": "received"
+    }
+  ],
+  "qcRequired": true,
+  "notes": "Partial delivery",
+  "documents": [File objects]
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/invoice-receiving/:id</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update invoice receiving</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-yellow-lt permission-badge">invoice_receiving:update</span></p>
+                                    <div class="endpoint-url">/api/invoice-receiving/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/invoice-receiving/:id/qc-check</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Perform QC check on invoice receiving</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">invoice_receiving:qc_check</span></p>
+                                    <div class="endpoint-url">/api/invoice-receiving/64a7b8c9d1e2f3g4h5i6j7k8/qc-check</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "qcStatus": "passed",
+  "qcRemarks": "All products passed quality check",
+  "productQCResults": [
+    {
+      "productId": "64a7b8c9d1e2f3g4h5i6j7k8",
+      "status": "passed",
+      "remarks": "Good quality"
+    }
+  ]
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-put">PUT</span>
+                                    <span class="ms-2 fw-bold">/invoice-receiving/:id/qc-status</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Update individual product QC status</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">invoice_receiving:qc_check</span></p>
+                                    <div class="endpoint-url">/api/invoice-receiving/64a7b8c9d1e2f3g4h5i6j7k8/qc-status</div>
+                                    <h5 class="mt-3">Request Body:</h5>
+                                    <pre>{
+  "productIndex": 0,
+  "qcStatus": "passed",
+  "qcRemarks": "Quality approved",
+  "qcBy": "QC Manager",
+  "qcDate": "2024-01-17"
+}</pre>
+                                </div>
+                            </div>
+
+                            <!-- Branches Section -->
+                            <div id="branches" class="section-header">
+                                <h2>Branches</h2>
+                                <p class="text-muted">Branch management with contact information</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/branches</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all branches with pagination</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">branches_view</span></p>
+                                    <div class="endpoint-url">/api/branches?page=1&limit=10&search=mumbai</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/branches</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new branch</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">branches_create</span></p>
+                                    <div class="endpoint-url">/api/branches</div>
+                                    <h5 class="mt-3">Request Body (multipart/form-data):</h5>
+                                    <pre>{
+  "name": "Mumbai Branch",
+  "code": "MUM001",
+  "address": "123 Business District, Mumbai",
+  "city": "Mumbai",
+  "state": "64a7b8c9d1e2f3g4h5i6j7k8",
+  "pincode": "400001",
+  "phone": "+91-22-12345678",
+  "email": "mumbai@company.com",
+  "gstin": "27ABCDE1234F1Z5",
+  "drugLicense": "DL-MH-001",
+  "isActive": true,
+  "documents": [File objects]
+}</pre>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/branches/:branchId/contacts</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get branch contacts</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">branches_view</span></p>
+                                    <div class="endpoint-url">/api/branches/64a7b8c9d1e2f3g4h5i6j7k8/contacts</div>
+                                </div>
+                            </div>
+
+                            <!-- Warehouses Section -->
+                            <div id="warehouses" class="section-header">
+                                <h2>Warehouses</h2>
+                                <p class="text-muted">Warehouse management with branch relationships</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/warehouses</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all warehouses with filtering</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">warehouses_view</span></p>
+                                    <div class="endpoint-url">/api/warehouses?page=1&limit=10&branch=64a7b8c9&search=storage</div>
+                                    <p><strong>Query Parameters:</strong></p>
+                                    <ul>
+                                        <li><code>branch</code> - Filter by branch ID</li>
+                                        <li><code>search</code> - Search by name or code</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/warehouses/branch/:branchId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get warehouses by branch</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">warehouses_view</span></p>
+                                    <div class="endpoint-url">/api/warehouses/branch/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <!-- Workflow Section -->
+                            <div id="workflow" class="section-header">
+                                <h2>Workflow</h2>
+                                <p class="text-muted">Workflow stage and transition management</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/workflow/stages</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all workflow stages</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">workflow_view</span></p>
+                                    <div class="endpoint-url">/api/workflow/stages</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/workflow/transitions/:stageId</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get available transitions for a stage</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">workflow_view</span></p>
+                                    <div class="endpoint-url">/api/workflow/transitions/64a7b8c9d1e2f3g4h5i6j7k8</div>
+                                </div>
+                            </div>
+
+                            <!-- File Management Section -->
+                            <div id="files" class="section-header">
+                                <h2>File Management</h2>
+                                <p class="text-muted">File upload, download, and viewing operations</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/files/view/:filename</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> View file in browser</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/files/view/document_123456.pdf</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/files/download/:filename</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Download file</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/files/download/document_123456.pdf</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/files/upload</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Upload file</p>
+                                    <p><strong>Authentication:</strong> <span class="auth-required">Bearer Token Required</span></p>
+                                    <div class="endpoint-url">/api/files/upload</div>
+                                    <h5 class="mt-3">Request Body (multipart/form-data):</h5>
+                                    <pre><code>file: [File] (required)</code></pre>
+                                    <h5 class="mt-3">Response:</h5>
+                                    <pre><code>{
+  "message": "File uploaded successfully",
+  "file": {
+    "filename": "generated_filename.pdf",
+    "originalName": "document.pdf",
+    "mimetype": "application/pdf",
+    "size": 1024,
+    "path": "/uploads/...",
+    "url": "/api/files/download/generated_filename.pdf"
+  }
+}</code></pre>
+                                </div>
+                            </div>
+
+                            <!-- Principals Section -->
+                            <div id="principals" class="section-header">
+                                <h2>Principals</h2>
+                                <p class="text-muted">Principal/supplier management with documents</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/principals</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all principals with pagination</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">principals_view</span></p>
+                                    <div class="endpoint-url">/api/principals?page=1&limit=10&search=pharma</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-post">POST</span>
+                                    <span class="ms-2 fw-bold">/principals</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Create new principal</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-green-lt permission-badge">principals_create</span></p>
+                                    <div class="endpoint-url">/api/principals</div>
+                                </div>
+                            </div>
+
+                            <!-- Categories Section -->
+                            <div id="categories" class="section-header">
+                                <h2>Categories</h2>
+                                <p class="text-muted">Product category management with hierarchy</p>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/categories</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get all categories with hierarchy</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">categories_view</span></p>
+                                    <div class="endpoint-url">/api/categories?includeHierarchy=true</div>
+                                </div>
+                            </div>
+
+                            <div class="card endpoint-card">
+                                <div class="card-header">
+                                    <span class="badge badge-method badge-get">GET</span>
+                                    <span class="ms-2 fw-bold">/categories/:id/products</span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Description:</strong> Get products in category</p>
+                                    <p><strong>Permission:</strong> <span class="badge bg-blue-lt permission-badge">categories_view</span></p>
+                                    <div class="endpoint-url">/api/categories/64a7b8c9d1e2f3g4h5i6j7k8/products</div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js"></script>
+</body>
+</html>
