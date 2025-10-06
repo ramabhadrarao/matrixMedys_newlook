@@ -19,9 +19,37 @@ const invoiceValidation = [
   body('purchaseOrder').isMongoId().withMessage('Valid purchase order ID required'),
   body('invoiceNumber').notEmpty().withMessage('Invoice number required'),
   body('invoiceAmount').isFloat({ min: 0 }).withMessage('Invoice amount must be positive'),
-  body('products').isArray({ min: 1 }).withMessage('At least one product required'),
-  body('products.*.product').isMongoId().withMessage('Valid product ID required'),
-  body('products.*.receivedQty').isInt({ min: 0 }).withMessage('Received quantity must be non-negative')
+  body('products').custom((value) => {
+    // Handle both string (JSON) and array formats
+    let productsArray;
+    if (typeof value === 'string') {
+      try {
+        productsArray = JSON.parse(value);
+      } catch (error) {
+        throw new Error('Products must be valid JSON array');
+      }
+    } else if (Array.isArray(value)) {
+      productsArray = value;
+    } else {
+      throw new Error('Products must be an array');
+    }
+    
+    if (!Array.isArray(productsArray) || productsArray.length === 0) {
+      throw new Error('At least one product required');
+    }
+    
+    // Validate each product
+    productsArray.forEach((product, index) => {
+      if (product.product && !product.product.match(/^[0-9a-fA-F]{24}$/)) {
+        throw new Error(`Product at index ${index} must have a valid product ID`);
+      }
+      if (product.receivedQuantity !== undefined && (isNaN(product.receivedQuantity) || product.receivedQuantity < 0)) {
+        throw new Error(`Received quantity at index ${index} must be non-negative`);
+      }
+    });
+    
+    return true;
+  })
 ];
 
 // Routes

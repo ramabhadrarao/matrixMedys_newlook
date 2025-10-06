@@ -99,8 +99,14 @@ invoiceReceivingSchema.post('save', async function() {
   if (po) {
     // Update received quantities in PO
     for (const receivedProduct of this.products) {
+      // Skip products with null product ID
+      if (!receivedProduct.product) {
+        console.log(`[${process.pid}] Skipping product with null ID: ${receivedProduct.productName}`);
+        continue;
+      }
+      
       const poProduct = po.products.find(p => 
-        p.product.toString() === receivedProduct.product.toString()
+        p.product && p.product.toString() === receivedProduct.product.toString()
       );
       
       if (poProduct) {
