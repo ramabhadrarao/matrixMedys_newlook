@@ -41,9 +41,20 @@ export const createInvoiceReceiving = async (req, res) => {
       }
     }
     
-    // Validate received products
-    if (!productsArray || !Array.isArray(productsArray) || productsArray.length === 0) {
-      return res.status(400).json({ message: 'At least one received product is required' });
+    // Validate received products - allow zero quantities but require products array
+    if (!productsArray || !Array.isArray(productsArray)) {
+      return res.status(400).json({ message: 'Products data is required' });
+    }
+    
+    if (productsArray.length === 0) {
+      return res.status(400).json({ message: 'Product list cannot be empty (even with zero received quantities)' });
+    }
+    
+    // Log zero received quantities for business tracking
+    const zeroReceivedProducts = productsArray.filter(p => (p.receivedQuantity || 0) === 0);
+    if (zeroReceivedProducts.length > 0) {
+      console.log(`Invoice receiving with ${zeroReceivedProducts.length} zero-received products:`, 
+        zeroReceivedProducts.map(p => p.productName || p.productCode).join(', '));
     }
     
     const invoiceReceiving = new InvoiceReceiving({
@@ -54,18 +65,18 @@ export const createInvoiceReceiving = async (req, res) => {
       dueDate,
       receivedDate: receivedDate || new Date(),
       receivedBy: req.user._id,
-      receivedProducts: productsArray.map(product => ({
+      products: productsArray.map(product => ({
         product: product.product,
         productCode: product.productCode || '',
         productName: product.productName || '',
-        orderedQuantity: product.orderedQuantity || product.orderedQty || 0,
-        receivedQuantity: product.receivedQuantity || product.receivedQty || 0,
+        orderedQty: product.orderedQuantity || product.orderedQty || 0,
+        receivedQty: product.receivedQuantity || product.receivedQty || 0,
         foc: product.foc || 0,
         unitPrice: product.unitPrice || 0,
         unit: product.unit || 'PCS',
-        batchNumber: product.batchNumber || product.batchNo || '',
-        manufacturingDate: product.manufacturingDate || product.mfgDate || '',
-        expiryDate: product.expiryDate || product.expDate || '',
+        batchNo: product.batchNumber || product.batchNo || '',
+        mfgDate: product.manufacturingDate || product.mfgDate || '',
+        expDate: product.expiryDate || product.expDate || '',
         status: product.status || 'received',
         remarks: product.remarks || '',
         qcStatus: qcRequired ? 'pending' : 'not_required',

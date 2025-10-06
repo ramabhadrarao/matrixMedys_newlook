@@ -160,12 +160,82 @@ const InvoiceReceivingForm: React.FC = () => {
     }
   };
 
-  const updateReceivedProduct = (index: number, field: keyof ReceivedProduct, value: any) => {
+  const updateReceivedProduct = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       receivedProducts: prev.receivedProducts.map((product, i) => 
         i === index ? { ...product, [field]: value } : product
       )
+    }));
+  };
+
+  // Add new function to handle multiple batch entries
+  const addBatchEntry = (productIndex: number) => {
+    const product = formData.receivedProducts[productIndex];
+    const newBatchEntry = {
+      ...product,
+      receivedQuantity: 0,
+      batchNumber: '',
+      expiryDate: '',
+      manufacturingDate: '',
+      remarks: ''
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      receivedProducts: [
+        ...prev.receivedProducts.slice(0, productIndex + 1),
+        newBatchEntry,
+        ...prev.receivedProducts.slice(productIndex + 1)
+      ]
+    }));
+  };
+
+  // Add function to remove batch entry
+  const removeBatchEntry = (index: number) => {
+    if (formData.receivedProducts.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        receivedProducts: prev.receivedProducts.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  // Add function to handle item substitution
+  const handleItemSubstitution = (index: number, substitutedProductId: string, substitutedProductName: string) => {
+    setFormData(prev => ({
+      ...prev,
+      receivedProducts: prev.receivedProducts.map((product, i) => 
+        i === index ? { 
+          ...product, 
+          product: substitutedProductId,
+          productName: substitutedProductName,
+          remarks: `Substituted for ${product.productName}` 
+        } : product
+      )
+    }));
+  };
+
+  // Add function to handle adding substituted product
+  const addSubstitutedProduct = (originalIndex: number) => {
+    const originalProduct = formData.receivedProducts[originalIndex];
+    const substitutedEntry = {
+      ...originalProduct,
+      receivedQuantity: 0,
+      batchNumber: '',
+      expiryDate: '',
+      manufacturingDate: '',
+      remarks: `Substituted for ${originalProduct.productName}`,
+      isSubstitution: true
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      receivedProducts: [
+        ...prev.receivedProducts.slice(0, originalIndex + 1),
+        substitutedEntry,
+        ...prev.receivedProducts.slice(originalIndex + 1)
+      ]
     }));
   };
 
@@ -206,17 +276,68 @@ const InvoiceReceivingForm: React.FC = () => {
       newErrors.supplier = 'Supplier is required';
     }
 
+    // Allow zero receiving - check if we have product entries (even with 0 quantities)
     if (formData.receivedProducts.length === 0) {
-      newErrors.receivedProducts = 'At least one product must be received';
+      newErrors.receivedProducts = 'Product list is required (even if received quantities are zero)';
     }
 
-    // Validate received products
-    formData.receivedProducts.forEach((product, index) => {
-      if (product.receivedQuantity <= 0) {
-        newErrors[`receivedProduct_${index}_quantity`] = 'Received quantity must be greater than 0';
+    // Enhanced validation for received products
+    const productGroups = formData.receivedProducts.reduce((acc, product, index) => {
+      const key = `${product.product}_${product.productName}`;
+      if (!acc[key]) {
+        acc[key] = {
+          orderedQuantity: product.orderedQuantity,
+          entries: []
+        };
       }
-      if (product.receivedQuantity > product.orderedQuantity) {
-        newErrors[`receivedProduct_${index}_quantity`] = 'Received quantity cannot exceed ordered quantity';
+      acc[key].entries.push({ ...product, index });
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Validate each product group
+    Object.entries(productGroups).forEach(([key, group]) => {
+      const totalReceived = group.entries.reduce((sum: number, entry: any) => sum + entry.receivedQuantity, 0);
+      
+      group.entries.forEach((entry: any) => {
+        // Basic quantity validation
+        if (entry.receivedQuantity < 0) {
+          newErrors[`receivedProduct_${entry.index}_quantity`] = 'Received quantity cannot be negative';
+        }
+        
+        // Batch number validation - only required if quantity > 0
+        if (entry.receivedQuantity > 0 && !entry.batchNumber.trim()) {
+          newErrors[`receivedProduct_${entry.index}_batch`] = 'Batch number is required for received products';
+        }
+        
+        // Expiry date validation for pharmaceutical products
+        if (entry.receivedQuantity > 0 && entry.expiryDate) {
+          const expiryDate = new Date(entry.expiryDate);
+          const today = new Date();
+          if (expiryDate <= today) {
+            newErrors[`receivedProduct_${entry.index}_expiry`] = 'Expiry date must be in the future';
+          }
+        }
+        
+        // Manufacturing date validation
+        if (entry.manufacturingDate && entry.expiryDate) {
+          const mfgDate = new Date(entry.manufacturingDate);
+          const expDate = new Date(entry.expiryDate);
+          if (mfgDate >= expDate) {
+            newErrors[`receivedProduct_${entry.index}_mfg`] = 'Manufacturing date must be before expiry date';
+          }
+        }
+      });
+      
+      // Group-level validation - allow zero receiving but warn about over-receiving
+      const tolerance = 0.1; // 10% tolerance
+      if (totalReceived > group.orderedQuantity * (1 + tolerance)) {
+        newErrors[`productGroup_${key}`] = `Total received quantity (${totalReceived}) significantly exceeds ordered quantity (${group.orderedQuantity})`;
+      }
+      
+      // Optional: Add warning for zero receiving (not an error, just informational)
+      if (totalReceived === 0) {
+        // This is allowed - no error, just track it
+        console.log(`Product group ${key}: No items received (${group.orderedQuantity} ordered)`);
       }
     });
 
@@ -474,76 +595,202 @@ const InvoiceReceivingForm: React.FC = () => {
               <p className="text-red-600 text-sm mb-4">{errors.receivedProducts}</p>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ordered</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Received *</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Batch No.</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expiry Date</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {formData.receivedProducts.map((product, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2">
-                        <div className="font-medium text-sm">{product.productName}</div>
-                        <div className="text-xs text-gray-500">{product.productCode}</div>
-                        <div className="text-xs text-gray-500">Unit: {product.unit}</div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="font-medium">{product.orderedQuantity}</div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          value={product.receivedQuantity}
-                          onChange={(e) => updateReceivedProduct(index, 'receivedQuantity', Number(e.target.value))}
-                          className={`w-20 px-2 py-1 border rounded text-sm ${
-                            errors[`receivedProduct_${index}_quantity`] ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          min="0"
-                          max={product.orderedQuantity}
-                        />
-                        {errors[`receivedProduct_${index}_quantity`] && (
-                          <p className="text-red-600 text-xs mt-1">
-                            {errors[`receivedProduct_${index}_quantity`]}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="text"
-                          value={product.batchNumber}
-                          onChange={(e) => updateReceivedProduct(index, 'batchNumber', e.target.value)}
-                          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                          placeholder="Batch"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="date"
-                          value={product.expiryDate}
-                          onChange={(e) => updateReceivedProduct(index, 'expiryDate', e.target.value)}
-                          className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="text"
-                          value={product.remarks}
-                          onChange={(e) => updateReceivedProduct(index, 'remarks', e.target.value)}
-                          className="w-32 px-2 py-1 border border-gray-300 rounded text-sm"
-                          placeholder="Remarks"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+               {/* Group products by original product to show multiple batches */}
+               {(() => {
+                 const groupedProducts = formData.receivedProducts.reduce((acc, product, index) => {
+                   const key = `${product.product}_${product.productName}`;
+                   if (!acc[key]) {
+                     acc[key] = {
+                       productInfo: {
+                         productName: product.productName,
+                         productCode: product.productCode,
+                         unit: product.unit,
+                         orderedQuantity: product.orderedQuantity
+                       },
+                       entries: []
+                     };
+                   }
+                   acc[key].entries.push({ ...product, originalIndex: index });
+                   return acc;
+                 }, {} as Record<string, any>);
+
+                return Object.entries(groupedProducts).map(([key, group]) => {
+                  const totalReceived = group.entries.reduce((sum: number, entry: any) => sum + entry.receivedQuantity, 0);
+                  const isPartialReceived = totalReceived > 0 && totalReceived < group.productInfo.orderedQuantity;
+                  const isOverReceived = totalReceived > group.productInfo.orderedQuantity;
+                  const isFullyReceived = totalReceived === group.productInfo.orderedQuantity;
+
+                  return (
+                    <div key={key} className="border border-gray-200 rounded-lg p-4">
+                      {/* Product Header */}
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-medium text-gray-900">{group.productInfo.productName}</h3>
+                            {isPartialReceived && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Partial
+                              </span>
+                            )}
+                            {isOverReceived && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Over-received
+                              </span>
+                            )}
+                            {isFullyReceived && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Complete
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Code: {group.productInfo.productCode} | Unit: {group.productInfo.unit}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            Ordered: {group.productInfo.orderedQuantity} | Received: {totalReceived} | 
+                            Remaining: {Math.max(0, group.productInfo.orderedQuantity - totalReceived)}
+                          </div>
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => addBatchEntry(group.entries[0].originalIndex)}
+                          className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Batch
+                        </button>
+                      </div>
+
+                      {/* Batch Entries */}
+                      <div className="space-y-2">
+                        {group.entries.map((entry: any, entryIndex: number) => (
+                          <div key={entryIndex} className="bg-gray-50 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">
+                                Batch {entryIndex + 1}
+                              </span>
+                              {group.entries.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeBatchEntry(entry.originalIndex)}
+                                  className="text-red-600 hover:text-red-800 p-1"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Received Qty *
+                                </label>
+                                <input
+                                  type="number"
+                                  value={entry.receivedQuantity}
+                                  onChange={(e) => updateReceivedProduct(entry.originalIndex, 'receivedQuantity', Number(e.target.value))}
+                                  className={`w-full px-2 py-1 border rounded text-sm ${
+                                    errors[`receivedProduct_${entry.originalIndex}_quantity`] ? 'border-red-300' : 'border-gray-300'
+                                  }`}
+                                  min="0"
+                                  placeholder="0"
+                                />
+                                {errors[`receivedProduct_${entry.originalIndex}_quantity`] && (
+                                  <p className="text-red-600 text-xs mt-1">
+                                    {errors[`receivedProduct_${entry.originalIndex}_quantity`]}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Batch Number
+                                </label>
+                                <input
+                                  type="text"
+                                  value={entry.batchNumber}
+                                  onChange={(e) => updateReceivedProduct(entry.originalIndex, 'batchNumber', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  placeholder="Batch No."
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Manufacturing Date
+                                </label>
+                                <input
+                                  type="date"
+                                  value={entry.manufacturingDate}
+                                  onChange={(e) => updateReceivedProduct(entry.originalIndex, 'manufacturingDate', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Expiry Date
+                                </label>
+                                <input
+                                  type="date"
+                                  value={entry.expiryDate}
+                                  onChange={(e) => updateReceivedProduct(entry.originalIndex, 'expiryDate', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Remarks
+                                </label>
+                                <input
+                                  type="text"
+                                  value={entry.remarks}
+                                  onChange={(e) => updateReceivedProduct(entry.originalIndex, 'remarks', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  placeholder="Notes"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Summary Section */}
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <h3 className="font-medium text-blue-900 mb-2">Receiving Summary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-blue-700 font-medium">Total Ordered:</span>
+                  <p className="text-blue-900 font-semibold">{calculateTotalOrdered()}</p>
+                </div>
+                <div>
+                  <span className="text-blue-700 font-medium">Total Received:</span>
+                  <p className="text-blue-900 font-semibold">{calculateTotalReceived()}</p>
+                </div>
+                <div>
+                  <span className="text-blue-700 font-medium">Remaining:</span>
+                  <p className="text-blue-900 font-semibold">{calculateTotalOrdered() - calculateTotalReceived()}</p>
+                </div>
+                <div>
+                  <span className="text-blue-700 font-medium">Status:</span>
+                  <p className="text-blue-900 font-semibold">
+                    {calculateTotalReceived() === 0 ? 'Not Started' :
+                     calculateTotalReceived() === calculateTotalOrdered() ? 'Complete' :
+                     calculateTotalReceived() > calculateTotalOrdered() ? 'Over-received' : 'Partial'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
