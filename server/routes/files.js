@@ -18,6 +18,8 @@ const findFilePath = (filename) => {
     path.join(__dirname, '../uploads/hospital-documents', filename),
     path.join(__dirname, '../uploads/doctor-attachments', filename),
     path.join(__dirname, '../uploads/principal-documents', filename),
+    path.join(__dirname, '../uploads/product-documents', filename),
+    path.join(__dirname, '../uploads/invoice-receiving-images', filename),
   ];
   
   for (const filePath of possiblePaths) {
@@ -221,7 +223,9 @@ router.get('/', authenticate, (req, res) => {
     const uploadDirs = [
       { path: path.join(__dirname, '../uploads/hospital-documents'), type: 'hospital' },
       { path: path.join(__dirname, '../uploads/doctor-attachments'), type: 'doctor' },
-      { path: path.join(__dirname, '../uploads/principal-documents'), type: 'principal' }
+      { path: path.join(__dirname, '../uploads/principal-documents'), type: 'principal' },
+      { path: path.join(__dirname, '../uploads/product-documents'), type: 'product' },
+      { path: path.join(__dirname, '../uploads/invoice-receiving-images'), type: 'invoice-receiving' }
     ];
     
     uploadDirs.forEach(dir => {

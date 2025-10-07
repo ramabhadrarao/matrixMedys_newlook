@@ -156,6 +156,8 @@ const getUploadPath = (req) => {
     return doctorAttachmentsDir;
   } else if (req.route?.path?.includes('hospitals') || req.originalUrl?.includes('hospitals')) {
     return hospitalDocsDir;
+  } else if (req.route?.path?.includes('invoice-receiving') || req.originalUrl?.includes('invoice-receiving')) {
+    return invoiceReceivingImagesDir;
   }
   return hospitalDocsDir; // Default
 };
