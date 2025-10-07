@@ -1,6 +1,6 @@
 // src/components/InvoiceReceiving/InvoiceReceivingDetails.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Edit,
@@ -441,6 +441,9 @@ const InvoiceReceivingDetails: React.FC = () => {
                       QC Status
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Images
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Remarks
                     </th>
                   </tr>
@@ -487,6 +490,29 @@ const InvoiceReceivingDetails: React.FC = () => {
                           <div className="text-xs text-gray-500 mt-1">
                             By: {product.qcBy}
                           </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        {product.productImages && product.productImages.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {product.productImages.slice(0, 3).map((image, imgIndex) => (
+                              <div key={imgIndex} className="relative group">
+                                <img
+                                  src={`http://localhost:5000/api/files/view/${image.filename}`}
+                                  alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
+                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80"
+                                  onClick={() => window.open(`http://localhost:5000/api/files/view/${image.filename}`, '_blank')}
+                                />
+                              </div>
+                            ))}
+                            {product.productImages.length > 3 && (
+                              <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center text-xs text-gray-500">
+                                +{product.productImages.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">No images</span>
                         )}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
