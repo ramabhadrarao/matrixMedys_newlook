@@ -77,29 +77,51 @@ const InvoiceReceivingForm: React.FC = () => {
     try {
       const response = await purchaseOrderAPI.getPurchaseOrder(poId);
       const po = response.purchaseOrder;
+      
+      console.log('=== PURCHASE ORDER DEBUG ===');
+      console.log('Full PO data:', po);
+      console.log('PO products:', po.products);
+      po.products?.forEach((line, index) => {
+        console.log(`Product ${index}:`, {
+          product: line.product,
+          productId: line.product?._id,
+          productName: line.productName,
+          productCode: line.productCode,
+          quantity: line.quantity,
+          receivedQty: line.receivedQty,
+          remainingCalculated: Math.max(0, line.quantity - (line.receivedQty || 0))
+        });
+      });
+      console.log('=== END PO DEBUG ===');
+      
       setSelectedPO(po);
       
-      // Pre-populate form with PO data
+      // Pre-populate form with PO data - show remaining quantities
       setFormData(prev => ({
         ...prev,
         purchaseOrder: po._id,
         supplier: po.principal?.name || '',
-        receivedProducts: po.products?.map(line => ({
-          product: line.product,
-          productName: line.productName,
-          productCode: line.productCode || '',
-          orderedQuantity: line.quantity,
-          receivedQuantity: 0,
-          unit: line.unit || 'PCS',
-          batchNumber: '',
-          expiryDate: '',
-          manufacturingDate: '',
-          unitPrice: line.unitPrice,
-          remarks: '',
-          qcStatus: 'pending',
-          qcRemarks: '',
-          status: 'received'
-        })) || []
+        receivedProducts: po.products?.map(line => {
+          const remainingQty = Math.max(0, line.quantity - (line.receivedQty || 0));
+          return {
+            product: line.product?._id || line.product, // Handle both populated and non-populated cases
+            productName: line.productName,
+            productCode: line.productCode || '',
+            orderedQuantity: line.quantity, // Original ordered quantity
+            remainingQuantity: remainingQty, // Available to receive
+            alreadyReceived: line.receivedQty || 0, // Previously received
+            receivedQuantity: 0, // Current receiving quantity
+            unit: line.unit || 'PCS',
+            batchNumber: '',
+            expiryDate: '',
+            manufacturingDate: '',
+            unitPrice: line.unitPrice,
+            remarks: '',
+            qcStatus: 'pending',
+            qcRemarks: '',
+            status: 'received'
+          };
+        }) || []
       }));
     } catch (error) {
       toast.error('Failed to load purchase order details');
@@ -256,29 +278,51 @@ const InvoiceReceivingForm: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
+    console.log('=== FORM VALIDATION DEBUG ===');
+    console.log('Form data:', formData);
+
     if (!formData.purchaseOrder) {
       newErrors.purchaseOrder = 'Purchase order is required';
+      console.log('❌ Purchase order missing');
+    } else {
+      console.log('✅ Purchase order:', formData.purchaseOrder);
     }
 
     if (!formData.invoiceNumber.trim()) {
       newErrors.invoiceNumber = 'Invoice number is required';
+      console.log('❌ Invoice number missing');
+    } else {
+      console.log('✅ Invoice number:', formData.invoiceNumber);
     }
 
     if (!formData.invoiceDate) {
       newErrors.invoiceDate = 'Invoice date is required';
+      console.log('❌ Invoice date missing');
+    } else {
+      console.log('✅ Invoice date:', formData.invoiceDate);
     }
 
     if (!formData.receivedDate) {
       newErrors.receivedDate = 'Received date is required';
+      console.log('❌ Received date missing');
+    } else {
+      console.log('✅ Received date:', formData.receivedDate);
     }
 
     if (!formData.supplier.trim()) {
       newErrors.supplier = 'Supplier is required';
+      console.log('❌ Supplier missing');
+    } else {
+      console.log('✅ Supplier:', formData.supplier);
     }
 
     // Allow zero receiving - check if we have product entries (even with 0 quantities)
     if (formData.receivedProducts.length === 0) {
       newErrors.receivedProducts = 'Product list is required (even if received quantities are zero)';
+      console.log('❌ No products in list');
+    } else {
+      console.log('✅ Products count:', formData.receivedProducts.length);
+      console.log('Products:', formData.receivedProducts);
     }
 
     // Enhanced validation for received products
@@ -287,6 +331,7 @@ const InvoiceReceivingForm: React.FC = () => {
       if (!acc[key]) {
         acc[key] = {
           orderedQuantity: product.orderedQuantity,
+          remainingQuantity: product.remainingQuantity, // Add this field to the group
           entries: []
         };
       }
@@ -294,19 +339,25 @@ const InvoiceReceivingForm: React.FC = () => {
       return acc;
     }, {} as Record<string, any>);
 
+    console.log('Product groups:', productGroups);
+
     // Validate each product group
     Object.entries(productGroups).forEach(([key, group]) => {
       const totalReceived = group.entries.reduce((sum: number, entry: any) => sum + entry.receivedQuantity, 0);
       
       group.entries.forEach((entry: any) => {
+        console.log(`Validating product ${entry.index}:`, entry);
+        
         // Basic quantity validation
         if (entry.receivedQuantity < 0) {
           newErrors[`receivedProduct_${entry.index}_quantity`] = 'Received quantity cannot be negative';
+          console.log(`❌ Product ${entry.index}: Negative quantity`);
         }
         
         // Batch number validation - only required if quantity > 0
-        if (entry.receivedQuantity > 0 && !entry.batchNumber.trim()) {
+        if (entry.receivedQuantity > 0 && !entry.batchNumber?.trim()) {
           newErrors[`receivedProduct_${entry.index}_batch`] = 'Batch number is required for received products';
+          console.log(`❌ Product ${entry.index}: Missing batch number for received quantity ${entry.receivedQuantity}`);
         }
         
         // Expiry date validation for pharmaceutical products
@@ -315,6 +366,7 @@ const InvoiceReceivingForm: React.FC = () => {
           const today = new Date();
           if (expiryDate <= today) {
             newErrors[`receivedProduct_${entry.index}_expiry`] = 'Expiry date must be in the future';
+            console.log(`❌ Product ${entry.index}: Expiry date in past`);
           }
         }
         
@@ -324,22 +376,28 @@ const InvoiceReceivingForm: React.FC = () => {
           const expDate = new Date(entry.expiryDate);
           if (mfgDate >= expDate) {
             newErrors[`receivedProduct_${entry.index}_mfg`] = 'Manufacturing date must be before expiry date';
+            console.log(`❌ Product ${entry.index}: Manufacturing date after expiry`);
           }
         }
       });
       
-      // Group-level validation - allow zero receiving but warn about over-receiving
+      // Group-level validation - check against remaining quantities
       const tolerance = 0.1; // 10% tolerance
-      if (totalReceived > group.orderedQuantity * (1 + tolerance)) {
-        newErrors[`productGroup_${key}`] = `Total received quantity (${totalReceived}) significantly exceeds ordered quantity (${group.orderedQuantity})`;
+      const remainingQty = group.remainingQuantity || 0;
+      if (totalReceived > remainingQty * (1 + tolerance)) {
+        newErrors[`productGroup_${key}`] = `Total received quantity (${totalReceived}) exceeds available quantity (${remainingQty})`;
+        console.log(`❌ Product group ${key}: Exceeds available quantity`);
       }
       
       // Optional: Add warning for zero receiving (not an error, just informational)
       if (totalReceived === 0) {
         // This is allowed - no error, just track it
-        console.log(`Product group ${key}: No items received (${group.orderedQuantity} ordered)`);
+        console.log(`ℹ️ Product group ${key}: No items received (${remainingQty} available)`);
       }
     });
+
+    console.log('Validation errors:', newErrors);
+    console.log('=== END VALIDATION DEBUG ===');
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -606,7 +664,9 @@ const InvoiceReceivingForm: React.FC = () => {
                          productName: product.productName,
                          productCode: product.productCode,
                          unit: product.unit,
-                         orderedQuantity: product.orderedQuantity
+                         orderedQuantity: product.orderedQuantity,
+                         remainingQuantity: product.remainingQuantity,
+                         alreadyReceived: product.alreadyReceived
                        },
                        entries: []
                      };
@@ -617,9 +677,10 @@ const InvoiceReceivingForm: React.FC = () => {
 
                 return Object.entries(groupedProducts).map(([key, group]) => {
                   const totalReceived = group.entries.reduce((sum: number, entry: any) => sum + entry.receivedQuantity, 0);
-                  const isPartialReceived = totalReceived > 0 && totalReceived < group.productInfo.orderedQuantity;
-                  const isOverReceived = totalReceived > group.productInfo.orderedQuantity;
-                  const isFullyReceived = totalReceived === group.productInfo.orderedQuantity;
+                  const remainingQty = group.productInfo.remainingQuantity || 0;
+                  const isPartialReceived = totalReceived > 0 && totalReceived < remainingQty;
+                  const isOverReceived = totalReceived > remainingQty;
+                  const isFullyReceived = totalReceived === remainingQty;
 
                   return (
                     <div key={key} className="border border-gray-200 rounded-lg p-4">
@@ -651,8 +712,8 @@ const InvoiceReceivingForm: React.FC = () => {
                             Code: {group.productInfo.productCode} | Unit: {group.productInfo.unit}
                           </div>
                           <div className="text-sm text-gray-600 mt-1">
-                            Ordered: {group.productInfo.orderedQuantity} | Received: {totalReceived} | 
-                            Remaining: {Math.max(0, group.productInfo.orderedQuantity - totalReceived)}
+                            Ordered: {group.productInfo.orderedQuantity} | Already Received: {group.productInfo.alreadyReceived || 0} | 
+                            Available: {group.productInfo.remainingQuantity || 0} | Current Receiving: {totalReceived}
                           </div>
                         </div>
                         

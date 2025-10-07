@@ -8,7 +8,9 @@ export interface ReceivedProduct {
   productCode?: string;
   productName?: string;
   orderedQuantity: number;
-  receivedQuantity: number;
+  remainingQuantity?: number; // Available to receive (orderedQuantity - alreadyReceived)
+  alreadyReceived?: number; // Previously received quantity
+  receivedQuantity: number; // Current receiving quantity
   foc?: number;
   unitPrice?: number;
   unit?: string;

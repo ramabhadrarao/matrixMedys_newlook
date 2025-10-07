@@ -43,7 +43,9 @@ const invoiceValidation = [
       if (product.product && !product.product.match(/^[0-9a-fA-F]{24}$/)) {
         throw new Error(`Product at index ${index} must have a valid product ID`);
       }
-      if (product.receivedQuantity !== undefined && (isNaN(product.receivedQuantity) || product.receivedQuantity < 0)) {
+      // Check both receivedQuantity and receivedQty field names
+      const receivedQty = product.receivedQuantity !== undefined ? product.receivedQuantity : product.receivedQty;
+      if (receivedQty !== undefined && (isNaN(receivedQty) || receivedQty < 0)) {
         throw new Error(`Received quantity at index ${index} must be non-negative`);
       }
     });

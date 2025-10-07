@@ -93,12 +93,23 @@ const invoiceReceivingSchema = new mongoose.Schema({
 
 // Update PO status after receiving
 invoiceReceivingSchema.post('save', async function() {
-  const PurchaseOrder = mongoose.model('PurchaseOrder');
-  const po = await PurchaseOrder.findById(this.purchaseOrder);
-  
-  if (po) {
+  try {
+    console.log(`[${process.pid}] Post-save hook triggered for invoice receiving: ${this.invoiceNumber}`);
+    
+    const PurchaseOrder = mongoose.model('PurchaseOrder');
+    const po = await PurchaseOrder.findById(this.purchaseOrder);
+    
+    if (!po) {
+      console.log(`[${process.pid}] PO not found: ${this.purchaseOrder}`);
+      return;
+    }
+    
+    console.log(`[${process.pid}] Found PO: ${po.poNumber}, products count: ${this.products.length}`);
+    
     // Update received quantities in PO
     for (const receivedProduct of this.products) {
+      console.log(`[${process.pid}] Processing received product: ${receivedProduct.productName}, product ID: ${receivedProduct.product}`);
+      
       // Skip products with null product ID
       if (!receivedProduct.product) {
         console.log(`[${process.pid}] Skipping product with null ID: ${receivedProduct.productName}`);
@@ -110,20 +121,13 @@ invoiceReceivingSchema.post('save', async function() {
       );
       
       if (poProduct) {
-        poProduct.receivedQty = (poProduct.receivedQty || 0) + receivedProduct.receivedQty;
+        const oldReceivedQty = poProduct.receivedQty || 0;
+        poProduct.receivedQty = oldReceivedQty + receivedProduct.receivedQty;
         poProduct.backlogQty = poProduct.quantity - poProduct.receivedQty;
         
-        // Add to receiving history
-        poProduct.receivingHistory.push({
-          receivedQty: receivedProduct.receivedQty,
-          receivedDate: this.receivedDate,
-          receivedBy: this.receivedBy,
-          invoiceNumber: this.invoiceNumber,
-          batchNo: receivedProduct.batchNo,
-          mfgDate: receivedProduct.mfgDate,
-          expDate: receivedProduct.expDate,
-          remarks: receivedProduct.remarks
-        });
+        console.log(`[${process.pid}] Updated PO product ${poProduct.productName}: receivedQty=${oldReceivedQty} + ${receivedProduct.receivedQty} = ${poProduct.receivedQty}, backlogQty=${poProduct.backlogQty}`);
+      } else {
+        console.log(`[${process.pid}] PO product not found for: ${receivedProduct.productName}`);
       }
     }
     
@@ -142,7 +146,11 @@ invoiceReceivingSchema.post('save', async function() {
     po.totalReceivedQty = po.products.reduce((sum, p) => sum + (p.receivedQty || 0), 0);
     po.totalBacklogQty = po.products.reduce((sum, p) => sum + (p.backlogQty || 0), 0);
     
+    console.log(`[${process.pid}] Saving PO with new status: ${po.status}`);
     await po.save();
+    console.log(`[${process.pid}] PO saved successfully`);
+  } catch (error) {
+    console.error(`[${process.pid}] Error in post-save hook:`, error);
   }
 });
 
