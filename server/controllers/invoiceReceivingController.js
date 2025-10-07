@@ -1,4 +1,4 @@
-// server/controllers/invoiceReceivingController.js - FIXED VERSION
+// server/controllers/invoiceReceivingController.js - COMPLETE FIXED VERSION
 import InvoiceReceiving from '../models/InvoiceReceiving.js';
 import PurchaseOrder from '../models/PurchaseOrder.js';
 import WorkflowStage from '../models/WorkflowStage.js';
@@ -28,9 +28,9 @@ export const createInvoiceReceiving = async (req, res) => {
       return res.status(404).json({ message: 'Purchase order not found' });
     }
     
-    if (!['ordered', 'partial_received'].includes(po.status)) {
+    if (!['ordered', 'partial_received', 'received'].includes(po.status)) {
       return res.status(400).json({ 
-        message: 'Purchase order must be in ordered or partial_received status' 
+        message: 'Purchase order must be in ordered, partial_received, or received status' 
       });
     }
     
@@ -53,11 +53,71 @@ export const createInvoiceReceiving = async (req, res) => {
     }
     
     if (productsArray.length === 0) {
-      return res.status(400).json({ message: 'Product list cannot be empty (even with zero received quantities)' });
+      return res.status(400).json({ message: 'Product list cannot be empty' });
+    }
+    
+    // Get all existing invoice receivings for this PO (excluding draft status)
+    const existingReceivings = await InvoiceReceiving.find({
+      purchaseOrder,
+      status: { $in: ['submitted', 'completed', 'qc_pending'] }
+    });
+    
+    // Calculate cumulative received quantities for validation
+    const cumulativeReceived = {};
+    existingReceivings.forEach(receiving => {
+      receiving.products?.forEach(product => {
+        const productId = product.product?.toString();
+        if (productId) {
+          cumulativeReceived[productId] = (cumulativeReceived[productId] || 0) + (product.receivedQty || 0);
+        }
+      });
+    });
+    
+    // Validate that new receiving doesn't exceed ordered quantities
+    let hasValidationErrors = false;
+    const validationErrors = [];
+    
+    productsArray.forEach(product => {
+      const productId = product.product?.toString();
+      if (!productId) return;
+      
+      // Find the corresponding product in the PO
+      const poProduct = po.products.find(p => p.product?.toString() === productId);
+      if (!poProduct) {
+        validationErrors.push(`Product ${product.productName} not found in purchase order`);
+        hasValidationErrors = true;
+        return;
+      }
+      
+      // Calculate total that would be received after this receiving
+      const alreadyReceived = cumulativeReceived[productId] || 0;
+      const newReceiving = product.receivedQuantity || product.receivedQty || 0;
+      const totalAfterReceiving = alreadyReceived + newReceiving;
+      const orderedQty = poProduct.quantity;
+      
+      console.log(`Product ${product.productName}: Ordered=${orderedQty}, Already Received=${alreadyReceived}, New Receiving=${newReceiving}, Total After=${totalAfterReceiving}`);
+      
+      // Allow up to 10% over-receiving tolerance
+      const tolerance = 0.1;
+      const maxAllowed = orderedQty * (1 + tolerance);
+      
+      if (totalAfterReceiving > maxAllowed) {
+        validationErrors.push(
+          `Product ${product.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
+        );
+        hasValidationErrors = true;
+      }
+    });
+    
+    if (hasValidationErrors) {
+      return res.status(400).json({ 
+        message: 'Validation errors found',
+        errors: validationErrors 
+      });
     }
     
     // Log zero received quantities for business tracking
-    const zeroReceivedProducts = productsArray.filter(p => (p.receivedQuantity || 0) === 0);
+    const zeroReceivedProducts = productsArray.filter(p => (p.receivedQuantity || p.receivedQty || 0) === 0);
     if (zeroReceivedProducts.length > 0) {
       console.log(`Invoice receiving with ${zeroReceivedProducts.length} zero-received products:`, 
         zeroReceivedProducts.map(p => p.productName || p.productCode).join(', '));
@@ -119,7 +179,7 @@ export const createInvoiceReceiving = async (req, res) => {
       { path: 'createdBy', select: 'name email' }
     ]);
     
-    // Update PO with received quantities
+    // Update PO with received quantities (considering all receivings)
     await updatePOReceivedQuantities(po._id);
     
     console.log('Invoice receiving created successfully:', invoiceReceiving._id);
@@ -233,18 +293,103 @@ export const updateInvoiceReceiving = async (req, res) => {
       });
     }
     
-    // Parse receivedProducts if it's a string (from FormData)
-    if (updates.receivedProducts && typeof updates.receivedProducts === 'string') {
+    // Parse receivedProducts/products if it's a string (from FormData)
+    let productsArray = updates.products || updates.receivedProducts;
+    if (productsArray && typeof productsArray === 'string') {
       try {
-        updates.receivedProducts = JSON.parse(updates.receivedProducts);
+        productsArray = JSON.parse(productsArray);
       } catch (e) {
         return res.status(400).json({ message: 'Invalid products data format' });
       }
     }
     
-    // Update fields
+    // If products are being updated, validate them
+    if (productsArray) {
+      const po = await PurchaseOrder.findById(invoiceReceiving.purchaseOrder);
+      if (!po) {
+        return res.status(404).json({ message: 'Associated purchase order not found' });
+      }
+      
+      // Get all existing invoice receivings except current one
+      const existingReceivings = await InvoiceReceiving.find({
+        purchaseOrder: invoiceReceiving.purchaseOrder,
+        _id: { $ne: id },
+        status: { $in: ['submitted', 'completed', 'qc_pending'] }
+      });
+      
+      // Calculate cumulative received quantities (excluding current receiving)
+      const cumulativeReceived = {};
+      existingReceivings.forEach(receiving => {
+        receiving.products?.forEach(product => {
+          const productId = product.product?.toString();
+          if (productId) {
+            cumulativeReceived[productId] = (cumulativeReceived[productId] || 0) + (product.receivedQty || 0);
+          }
+        });
+      });
+      
+      // Validate updated quantities
+      let hasValidationErrors = false;
+      const validationErrors = [];
+      
+      productsArray.forEach(product => {
+        const productId = product.product?.toString();
+        if (!productId) return;
+        
+        const poProduct = po.products.find(p => p.product?.toString() === productId);
+        if (!poProduct) {
+          validationErrors.push(`Product ${product.productName} not found in purchase order`);
+          hasValidationErrors = true;
+          return;
+        }
+        
+        const alreadyReceived = cumulativeReceived[productId] || 0;
+        const newReceiving = product.receivedQuantity || product.receivedQty || 0;
+        const totalAfterReceiving = alreadyReceived + newReceiving;
+        const orderedQty = poProduct.quantity;
+        
+        // Allow up to 10% over-receiving tolerance
+        const tolerance = 0.1;
+        const maxAllowed = orderedQty * (1 + tolerance);
+        
+        if (totalAfterReceiving > maxAllowed) {
+          validationErrors.push(
+            `Product ${product.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
+          );
+          hasValidationErrors = true;
+        }
+      });
+      
+      if (hasValidationErrors) {
+        return res.status(400).json({ 
+          message: 'Validation errors found',
+          errors: validationErrors 
+        });
+      }
+      
+      // Update products
+      invoiceReceiving.products = productsArray.map(product => ({
+        product: product.product,
+        productCode: product.productCode || '',
+        productName: product.productName || '',
+        orderedQty: product.orderedQuantity || product.orderedQty || 0,
+        receivedQty: product.receivedQuantity || product.receivedQty || 0,
+        foc: product.foc || 0,
+        unitPrice: product.unitPrice || 0,
+        unit: product.unit || 'PCS',
+        batchNo: product.batchNumber || product.batchNo || '',
+        mfgDate: product.manufacturingDate || product.mfgDate || '',
+        expDate: product.expiryDate || product.expDate || '',
+        status: product.status || 'received',
+        remarks: product.remarks || '',
+        qcStatus: product.qcStatus || (invoiceReceiving.qcRequired ? 'pending' : 'not_required'),
+        qcRemarks: product.qcRemarks || ''
+      }));
+    }
+    
+    // Update other fields
     Object.keys(updates).forEach(key => {
-      if (key !== '_id' && updates[key] !== undefined) {
+      if (key !== '_id' && key !== 'products' && key !== 'receivedProducts' && updates[key] !== undefined) {
         invoiceReceiving[key] = updates[key];
       }
     });
@@ -259,7 +404,7 @@ export const updateInvoiceReceiving = async (req, res) => {
     ]);
     
     // Update PO received quantities
-    await updatePOReceivedQuantities(invoiceReceiving.purchaseOrder._id);
+    await updatePOReceivedQuantities(invoiceReceiving.purchaseOrder._id || invoiceReceiving.purchaseOrder);
     
     res.json({
       message: 'Invoice receiving updated successfully',
@@ -289,6 +434,11 @@ export const submitToQC = async (req, res) => {
     invoiceReceiving.status = 'submitted';
     if (invoiceReceiving.qcRequired) {
       invoiceReceiving.qcStatus = 'pending';
+      invoiceReceiving.products.forEach(product => {
+        if (!product.qcStatus || product.qcStatus === 'not_required') {
+          product.qcStatus = 'pending';
+        }
+      });
     }
     
     await invoiceReceiving.save();
@@ -313,6 +463,9 @@ export const submitToQC = async (req, res) => {
         }
       }
     }
+    
+    // Update PO received quantities
+    await updatePOReceivedQuantities(invoiceReceiving.purchaseOrder._id || invoiceReceiving.purchaseOrder);
     
     await invoiceReceiving.populate([
       { path: 'purchaseOrder', select: 'poNumber status' },
@@ -351,7 +504,7 @@ export const performQCCheck = async (req, res) => {
     // Update product-level QC status if provided
     if (productQCResults && Array.isArray(productQCResults)) {
       productQCResults.forEach(result => {
-        const product = invoiceReceiving.receivedProducts.find(p => 
+        const product = invoiceReceiving.products.find(p => 
           p.product.toString() === result.productId || 
           p._id.toString() === result.productId
         );
@@ -362,7 +515,7 @@ export const performQCCheck = async (req, res) => {
       });
     } else {
       // Apply QC status to all products
-      invoiceReceiving.receivedProducts.forEach(product => {
+      invoiceReceiving.products.forEach(product => {
         product.qcStatus = qcStatus;
         product.qcRemarks = qcRemarks;
       });
@@ -404,11 +557,15 @@ export const performQCCheck = async (req, res) => {
         });
         
         // Check if all items are fully received and QC passed
-        if (qcStatus === 'passed' && po.isFullyReceived) {
-          const completedStage = await WorkflowStage.findOne({ code: 'COMPLETED' });
-          if (completedStage) {
-            po.currentStage = completedStage._id;
-            po.status = 'completed';
+        if (qcStatus === 'passed') {
+          await updatePOReceivedQuantities(po._id);
+          
+          if (po.isFullyReceived) {
+            const completedStage = await WorkflowStage.findOne({ code: 'COMPLETED' });
+            if (completedStage) {
+              po.currentStage = completedStage._id;
+              po.status = 'completed';
+            }
           }
         }
         
@@ -431,77 +588,6 @@ export const performQCCheck = async (req, res) => {
   }
 };
 
-// Helper function to update PO received quantities
-const updatePOReceivedQuantities = async (purchaseOrderId) => {
-  try {
-    const po = await PurchaseOrder.findById(purchaseOrderId);
-    if (!po) return;
-    
-    // Get all invoice receivings for this PO
-    const invoiceReceivings = await InvoiceReceiving.find({ 
-      purchaseOrder: purchaseOrderId,
-      status: { $in: ['submitted', 'completed'] }
-    });
-    
-    // Calculate total received quantities per product
-    const receivedQuantities = {};
-    
-    invoiceReceivings.forEach(receiving => {
-      receiving.receivedProducts.forEach(product => {
-        const productId = product.product.toString();
-        if (!receivedQuantities[productId]) {
-          receivedQuantities[productId] = 0;
-        }
-        receivedQuantities[productId] += product.receivedQuantity || 0;
-      });
-    });
-    
-    // Update PO products with received quantities
-    let allFullyReceived = true;
-    
-    po.products.forEach(product => {
-      const productId = product.product.toString();
-      const receivedQty = receivedQuantities[productId] || 0;
-      
-      product.receivedQty = receivedQty;
-      product.backlogQty = Math.max(0, product.quantity - receivedQty);
-      
-      if (product.backlogQty > 0) {
-        allFullyReceived = false;
-      }
-    });
-    
-    // Update PO status based on received quantities
-    const totalReceived = Object.values(receivedQuantities).reduce((sum, qty) => sum + qty, 0);
-    
-    if (totalReceived === 0) {
-      po.status = 'ordered';
-    } else if (allFullyReceived) {
-      po.status = 'received';
-      // Find and set appropriate workflow stage
-      const receivedStage = await WorkflowStage.findOne({ code: 'RECEIVED' });
-      if (receivedStage) {
-        po.currentStage = receivedStage._id;
-      }
-    } else {
-      po.status = 'partial_received';
-      const partialReceivedStage = await WorkflowStage.findOne({ code: 'PARTIAL_RECEIVED' });
-      if (partialReceivedStage) {
-        po.currentStage = partialReceivedStage._id;
-      }
-    }
-    
-    po.isFullyReceived = allFullyReceived;
-    po.updatedAt = new Date();
-    
-    await po.save();
-    
-    console.log(`Updated PO ${po.poNumber} - Status: ${po.status}, Fully Received: ${allFullyReceived}`);
-  } catch (error) {
-    console.error('Error updating PO received quantities:', error);
-  }
-};
-
 export const updateQCStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -512,8 +598,8 @@ export const updateQCStatus = async (req, res) => {
       return res.status(404).json({ message: 'Invoice receiving not found' });
     }
     
-    if (productIndex >= 0 && productIndex < invoiceReceiving.receivedProducts.length) {
-      const product = invoiceReceiving.receivedProducts[productIndex];
+    if (productIndex >= 0 && productIndex < invoiceReceiving.products.length) {
+      const product = invoiceReceiving.products[productIndex];
       product.qcStatus = qcStatus;
       product.qcRemarks = qcRemarks;
       product.qcBy = qcBy;
@@ -534,6 +620,118 @@ export const updateQCStatus = async (req, res) => {
   }
 };
 
+export const deleteInvoiceReceiving = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const invoiceReceiving = await InvoiceReceiving.findById(id);
+    if (!invoiceReceiving) {
+      return res.status(404).json({ message: 'Invoice receiving not found' });
+    }
+    
+    // Only allow deletion of draft status
+    if (invoiceReceiving.status !== 'draft') {
+      return res.status(400).json({ 
+        message: 'Can only delete draft invoice receivings' 
+      });
+    }
+    
+    const poId = invoiceReceiving.purchaseOrder;
+    
+    await InvoiceReceiving.findByIdAndDelete(id);
+    
+    // Update PO received quantities after deletion
+    if (poId) {
+      await updatePOReceivedQuantities(poId);
+    }
+    
+    res.json({ message: 'Invoice receiving deleted successfully' });
+  } catch (error) {
+    console.error('Delete invoice receiving error:', error);
+    res.status(500).json({ message: 'Failed to delete invoice receiving' });
+  }
+};
+
+// Helper function to update PO received quantities - FIXED VERSION
+const updatePOReceivedQuantities = async (purchaseOrderId) => {
+  try {
+    const po = await PurchaseOrder.findById(purchaseOrderId);
+    if (!po) return;
+    
+    // Get all invoice receivings for this PO (only non-draft ones count)
+    const invoiceReceivings = await InvoiceReceiving.find({ 
+      purchaseOrder: purchaseOrderId,
+      status: { $in: ['submitted', 'completed', 'qc_pending'] }
+    });
+    
+    // Calculate total received quantities per product
+    const receivedQuantities = {};
+    
+    invoiceReceivings.forEach(receiving => {
+      receiving.products?.forEach(product => {
+        const productId = product.product?.toString();
+        if (productId) {
+          if (!receivedQuantities[productId]) {
+            receivedQuantities[productId] = 0;
+          }
+          receivedQuantities[productId] += product.receivedQty || 0;
+        }
+      });
+    });
+    
+    // Update PO products with received quantities
+    let allFullyReceived = true;
+    let someReceived = false;
+    
+    po.products.forEach(product => {
+      const productId = product.product?.toString();
+      if (productId) {
+        const receivedQty = receivedQuantities[productId] || 0;
+        
+        product.receivedQty = receivedQty;
+        product.backlogQty = Math.max(0, product.quantity - receivedQty);
+        
+        if (receivedQty > 0) {
+          someReceived = true;
+        }
+        
+        if (product.backlogQty > 0) {
+          allFullyReceived = false;
+        }
+      }
+    });
+    
+    // Update PO status based on received quantities
+    if (allFullyReceived && someReceived) {
+      po.status = 'received';
+      po.isFullyReceived = true;
+      // Find and set appropriate workflow stage
+      const receivedStage = await WorkflowStage.findOne({ code: 'RECEIVED' });
+      if (receivedStage) {
+        po.currentStage = receivedStage._id;
+      }
+    } else if (someReceived) {
+      po.status = 'partial_received';
+      po.isFullyReceived = false;
+      const partialReceivedStage = await WorkflowStage.findOne({ code: 'PARTIAL_RECEIVED' });
+      if (partialReceivedStage) {
+        po.currentStage = partialReceivedStage._id;
+      }
+    } else {
+      // No items received yet, keep current status (likely 'ordered')
+      po.isFullyReceived = false;
+    }
+    
+    po.updatedAt = new Date();
+    
+    await po.save();
+    
+    console.log(`Updated PO ${po.poNumber} - Status: ${po.status}, Fully Received: ${allFullyReceived}`);
+  } catch (error) {
+    console.error('Error updating PO received quantities:', error);
+  }
+};
+
 export default {
   createInvoiceReceiving,
   getInvoiceReceiving,
@@ -541,5 +739,6 @@ export default {
   updateInvoiceReceiving,
   submitToQC,
   performQCCheck,
-  updateQCStatus
+  updateQCStatus,
+  deleteInvoiceReceiving
 };
