@@ -227,7 +227,7 @@ export const invoiceReceivingAPI = {
   createInvoiceReceiving: async (
     data: InvoiceReceivingFormData,
     productImages?: File[],
-    productImageMapping?: Record<string, number[]>,
+    productImageMapping?: Array<{ productIndex: number }>,
     onProgress?: (progress: number) => void
   ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
@@ -261,7 +261,7 @@ export const invoiceReceivingAPI = {
       
       // Add product image mapping if provided
       if (productImageMapping) {
-        formData.append('productImageMapping', JSON.stringify(productImageMapping));
+        formData.append('productImageMappings', JSON.stringify(productImageMapping));
       }
       
       const response = await createFormDataRequest('/invoice-receiving', formData, 'POST', onProgress);
@@ -278,7 +278,7 @@ export const invoiceReceivingAPI = {
     id: string,
     data: Partial<InvoiceReceivingFormData>,
     productImages?: File[],
-    productImageMapping?: Record<string, number[]>,
+    productImageMapping?: Array<{ productIndex: number }>,
     onProgress?: (progress: number) => void
   ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {

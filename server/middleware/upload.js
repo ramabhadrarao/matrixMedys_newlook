@@ -214,7 +214,11 @@ const uploadInvoiceReceivingImages = multer({
   }
 });
 
-export const uploadProductImages = uploadInvoiceReceivingImages.array('productImages', 10);
+// Invoice receiving specific uploads - handles both documents and product images
+export const uploadInvoiceReceivingFiles = uploadDynamic.fields([
+  { name: 'documents', maxCount: 20 },
+  { name: 'productImages', maxCount: 50 } // Allow multiple images across all products
+]);
 // Error handler middleware
 export const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {

@@ -4,7 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
-import { uploadMixedFiles, uploadProductImages, handleUploadError } from '../middleware/upload.js';
+import { uploadInvoiceReceivingFiles, handleUploadError } from '../middleware/upload.js';
 import {
   createInvoiceReceiving,
   getInvoiceReceiving,
@@ -65,8 +65,7 @@ router.get('/:id', authenticate, checkPermission('invoice_receiving', 'view'), g
 router.post('/', 
   authenticate, 
   checkPermission('invoice_receiving', 'create'),
-  uploadMixedFiles,
-  uploadProductImages,
+  uploadInvoiceReceivingFiles,
   handleUploadError,
   invoiceValidation,
   validate,
@@ -77,8 +76,7 @@ router.post('/',
 router.put('/:id', 
   authenticate, 
   checkPermission('invoice_receiving', 'update'),
-  uploadMixedFiles,
-  uploadProductImages,
+  uploadInvoiceReceivingFiles,
   handleUploadError,
   invoiceValidation,
   validate,
