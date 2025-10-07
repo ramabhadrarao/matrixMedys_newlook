@@ -123,11 +123,22 @@ export const createInvoiceReceiving = async (req, res) => {
         zeroReceivedProducts.map(p => p.productName || p.productCode).join(', '));
     }
     
+    // Calculate invoice amount if not provided
+    let calculatedInvoiceAmount = invoiceAmount;
+    if (!calculatedInvoiceAmount || calculatedInvoiceAmount === 0) {
+      calculatedInvoiceAmount = productsArray.reduce((total, product) => {
+        const receivedQty = product.receivedQuantity || product.receivedQty || 0;
+        const unitPrice = product.unitPrice || 0;
+        return total + (receivedQty * unitPrice);
+      }, 0);
+      console.log('Calculated invoice amount:', calculatedInvoiceAmount);
+    }
+    
     const invoiceReceiving = new InvoiceReceiving({
       purchaseOrder,
       invoiceNumber,
       invoiceDate,
-      invoiceAmount,
+      invoiceAmount: calculatedInvoiceAmount,
       dueDate,
       receivedDate: receivedDate || new Date(),
       receivedBy: req.user._id,
@@ -204,14 +215,21 @@ export const getInvoiceReceiving = async (req, res) => {
     const invoiceReceiving = await InvoiceReceiving.findById(id)
       .populate('purchaseOrder', 'poNumber status supplier')
       .populate('receivedBy', 'name email')
-      .populate('createdBy', 'name email')
-      .populate('qcBy', 'name email');
+      .populate('qcBy', 'name email')
+      .lean();
     
     if (!invoiceReceiving) {
       return res.status(404).json({ message: 'Invoice receiving not found' });
     }
     
-    res.json({ data: invoiceReceiving });
+    // Transform the data to match frontend expectations
+    const transformedReceiving = {
+      ...invoiceReceiving,
+      receivedProducts: invoiceReceiving.products, // Map products to receivedProducts for frontend
+      supplier: invoiceReceiving.purchaseOrder?.supplier || 'Unknown Supplier'
+    };
+    
+    res.json({ data: transformedReceiving });
   } catch (error) {
     console.error('Get invoice receiving error:', error);
     res.status(500).json({ message: 'Failed to fetch invoice receiving' });
@@ -258,13 +276,21 @@ export const getInvoiceReceivings = async (req, res) => {
       .populate('qcBy', 'name email')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
-      .skip(skip);
+      .skip(skip)
+      .lean(); // Use lean for better performance
+    
+    // Transform the data to match frontend expectations
+    const transformedReceivings = invoiceReceivings.map(receiving => ({
+      ...receiving,
+      receivedProducts: receiving.products, // Map products to receivedProducts for frontend
+      supplier: receiving.purchaseOrder?.supplier || 'Unknown Supplier'
+    }));
     
     const totalCount = await InvoiceReceiving.countDocuments(query);
     
     res.json({ 
       data: {
-        invoiceReceivings,
+        invoiceReceivings: transformedReceivings,
         totalCount,
         currentPage: parseInt(page),
         totalPages: Math.ceil(totalCount / parseInt(limit))
@@ -658,10 +684,10 @@ const updatePOReceivedQuantities = async (purchaseOrderId) => {
     const po = await PurchaseOrder.findById(purchaseOrderId);
     if (!po) return;
     
-    // Get all invoice receivings for this PO (only non-draft ones count)
+    // Get all invoice receivings for this PO (include draft status for immediate updates)
     const invoiceReceivings = await InvoiceReceiving.find({ 
       purchaseOrder: purchaseOrderId,
-      status: { $in: ['submitted', 'completed', 'qc_pending'] }
+      status: { $in: ['draft', 'submitted', 'completed', 'qc_pending'] }
     });
     
     // Calculate total received quantities per product

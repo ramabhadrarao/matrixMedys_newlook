@@ -74,34 +74,47 @@ const InvoiceReceivingForm: React.FC = () => {
   };
 
   // Update the loadPurchaseOrderDetails function
-const loadPurchaseOrderDetails = async (poId: string) => {
-  try {
-    const response = await purchaseOrderAPI.getPurchaseOrder(poId);
-    const po = response.purchaseOrder;
-    
-    // Get all existing receivings for this PO to calculate cumulative received
-    let cumulativeReceived: Record<string, number> = {};
+  const loadPurchaseOrderDetails = async (poId: string) => {
     try {
-      const receivingsResponse = await invoiceReceivingAPI.getByPurchaseOrder(poId);
-      const existingReceivings = receivingsResponse.data.invoiceReceivings || [];
+      const response = await purchaseOrderAPI.getPurchaseOrder(poId);
+      const po = response.purchaseOrder;
       
-      // Calculate cumulative received quantities (only non-draft receivings)
-      existingReceivings
-        .filter(r => ['submitted', 'completed', 'qc_pending'].includes(r.status))
-        .forEach(receiving => {
-          receiving.receivedProducts?.forEach(product => {
-            const productId = typeof product.product === 'string' 
-              ? product.product 
-              : product.product._id;
-            cumulativeReceived[productId] = (cumulativeReceived[productId] || 0) + product.receivedQuantity;
+      // Get all existing receivings for this PO to calculate cumulative received
+      let cumulativeReceived: Record<string, number> = {};
+      try {
+        const receivingsResponse = await invoiceReceivingAPI.getByPurchaseOrder(poId);
+        const existingReceivings = receivingsResponse.data.invoiceReceivings || [];
+        
+        console.log('Existing receivings for PO:', poId, existingReceivings);
+        
+        // Calculate cumulative received quantities (only non-draft receivings)
+        existingReceivings
+          .filter(r => ['submitted', 'completed', 'qc_pending'].includes(r.status))
+          .forEach(receiving => {
+            console.log('Processing receiving:', receiving.invoiceNumber, 'Status:', receiving.status);
+            
+            // Handle both 'products' and 'receivedProducts' fields
+            const products = receiving.receivedProducts || receiving.products || [];
+            console.log('Products in receiving:', products);
+            
+            products.forEach(product => {
+              const productId = typeof product.product === 'string' 
+                ? product.product 
+                : product.product?._id || product.product;
+              
+              if (productId) {
+                const receivedQty = product.receivedQty || 0;
+                cumulativeReceived[productId] = (cumulativeReceived[productId] || 0) + receivedQty;
+                console.log(`Product ${product.productName}: Adding ${receivedQty}, Total now: ${cumulativeReceived[productId]}`);
+              }
+            });
           });
-        });
-      
-      console.log('Cumulative received quantities:', cumulativeReceived);
-    } catch (error) {
-      console.error('Error fetching existing receivings:', error);
-      // Continue even if we can't fetch existing receivings
-    }
+        
+        console.log('Final cumulative received quantities:', cumulativeReceived);
+      } catch (error) {
+        console.error('Error fetching existing receivings:', error);
+        // Continue even if we can't fetch existing receivings
+      }
     
     setSelectedPO(po);
     
@@ -119,10 +132,10 @@ const loadPurchaseOrderDetails = async (poId: string) => {
           product: productId,
           productName: line.productName,
           productCode: line.productCode || '',
-          orderedQuantity: line.quantity,
+          orderedQty: line.quantity,
           remainingQuantity: remainingQty,
           alreadyReceived: alreadyReceived,
-          receivedQuantity: 0, // Start with 0, user will input
+          receivedQty: 0, // Start with 0, user will input
           unit: line.unit || 'PCS',
           batchNumber: '',
           expiryDate: '',
@@ -208,7 +221,7 @@ const loadPurchaseOrderDetails = async (poId: string) => {
     const product = formData.receivedProducts[productIndex];
     const newBatchEntry = {
       ...product,
-      receivedQuantity: 0,
+      receivedQty: 0,
       batchNumber: '',
       expiryDate: '',
       manufacturingDate: '',
@@ -255,7 +268,7 @@ const loadPurchaseOrderDetails = async (poId: string) => {
     const originalProduct = formData.receivedProducts[originalIndex];
     const substitutedEntry = {
       ...originalProduct,
-      receivedQuantity: 0,
+      receivedQty: 0,
       batchNumber: '',
       expiryDate: '',
       manufacturingDate: '',
@@ -290,8 +303,8 @@ const loadPurchaseOrderDetails = async (poId: string) => {
  const validateForm = (): boolean => {
   const newErrors: Record<string, string> = {};
 
-  console.log('=== FORM VALIDATION DEBUG ===');
-  console.log('Form data:', formData);
+  // console.log('=== FORM VALIDATION DEBUG ===');
+    // console.log('Form data:', formData);
 
   // Basic field validation
   if (!formData.purchaseOrder) {
@@ -324,8 +337,8 @@ const loadPurchaseOrderDetails = async (poId: string) => {
       if (!acc[key]) {
         acc[key] = {
           productName: product.productName,
-          orderedQuantity: product.orderedQuantity,
-          remainingQuantity: product.remainingQuantity || product.orderedQuantity,
+          orderedQty: product.orderedQty,
+          remainingQuantity: product.remainingQuantity || product.orderedQty,
           alreadyReceived: product.alreadyReceived || 0,
           entries: []
         };
@@ -334,37 +347,37 @@ const loadPurchaseOrderDetails = async (poId: string) => {
       return acc;
     }, {} as Record<string, any>);
 
-    console.log('Product groups for validation:', productGroups);
+    // console.log('Product groups for validation:', productGroups);
 
     // Validate each product group
     Object.entries(productGroups).forEach(([productId, group]) => {
       // Calculate total being received in this invoice
       const totalReceivingNow = group.entries.reduce((sum: number, entry: any) => 
-        sum + (entry.receivedQuantity || 0), 0
+        sum + (entry.receivedQty || 0), 0
       );
       
       // Calculate what would be the total after this receiving
       const totalAfterReceiving = group.alreadyReceived + totalReceivingNow;
-      const orderedQty = group.orderedQuantity;
+      const orderedQty = group.orderedQty;
       
-      console.log(`Product ${group.productName}:`, {
-        ordered: orderedQty,
-        alreadyReceived: group.alreadyReceived,
-        receivingNow: totalReceivingNow,
-        totalAfter: totalAfterReceiving
-      });
+      // console.log(`Product ${group.productName}:`, {
+      //   ordered: orderedQty,
+      //   alreadyReceived: group.alreadyReceived,
+      //   receivingNow: totalReceivingNow,
+      //   totalAfter: totalAfterReceiving
+      // });
       
       // Validate individual entries
       group.entries.forEach((entry: any) => {
         // Check for negative quantities
-        if (entry.receivedQuantity < 0) {
+        if (entry.receivedQty < 0) {
           newErrors[`product_${entry.index}_quantity`] = 'Quantity cannot be negative';
         }
         
         // Batch number validation - make it optional or based on business rules
-        if (entry.receivedQuantity > 0 && formData.qcRequired && !entry.batchNumber?.trim()) {
+        if (entry.receivedQty > 0 && formData.qcRequired && !entry.batchNumber?.trim()) {
           // This is now a warning, not an error
-          console.warn(`Product ${entry.index}: Consider adding batch number for QC tracking`);
+          // console.warn(`Product ${entry.index}: Consider adding batch number for QC tracking`);
         }
         
         // Validate dates if provided
@@ -382,7 +395,7 @@ const loadPurchaseOrderDetails = async (poId: string) => {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           
-          if (expDate < today && entry.receivedQuantity > 0) {
+          if (expDate < today && entry.receivedQty > 0) {
             newErrors[`product_${entry.index}_expiry`] = 'Cannot receive expired products';
           }
         }
@@ -404,21 +417,21 @@ const loadPurchaseOrderDetails = async (poId: string) => {
     });
   }
 
-  console.log('Validation complete. Errors found:', Object.keys(newErrors).length);
-  console.log('Errors:', newErrors);
+  // console.log('Validation complete. Errors found:', Object.keys(newErrors).length);
+    // console.log('Errors:', newErrors);
 
   setErrors(newErrors);
   return Object.keys(newErrors).length === 0;
 };
 const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
-  const percentage = product.orderedQuantity > 0 
-    ? ((product.alreadyReceived / product.orderedQuantity) * 100).toFixed(1)
+  const percentage = product.orderedQty > 0
+          ? ((product.alreadyReceived / product.orderedQty) * 100).toFixed(1)
     : 0;
     
   return (
     <div className="mt-2 space-y-1">
       <div className="flex justify-between text-xs text-gray-600">
-        <span>Progress: {product.alreadyReceived}/{product.orderedQuantity}</span>
+        <span>Progress: {product.alreadyReceived}/{product.orderedQty}</span>
         <span>{percentage}%</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -479,11 +492,11 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
   };
 
   const calculateTotalReceived = () => {
-    return formData.receivedProducts.reduce((sum, product) => sum + product.receivedQuantity, 0);
+    return formData.receivedProducts.reduce((sum, product) => sum + product.receivedQty, 0);
   };
 
   const calculateTotalOrdered = () => {
-    return formData.receivedProducts.reduce((sum, product) => sum + product.orderedQuantity, 0);
+    return formData.receivedProducts.reduce((sum, product) => sum + product.orderedQty, 0);
   };
 
   const formatCurrency = (amount: number) => {
@@ -700,7 +713,7 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
                          productName: product.productName,
                          productCode: product.productCode,
                          unit: product.unit,
-                         orderedQuantity: product.orderedQuantity,
+                         orderedQty: product.orderedQty,
                          remainingQuantity: product.remainingQuantity,
                          alreadyReceived: product.alreadyReceived
                        },
@@ -712,7 +725,7 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
                  }, {} as Record<string, any>);
 
                 return Object.entries(groupedProducts).map(([key, group]) => {
-                  const totalReceived = group.entries.reduce((sum: number, entry: any) => sum + entry.receivedQuantity, 0);
+                  const totalReceived = group.entries.reduce((sum: number, entry: any) => sum + entry.receivedQty, 0);
                   const remainingQty = group.productInfo.remainingQuantity || 0;
                   const isPartialReceived = totalReceived > 0 && totalReceived < remainingQty;
                   const isOverReceived = totalReceived > remainingQty;
@@ -748,7 +761,7 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
                             Code: {group.productInfo.productCode} | Unit: {group.productInfo.unit}
                           </div>
                           <div className="text-sm text-gray-600 mt-1">
-                            Ordered: {group.productInfo.orderedQuantity} | Already Received: {group.productInfo.alreadyReceived || 0} | 
+                            Ordered: {group.productInfo.orderedQty} | Already Received: {group.productInfo.alreadyReceived || 0} | 
                             Available: {group.productInfo.remainingQuantity || 0} | Current Receiving: {totalReceived}
                           </div>
                         </div>
@@ -789,8 +802,8 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
                                 </label>
                                 <input
                                   type="number"
-                                  value={entry.receivedQuantity}
-                                  onChange={(e) => updateReceivedProduct(entry.originalIndex, 'receivedQuantity', Number(e.target.value))}
+                                  value={entry.receivedQty}
+                              onChange={(e) => updateReceivedProduct(entry.originalIndex, 'receivedQty', Number(e.target.value))}
                                   className={`w-full px-2 py-1 border rounded text-sm ${
                                     errors[`receivedProduct_${entry.originalIndex}_quantity`] ? 'border-red-300' : 'border-gray-300'
                                   }`}

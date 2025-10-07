@@ -4,25 +4,22 @@ import { useAuthStore } from '../store/authStore';
 
 // Interfaces
 export interface ReceivedProduct {
-  product: string;
-  productCode?: string;
-  productName?: string;
-  orderedQuantity: number;
-  remainingQuantity?: number; // Available to receive (orderedQuantity - alreadyReceived)
-  alreadyReceived?: number; // Previously received quantity
-  receivedQuantity: number; // Current receiving quantity
+  _id?: string;
+  product?: string;
+  productCode: string;
+  productName: string;
+  orderedQty: number;
+  receivedQty: number;
   foc?: number;
-  unitPrice?: number;
+  unitPrice: number;
   unit?: string;
-  batchNumber?: string;
-  manufacturingDate?: string;
-  expiryDate?: string;
+  batchNo?: string;
+  mfgDate?: string;
+  expDate?: string;
   status: 'received' | 'backlog' | 'damaged' | 'rejected';
   remarks?: string;
   qcStatus?: 'pending' | 'passed' | 'failed' | 'not_required';
   qcRemarks?: string;
-  qcBy?: string;
-  qcDate?: string;
 }
 
 export interface InvoiceDocument {

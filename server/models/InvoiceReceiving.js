@@ -5,10 +5,11 @@ const receivedProductSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
   productCode: String,
   productName: String,
-  orderedQty: Number,
-  receivedQty: { type: Number, required: true },
+  orderedQty: { type: Number, default: 0 },
+  receivedQty: { type: Number, required: true, default: 0 },
   foc: { type: Number, default: 0 },
-  unitPrice: Number,
+  unitPrice: { type: Number, default: 0 },
+  unit: { type: String, default: 'PCS' },
   batchNo: String,
   mfgDate: Date,
   expDate: Date,
@@ -17,7 +18,13 @@ const receivedProductSchema = new mongoose.Schema({
     enum: ['received', 'backlog', 'damaged', 'rejected'],
     default: 'received'
   },
-  remarks: String
+  remarks: String,
+  qcStatus: {
+    type: String,
+    enum: ['pending', 'passed', 'failed', 'not_required'],
+    default: 'pending'
+  },
+  qcRemarks: String
 });
 
 const documentSchema = new mongoose.Schema({

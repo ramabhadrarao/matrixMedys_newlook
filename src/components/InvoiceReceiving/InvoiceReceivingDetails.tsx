@@ -455,14 +455,14 @@ const InvoiceReceivingDetails: React.FC = () => {
                         <div className="text-sm text-gray-500">₹{product.unitPrice}</div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
-                        {product.orderedQuantity}
+                        {product.orderedQty}
                       </td>
                       <td className="px-4 py-4">
                         <div className="text-sm text-gray-900 font-medium">
-                          {product.receivedQuantity}
+                          {product.receivedQty}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {((product.receivedQuantity / product.orderedQuantity) * 100).toFixed(1)}%
+                          {((product.receivedQty / product.orderedQty) * 100).toFixed(1)}%
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
@@ -522,7 +522,7 @@ const InvoiceReceivingDetails: React.FC = () => {
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900">{product.productName}</h4>
                         <div className="text-sm text-gray-500 mt-1">
-                          Received: {product.receivedQuantity} {product.unit}
+                          Received: {product.receivedQty} {product.unit}
                           {product.batchNumber && ` | Batch: ${product.batchNumber}`}
                         </div>
                         

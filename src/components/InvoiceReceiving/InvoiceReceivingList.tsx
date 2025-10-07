@@ -223,8 +223,8 @@ const InvoiceReceivingList: React.FC = () => {
         const tableData = receiving.receivedProducts.map(product => [
           product.productName || '',
           product.productCode || '',
-          product.orderedQuantity || 0,
-          product.receivedQuantity || 0,
+          product.orderedQty || 0,
+                      product.receivedQty || 0,
           product.unit || 'PCS',
           product.batchNumber || '',
           product.qcStatus || 'pending'
@@ -563,8 +563,8 @@ const InvoiceReceivingList: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {invoiceReceivings.map((receiving) => {
                     const StatusIcon = getStatusIcon(receiving.status);
-                    const totalReceived = receiving.receivedProducts?.reduce((sum, p) => sum + (p.receivedQuantity || 0), 0) || 0;
-                    const totalOrdered = receiving.receivedProducts?.reduce((sum, p) => sum + (p.orderedQuantity || 0), 0) || 0;
+                    const totalReceived = receiving.receivedProducts?.reduce((sum, p) => sum + (p.receivedQty || 0), 0) || 0;
+                    const totalOrdered = receiving.receivedProducts?.reduce((sum, p) => sum + (p.orderedQty || 0), 0) || 0;
                     
                     return (
                       <tr key={receiving._id} className="hover:bg-gray-50">
@@ -725,8 +725,8 @@ const InvoiceReceivingList: React.FC = () => {
             {/* Mobile Cards - Continuation */}
             <div className="lg:hidden divide-y divide-gray-200">
               {invoiceReceivings.map((receiving) => {
-                const totalReceived = receiving.receivedProducts?.reduce((sum, p) => sum + (p.receivedQuantity || 0), 0) || 0;
-                const totalOrdered = receiving.receivedProducts?.reduce((sum, p) => sum + (p.orderedQuantity || 0), 0) || 0;
+                const totalReceived = receiving.receivedProducts?.reduce((sum, p) => sum + (p.receivedQty || 0), 0) || 0;
+                    const totalOrdered = receiving.receivedProducts?.reduce((sum, p) => sum + (p.orderedQty || 0), 0) || 0;
                 
                 return (
                   <div key={receiving._id} className="p-6">
