@@ -535,7 +535,91 @@ export const invoiceReceivingAPI = {
       default:
         return qcStatus?.charAt(0).toUpperCase() + qcStatus?.slice(1) || 'Unknown';
     }
+  },
+
+  // File operations
+  viewFile: (filename: string) => {
+    try {
+      viewFileWithAuth(filename);
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      throw error;
+    }
+  },
+
+  downloadFile: async (filename: string, originalName?: string) => {
+    try {
+      await downloadFileWithAuth(filename, originalName);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      throw error;
+    }
+  },
+
+  // Get file URL with token (for cases where you need the URL)
+  getFileUrl: (filename: string, type: 'view' | 'download' = 'view') => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    return `${API_BASE_URL}/files/${type}/${filename}`;
   }
 };
 
 export default invoiceReceivingAPI;
+
+// Helper functions for file operations
+const downloadFileWithAuth = async (filename: string, originalName?: string) => {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const token = useAuthStore.getState().accessToken;
+    
+    const response = await fetch(`${API_BASE_URL}/files/download/${filename}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = originalName || filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download error:', error);
+    throw error;
+  }
+};
+
+const viewFileWithAuth = (filename: string) => {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const token = useAuthStore.getState().accessToken;
+  
+  fetch(`${API_BASE_URL}/files/view/${filename}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.blob();
+  })
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  })
+  .catch(error => {
+    console.error('View file error:', error);
+    throw error;
+  });
+};

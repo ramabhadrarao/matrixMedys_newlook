@@ -52,8 +52,76 @@ router.post('/upload', authenticate, uploadSingleFile, handleUploadError, (req, 
       file: fileInfo
     });
   } catch (error) {
-    console.error('File upload error:', error);
-    res.status(500).json({ message: 'File upload failed' });
+    console.error('Upload error:', error);
+    res.status(500).json({ message: 'Upload failed' });
+  }
+});
+
+// Public image viewing endpoint - NO AUTHENTICATION REQUIRED
+router.get('/public/view/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    
+    // Find file in any of the upload directories
+    const filePath = findFilePath(filename);
+    
+    // Check if file exists
+    if (!filePath) {
+      console.error('File not found for public viewing:', filename);
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    const fileExtension = path.extname(filename).toLowerCase();
+    
+    // Only allow image files for public access
+    let contentType = 'application/octet-stream';
+    switch (fileExtension) {
+      case '.jpg':
+      case '.jpeg':
+        contentType = 'image/jpeg';
+        break;
+      case '.png':
+        contentType = 'image/png';
+        break;
+      case '.gif':
+        contentType = 'image/gif';
+        break;
+      case '.webp':
+        contentType = 'image/webp';
+        break;
+      default:
+        // For non-image files, deny access
+        return res.status(403).json({ message: 'File type not allowed for public access' });
+    }
+
+    // Get file stats
+    const stats = fs.statSync(filePath);
+
+    // Set headers for inline viewing with proper CORS
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    
+    fileStream.on('error', (error) => {
+      console.error('File stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error reading file' });
+      }
+    });
+
+    fileStream.pipe(res);
+    
+  } catch (error) {
+    console.error('Public file view error:', error);
+    res.status(500).json({ message: 'File view failed' });
   }
 });
 

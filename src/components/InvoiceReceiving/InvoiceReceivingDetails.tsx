@@ -498,10 +498,10 @@ const InvoiceReceivingDetails: React.FC = () => {
                             {product.productImages.slice(0, 3).map((image, imgIndex) => (
                               <div key={imgIndex} className="relative group">
                                 <img
-                                  src={`http://localhost:5000/api/files/view/${image.filename}`}
+                                  src={`http://localhost:5000/api/files/public/view/${image.filename}`}
                                   alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
                                   className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80"
-                                  onClick={() => window.open(`http://localhost:5000/api/files/view/${image.filename}`, '_blank')}
+                                  onClick={() => window.open(`http://localhost:5000/api/files/public/view/${image.filename}`, '_blank')}
                                 />
                               </div>
                             ))}
@@ -616,23 +616,28 @@ const InvoiceReceivingDetails: React.FC = () => {
                     
                     <div className="mt-3 flex space-x-2">
                       <button
-                        onClick={() => doc.url && window.open(doc.url, '_blank')}
+                        onClick={() => {
+                          try {
+                            invoiceReceivingAPI.viewFile(doc.filename);
+                          } catch (error) {
+                            toast.error('Failed to view document');
+                            console.error('View error:', error);
+                          }
+                        }}
                         className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                        disabled={!doc.url}
                       >
                         View
                       </button>
                       <button
-                        onClick={() => {
-                          if (doc.url) {
-                            const link = document.createElement('a');
-                            link.href = doc.url;
-                            link.download = doc.originalName || `document-${index + 1}`;
-                            link.click();
+                        onClick={async () => {
+                          try {
+                            await invoiceReceivingAPI.downloadFile(doc.filename, doc.originalName);
+                          } catch (error) {
+                            toast.error('Failed to download document');
+                            console.error('Download error:', error);
                           }
                         }}
                         className="flex-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                        disabled={!doc.url}
                       >
                         Download
                       </button>
