@@ -40,7 +40,9 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors({
   origin: [
     'http://69.62.73.201:5173', // Development
@@ -48,6 +50,9 @@ app.use(cors({
     'http://localhost:5173'      // Local development
   ],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Content-Type']
 }));
 
 // Rate limiting - More relaxed for development

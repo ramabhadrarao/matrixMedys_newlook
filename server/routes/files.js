@@ -166,13 +166,15 @@ router.get('/view/:filename', authenticate, (req, res) => {
     // Get file stats
     const stats = fs.statSync(filePath);
 
-    // Set headers for inline viewing
+    // Set headers for inline viewing with proper CORS
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', stats.size);
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.setHeader('Access-Control-Allow-Origin', process.env.CLIENT_URL || 'http://localhost:5173');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
     // Stream the file
     const fileStream = fs.createReadStream(filePath);
