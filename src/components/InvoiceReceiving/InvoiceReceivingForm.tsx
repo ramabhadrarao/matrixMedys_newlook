@@ -79,79 +79,45 @@ const InvoiceReceivingForm: React.FC = () => {
       const response = await purchaseOrderAPI.getPurchaseOrder(poId);
       const po = response.purchaseOrder;
       
-      // Get all existing receivings for this PO to calculate cumulative received
-      let cumulativeReceived: Record<string, number> = {};
-      try {
-        const receivingsResponse = await invoiceReceivingAPI.getByPurchaseOrder(poId);
-        const existingReceivings = receivingsResponse.data.invoiceReceivings || [];
-        
-        console.log('Existing receivings for PO:', poId, existingReceivings);
-        
-        // Calculate cumulative received quantities (only non-draft receivings)
-        existingReceivings
-          .filter(r => ['submitted', 'completed', 'qc_pending'].includes(r.status))
-          .forEach(receiving => {
-            console.log('Processing receiving:', receiving.invoiceNumber, 'Status:', receiving.status);
-            
-            // Handle both 'products' and 'receivedProducts' fields
-            const products = receiving.receivedProducts || receiving.products || [];
-            console.log('Products in receiving:', products);
-            
-            products.forEach(product => {
-              const productId = typeof product.product === 'string' 
-                ? product.product 
-                : product.product?._id || product.product;
-              
-              if (productId) {
-                const receivedQty = product.receivedQty || 0;
-                cumulativeReceived[productId] = (cumulativeReceived[productId] || 0) + receivedQty;
-                console.log(`Product ${product.productName}: Adding ${receivedQty}, Total now: ${cumulativeReceived[productId]}`);
-              }
-            });
-          });
-        
-        console.log('Final cumulative received quantities:', cumulativeReceived);
-      } catch (error) {
-        console.error('Error fetching existing receivings:', error);
-        // Continue even if we can't fetch existing receivings
-      }
-    
-    setSelectedPO(po);
-    
-    // Pre-populate form with PO data - show actual remaining quantities
-    setFormData(prev => ({
-      ...prev,
-      purchaseOrder: po._id,
-      supplier: po.principal?.name || '',
-      receivedProducts: po.products?.map(line => {
-        const productId = line.product?._id || line.product;
-        const alreadyReceived = cumulativeReceived[productId] || line.receivedQty || 0;
-        const remainingQty = Math.max(0, line.quantity - alreadyReceived);
-        
-        return {
-          product: productId,
-          productName: line.productName,
-          productCode: line.productCode || '',
-          orderedQty: line.quantity,
-          remainingQuantity: remainingQty,
-          alreadyReceived: alreadyReceived,
-          receivedQty: 0, // Start with 0, user will input
-          unit: line.unit || 'PCS',
-          batchNumber: '',
-          expiryDate: '',
-          manufacturingDate: '',
-          unitPrice: line.unitPrice,
-          remarks: '',
-          qcStatus: 'pending',
-          qcRemarks: '',
-          status: 'received'
-        };
-      }) || []
-    }));
-  } catch (error) {
-    toast.error('Failed to load purchase order details');
-  }
-};
+      console.log('Loaded PO with updated quantities:', po);
+      
+      setSelectedPO(po);
+      
+      // Use the quantities already calculated by the backend
+      setFormData(prev => ({
+        ...prev,
+        purchaseOrder: po._id,
+        supplier: po.principal?.name || '',
+        receivedProducts: po.products?.map(line => {
+          const productId = line.product?._id || line.product;
+          // Use the backend-calculated quantities
+          const alreadyReceived = line.alreadyReceived || line.receivedQty || 0;
+          const remainingQty = line.pendingQty || line.backlogQty || Math.max(0, line.quantity - alreadyReceived);
+          
+          return {
+            product: productId,
+            productName: line.productName,
+            productCode: line.productCode || '',
+            orderedQty: line.quantity,
+            remainingQuantity: remainingQty,
+            alreadyReceived: alreadyReceived,
+            receivedQty: 0, // Start with 0, user will input
+            unit: line.unit || 'PCS',
+            batchNumber: '',
+            expiryDate: '',
+            manufacturingDate: '',
+            unitPrice: line.unitPrice,
+            remarks: '',
+            qcStatus: 'pending',
+            qcRemarks: '',
+            status: 'received'
+          };
+        }) || []
+      }));
+    } catch (error) {
+      toast.error('Failed to load purchase order details');
+    }
+  };
 
   const loadInvoiceReceiving = async (receivingId: string) => {
     try {

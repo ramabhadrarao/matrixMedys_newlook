@@ -217,8 +217,54 @@ export const getPurchaseOrder = async (req, res) => {
     if (!purchaseOrder) {
       return res.status(404).json({ message: 'Purchase order not found' });
     }
+
+    // Import InvoiceReceiving model at the top of the file if not already imported
+    const InvoiceReceiving = (await import('../models/InvoiceReceiving.js')).default;
     
-    res.json({ purchaseOrder });
+    // Get all invoice receivings for this PO to calculate actual received quantities
+    const invoiceReceivings = await InvoiceReceiving.find({ 
+      purchaseOrder: id,
+      status: { $in: ['draft', 'submitted', 'completed', 'qc_pending'] }
+    });
+    
+    // Calculate total received quantities per product from all invoice receivings
+    const receivedQuantities = {};
+    
+    invoiceReceivings.forEach(receiving => {
+      receiving.products?.forEach(product => {
+        const productId = product.product?.toString();
+        if (productId) {
+          if (!receivedQuantities[productId]) {
+            receivedQuantities[productId] = 0;
+          }
+          receivedQuantities[productId] += product.receivedQty || 0;
+        }
+      });
+    });
+    
+    // Update PO products with calculated received quantities
+    const updatedProducts = purchaseOrder.products.map(product => {
+      const productId = product.product?._id?.toString() || product.product?.toString();
+      const receivedQty = receivedQuantities[productId] || 0;
+      const backlogQty = Math.max(0, product.quantity - receivedQty);
+      const pendingQty = backlogQty; // pendingQty is same as backlogQty
+      
+      return {
+        ...product.toObject(),
+        receivedQty,
+        backlogQty,
+        pendingQty,
+        alreadyReceived: receivedQty // For frontend compatibility
+      };
+    });
+    
+    // Create updated purchase order object
+    const updatedPurchaseOrder = {
+      ...purchaseOrder.toObject(),
+      products: updatedProducts
+    };
+    
+    res.json({ purchaseOrder: updatedPurchaseOrder });
   } catch (error) {
     console.error('Get purchase order error:', error);
     res.status(500).json({ message: 'Failed to fetch purchase order' });
