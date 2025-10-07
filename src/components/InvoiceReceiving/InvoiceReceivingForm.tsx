@@ -12,7 +12,9 @@ import {
   Building2,
   AlertCircle,
   CheckCircle,
-  Plus
+  Plus,
+  Camera,
+  Image
 } from 'lucide-react';
 import { invoiceReceivingAPI, InvoiceReceivingFormData, ReceivedProduct } from '../../services/invoiceReceivingAPI';
 import { purchaseOrderAPI, PurchaseOrder } from '../../services/purchaseOrderAPI';
@@ -34,6 +36,7 @@ const InvoiceReceivingForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [productImages, setProductImages] = useState<Record<number, File[]>>({});
 
   const [formData, setFormData] = useState<InvoiceReceivingFormData>({
     purchaseOrder: preSelectedPO || '',
@@ -174,6 +177,24 @@ const InvoiceReceivingForm: React.FC = () => {
   };
 
   const updateReceivedProduct = (index: number, field: string, value: any) => {
+    // If updating receivedQty, validate against available quantity
+    if (field === 'receivedQty') {
+      const product = formData.receivedProducts[index];
+      const availableQty = product.remainingQuantity || 0;
+      
+      // Prevent exceeding available quantity
+      if (value > availableQty) {
+        toast.error(`Cannot receive ${value} items. Only ${availableQty} items available.`);
+        return; // Don't update if exceeding available quantity
+      }
+      
+      // Prevent negative quantities
+      if (value < 0) {
+        toast.error('Received quantity cannot be negative.');
+        return;
+      }
+    }
+    
     setFormData(prev => ({
       ...prev,
       receivedProducts: prev.receivedProducts.map((product, i) => 
@@ -263,6 +284,46 @@ const InvoiceReceivingForm: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       documents: prev.documents?.filter((_, i) => i !== index) || []
+    }));
+  };
+
+  // Product images handling functions
+  const handleProductImageUpload = (productIndex: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const existingImages = productImages[productIndex] || [];
+    const totalImages = existingImages.length + files.length;
+    
+    if (totalImages > 10) {
+      toast.error('Maximum 10 images allowed per product');
+      return;
+    }
+    
+    // Validate file types
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const invalidFiles = files.filter(file => !validTypes.includes(file.type));
+    
+    if (invalidFiles.length > 0) {
+      toast.error('Only JPG, JPEG, and PNG images are allowed');
+      return;
+    }
+    
+    // Validate file sizes (5MB max per image)
+    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      toast.error('Each image must be less than 5MB');
+      return;
+    }
+    
+    setProductImages(prev => ({
+      ...prev,
+      [productIndex]: [...existingImages, ...files]
+    }));
+  };
+
+  const removeProductImage = (productIndex: number, imageIndex: number) => {
+    setProductImages(prev => ({
+      ...prev,
+      [productIndex]: (prev[productIndex] || []).filter((_, i) => i !== imageIndex)
     }));
   };
 
@@ -432,16 +493,36 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
       
       const submitData = { ...formData };
       
+      // Prepare product images for submission
+      const productImagesArray: File[] = [];
+      const productImageMapping: Record<string, number[]> = {};
+      
+      Object.entries(productImages).forEach(([productIndex, images]) => {
+        if (images.length > 0) {
+          const startIndex = productImagesArray.length;
+          productImagesArray.push(...images);
+          const endIndex = productImagesArray.length - 1;
+          productImageMapping[productIndex] = Array.from(
+            { length: images.length }, 
+            (_, i) => startIndex + i
+          );
+        }
+      });
+      
       if (isEdit && id) {
         const response = await invoiceReceivingAPI.updateInvoiceReceiving(
           id, 
-          submitData, 
+          submitData,
+          productImagesArray,
+          productImageMapping,
           (progress) => setUploadProgress(progress)
         );
         toast.success('Invoice receiving updated successfully');
       } else {
         const response = await invoiceReceivingAPI.createInvoiceReceiving(
           submitData,
+          productImagesArray,
+          productImageMapping,
           (progress) => setUploadProgress(progress)
         );
         toast.success('Invoice receiving created successfully');
@@ -831,6 +912,53 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
                                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                   placeholder="Notes"
                                 />
+                              </div>
+                              
+                              {/* Product Images Upload */}
+                              <div className="col-span-full">
+                                <label className="block text-xs font-medium text-gray-700 mb-2">
+                                  <Camera className="w-4 h-4 inline mr-1" />
+                                  Product Images (Max 10)
+                                </label>
+                                <div className="space-y-2">
+                                  <input
+                                    type="file"
+                                    multiple
+                                    accept="image/jpeg,image/jpg,image/png"
+                                    onChange={(e) => handleProductImageUpload(entry.originalIndex, e)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                  <p className="text-xs text-gray-500">
+                                    JPG, JPEG, PNG only. Max 5MB per image.
+                                  </p>
+                                  
+                                  {/* Display uploaded images */}
+                                  {productImages[entry.originalIndex] && productImages[entry.originalIndex].length > 0 && (
+                                    <div className="grid grid-cols-3 gap-2 mt-2">
+                                      {productImages[entry.originalIndex].map((image, imageIndex) => (
+                                        <div key={imageIndex} className="relative group">
+                                          <div className="aspect-square bg-gray-100 rounded border overflow-hidden">
+                                            <img
+                                              src={URL.createObjectURL(image)}
+                                              alt={`Product ${entry.originalIndex + 1} - Image ${imageIndex + 1}`}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => removeProductImage(entry.originalIndex, imageIndex)}
+                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                          <div className="text-xs text-gray-500 mt-1 truncate">
+                                            {image.name}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>

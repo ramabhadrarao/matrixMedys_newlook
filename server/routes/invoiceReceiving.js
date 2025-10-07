@@ -4,12 +4,15 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
-import { uploadMixedFiles, handleUploadError } from '../middleware/upload.js';
+import { uploadMixedFiles, uploadProductImages, handleUploadError } from '../middleware/upload.js';
 import {
   createInvoiceReceiving,
+  getInvoiceReceiving,
+  getInvoiceReceivings,
+  updateInvoiceReceiving,
   submitToQC,
   performQCCheck,
-  getInvoiceReceivings
+  deleteInvoiceReceiving
 } from '../controllers/invoiceReceivingController.js';
 
 const router = express.Router();
@@ -56,15 +59,36 @@ const invoiceValidation = [
 
 // Routes
 router.get('/', authenticate, checkPermission('invoice_receiving', 'view'), getInvoiceReceivings);
+router.get('/:id', authenticate, checkPermission('invoice_receiving', 'view'), getInvoiceReceiving);
 
+// Create with product images support
 router.post('/', 
   authenticate, 
   checkPermission('invoice_receiving', 'create'),
   uploadMixedFiles,
+  uploadProductImages,
   handleUploadError,
   invoiceValidation,
   validate,
   createInvoiceReceiving
+);
+
+// Update with product images support
+router.put('/:id', 
+  authenticate, 
+  checkPermission('invoice_receiving', 'update'),
+  uploadMixedFiles,
+  uploadProductImages,
+  handleUploadError,
+  invoiceValidation,
+  validate,
+  updateInvoiceReceiving
+);
+
+router.delete('/:id', 
+  authenticate, 
+  checkPermission('invoice_receiving', 'delete'), 
+  deleteInvoiceReceiving
 );
 
 router.post('/:id/submit-qc', 

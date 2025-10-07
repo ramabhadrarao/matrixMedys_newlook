@@ -24,7 +24,16 @@ const receivedProductSchema = new mongoose.Schema({
     enum: ['pending', 'passed', 'failed', 'not_required'],
     default: 'pending'
   },
-  qcRemarks: String
+  qcRemarks: String,
+  // Product images field (max 10 images)
+  productImages: [{
+    filename: String,
+    originalName: String,
+    mimetype: String,
+    size: Number,
+    uploadedAt: { type: Date, default: Date.now },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }]
 });
 
 const documentSchema = new mongoose.Schema({

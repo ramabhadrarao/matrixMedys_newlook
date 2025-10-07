@@ -142,7 +142,7 @@ export const createInvoiceReceiving = async (req, res) => {
       dueDate,
       receivedDate: receivedDate || new Date(),
       receivedBy: req.user._id,
-      products: productsArray.map(product => ({
+      products: productsArray.map((product, index) => ({
         product: product.product,
         productCode: product.productCode || '',
         productName: product.productName || '',
@@ -157,7 +157,8 @@ export const createInvoiceReceiving = async (req, res) => {
         status: product.status || 'received',
         remarks: product.remarks || '',
         qcStatus: qcRequired ? 'pending' : 'not_required',
-        qcRemarks: ''
+        qcRemarks: '',
+        productImages: [] // Initialize empty array for product images
       })),
       documents: [],
       notes: notes || '',
@@ -165,6 +166,45 @@ export const createInvoiceReceiving = async (req, res) => {
       status: 'draft',
       createdBy: req.user._id
     });
+
+    // Handle product images if any
+    if (req.files && req.files.productImages) {
+      const productImageFiles = Array.isArray(req.files.productImages) 
+        ? req.files.productImages 
+        : [req.files.productImages];
+      
+      // Parse product image mappings from request body
+      const productImageMappings = req.body.productImageMappings ? 
+        JSON.parse(req.body.productImageMappings) : [];
+      
+      // Group images by product index
+      const imagesByProduct = {};
+      productImageFiles.forEach((file, fileIndex) => {
+        const mapping = productImageMappings[fileIndex];
+        if (mapping && mapping.productIndex !== undefined) {
+          const productIndex = mapping.productIndex;
+          if (!imagesByProduct[productIndex]) {
+            imagesByProduct[productIndex] = [];
+          }
+          imagesByProduct[productIndex].push({
+            filename: file.filename,
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            uploadedBy: req.user._id,
+            uploadedAt: new Date()
+          });
+        }
+      });
+      
+      // Assign images to products (max 10 per product)
+      Object.keys(imagesByProduct).forEach(productIndex => {
+        const index = parseInt(productIndex);
+        if (invoiceReceiving.products[index]) {
+          invoiceReceiving.products[index].productImages = imagesByProduct[productIndex].slice(0, 10);
+        }
+      });
+    }
     
     // Handle file uploads if any
     if (req.files && req.files.documents) {
@@ -394,7 +434,7 @@ export const updateInvoiceReceiving = async (req, res) => {
       }
       
       // Update products
-      invoiceReceiving.products = productsArray.map(product => ({
+      invoiceReceiving.products = productsArray.map((product, index) => ({
         product: product.product,
         productCode: product.productCode || '',
         productName: product.productName || '',
@@ -409,8 +449,51 @@ export const updateInvoiceReceiving = async (req, res) => {
         status: product.status || 'received',
         remarks: product.remarks || '',
         qcStatus: product.qcStatus || (invoiceReceiving.qcRequired ? 'pending' : 'not_required'),
-        qcRemarks: product.qcRemarks || ''
+        qcRemarks: product.qcRemarks || '',
+        productImages: product.productImages || [] // Preserve existing images or initialize empty
       }));
+      
+      // Handle product images if any
+      if (req.files && req.files.productImages) {
+        const productImageFiles = Array.isArray(req.files.productImages) 
+          ? req.files.productImages 
+          : [req.files.productImages];
+        
+        // Parse product image mappings from request body
+        const productImageMappings = req.body.productImageMappings ? 
+          JSON.parse(req.body.productImageMappings) : [];
+        
+        // Group images by product index
+        const imagesByProduct = {};
+        productImageFiles.forEach((file, fileIndex) => {
+          const mapping = productImageMappings[fileIndex];
+          if (mapping && mapping.productIndex !== undefined) {
+            const productIndex = mapping.productIndex;
+            if (!imagesByProduct[productIndex]) {
+              imagesByProduct[productIndex] = [];
+            }
+            imagesByProduct[productIndex].push({
+              filename: file.filename,
+              originalName: file.originalname,
+              mimetype: file.mimetype,
+              size: file.size,
+              uploadedBy: req.user._id,
+              uploadedAt: new Date()
+            });
+          }
+        });
+        
+        // Add new images to products (max 10 per product)
+        Object.keys(imagesByProduct).forEach(productIndex => {
+          const index = parseInt(productIndex);
+          if (invoiceReceiving.products[index]) {
+            const existingImages = invoiceReceiving.products[index].productImages || [];
+            const newImages = imagesByProduct[productIndex];
+            const totalImages = [...existingImages, ...newImages].slice(0, 10);
+            invoiceReceiving.products[index].productImages = totalImages;
+          }
+        });
+      }
     }
     
     // Update other fields

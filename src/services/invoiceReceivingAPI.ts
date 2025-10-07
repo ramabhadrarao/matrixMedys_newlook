@@ -226,6 +226,8 @@ export const invoiceReceivingAPI = {
   // Create invoice receiving
   createInvoiceReceiving: async (
     data: InvoiceReceivingFormData,
+    productImages?: File[],
+    productImageMapping?: Record<string, number[]>,
     onProgress?: (progress: number) => void
   ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
@@ -250,6 +252,18 @@ export const invoiceReceivingAPI = {
         }
       });
       
+      // Add product images if provided
+      if (productImages && productImages.length > 0) {
+        productImages.forEach((file: File) => {
+          formData.append('productImages', file);
+        });
+      }
+      
+      // Add product image mapping if provided
+      if (productImageMapping) {
+        formData.append('productImageMapping', JSON.stringify(productImageMapping));
+      }
+      
       const response = await createFormDataRequest('/invoice-receiving', formData, 'POST', onProgress);
       console.log('Create invoice receiving response:', response);
       return response;
@@ -263,13 +277,16 @@ export const invoiceReceivingAPI = {
   updateInvoiceReceiving: async (
     id: string,
     data: Partial<InvoiceReceivingFormData>,
+    productImages?: File[],
+    productImageMapping?: Record<string, number[]>,
     onProgress?: (progress: number) => void
   ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
       console.log('Updating invoice receiving:', id, data);
       
-      // Check if we have files to upload
-      const hasFiles = data.documents && data.documents.length > 0;
+      // Check if we have files to upload (documents or product images)
+      const hasFiles = (data.documents && data.documents.length > 0) || 
+                      (productImages && productImages.length > 0);
       
       if (hasFiles) {
         // Use FormData for file upload
@@ -289,6 +306,18 @@ export const invoiceReceivingAPI = {
             }
           }
         });
+        
+        // Add product images if provided
+        if (productImages && productImages.length > 0) {
+          productImages.forEach((file: File) => {
+            formData.append('productImages', file);
+          });
+        }
+        
+        // Add product image mapping if provided
+        if (productImageMapping) {
+          formData.append('productImageMapping', JSON.stringify(productImageMapping));
+        }
         
         const response = await createFormDataRequest(`/invoice-receiving/${id}`, formData, 'PUT', onProgress);
         console.log('Update invoice receiving response:', response);

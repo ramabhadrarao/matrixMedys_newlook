@@ -13,8 +13,9 @@ const hospitalDocsDir = path.join(uploadsDir, 'hospital-documents');
 const doctorAttachmentsDir = path.join(uploadsDir, 'doctor-attachments');
 const principalDocsDir = path.join(uploadsDir, 'principal-documents');
 const productDocsDir = path.join(uploadsDir, 'product-documents');
+const invoiceReceivingImagesDir = path.join(uploadsDir, 'invoice-receiving-images');
 
-[uploadsDir, hospitalDocsDir, doctorAttachmentsDir, principalDocsDir, productDocsDir].forEach(dir => {
+[uploadsDir, hospitalDocsDir, doctorAttachmentsDir, principalDocsDir, productDocsDir, invoiceReceivingImagesDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -55,11 +56,27 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Image-only file filter for product images
+const imageFilter = (req, file, cb) => {
+  const allowedImageTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/jpg'
+  ];
+  
+  if (allowedImageTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPG, JPEG, and PNG images are allowed.'), false);
+  }
+};
+
 // Configure multer for different upload scenarios
 const hospitalStorage = createStorage(hospitalDocsDir);
 const doctorStorage = createStorage(doctorAttachmentsDir);
 const principalStorage = createStorage(principalDocsDir);
 const productStorage = createStorage(productDocsDir);
+const invoiceReceivingImagesStorage = createStorage(invoiceReceivingImagesDir);
 // Hospital file uploads
 const uploadHospitalSingle = multer({
   storage: hospitalStorage,
@@ -186,6 +203,18 @@ export const uploadPrincipalDocuments = uploadPrincipalMultiple.array('documents
 // Export product uploads
 export const uploadProductDocument = uploadProductSingle.single('document');
 export const uploadProductDocuments = uploadProductMultiple.array('documents', 10);
+
+// Invoice receiving product images uploads
+const uploadInvoiceReceivingImages = multer({
+  storage: invoiceReceivingImagesStorage,
+  fileFilter: imageFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit per image
+    files: 10, // Maximum 10 images per product
+  }
+});
+
+export const uploadProductImages = uploadInvoiceReceivingImages.array('productImages', 10);
 // Error handler middleware
 export const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
