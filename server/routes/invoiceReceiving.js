@@ -12,7 +12,8 @@ import {
   updateInvoiceReceiving,
   submitToQC,
   performQCCheck,
-  deleteInvoiceReceiving
+  deleteInvoiceReceiving,
+  downloadInvoiceReceivingPDF
 } from '../controllers/invoiceReceivingController.js';
 
 const router = express.Router();
@@ -99,6 +100,13 @@ router.post('/:id/qc-check',
   authenticate, 
   checkPermission('invoice_receiving', 'qc_check'), 
   performQCCheck
+);
+
+// PDF download route
+router.get('/:id/download-pdf', 
+  authenticate, 
+  checkPermission('invoice_receiving', 'view'), 
+  downloadInvoiceReceivingPDF
 );
 
 export default router;

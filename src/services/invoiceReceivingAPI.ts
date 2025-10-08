@@ -560,6 +560,52 @@ export const invoiceReceivingAPI = {
   getFileUrl: (filename: string, type: 'view' | 'download' = 'view') => {
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     return `${API_BASE_URL}/files/${type}/${filename}`;
+  },
+
+  // Download PDF
+  downloadPDF: async (id: string): Promise<void> => {
+    try {
+      console.log('Downloading PDF for invoice receiving:', id);
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const token = useAuthStore.getState().accessToken;
+      
+      const response = await fetch(`${API_BASE_URL}/invoice-receiving/${id}/download-pdf`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from response headers or use default
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = `invoice-receiving-${id}.pdf`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('PDF downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      throw error;
+    }
   }
 };
 

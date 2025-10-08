@@ -2,6 +2,7 @@
 import InvoiceReceiving from '../models/InvoiceReceiving.js';
 import PurchaseOrder from '../models/PurchaseOrder.js';
 import WorkflowStage from '../models/WorkflowStage.js';
+import pdfService from '../services/pdfService.js';
 
 export const createInvoiceReceiving = async (req, res) => {
   try {
@@ -841,6 +842,76 @@ const updatePOReceivedQuantities = async (purchaseOrderId) => {
   }
 };
 
+// Download invoice receiving as PDF
+export const downloadInvoiceReceivingPDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get invoice receiving with all related data
+    const invoiceReceiving = await InvoiceReceiving.findById(id)
+      .populate({
+        path: 'purchaseOrder',
+        populate: [
+          { path: 'principal', select: 'name address' },
+          { path: 'products.product', select: 'name category unit' },
+          { path: 'products.product.category', select: 'name' }
+        ]
+      })
+      .populate('products.product')
+      .populate('products.product.category');
+
+    if (!invoiceReceiving) {
+      return res.status(404).json({ message: 'Invoice receiving not found' });
+    }
+
+    // Prepare data for PDF generation
+    const pdfData = {
+      invoiceNumber: invoiceReceiving.invoiceNumber,
+      invoiceDate: invoiceReceiving.invoiceDate,
+      receivedDate: invoiceReceiving.receivedDate,
+      status: invoiceReceiving.status,
+      supplierName: invoiceReceiving.purchaseOrder?.principal?.name || 'N/A',
+      supplierAddress: invoiceReceiving.purchaseOrder?.principal?.address || 'N/A',
+      totalAmount: invoiceReceiving.invoiceAmount || 0,
+      taxAmount: invoiceReceiving.taxAmount || 0,
+      grandTotal: invoiceReceiving.grandTotal || invoiceReceiving.invoiceAmount || 0,
+      purchaseOrder: {
+        poNumber: invoiceReceiving.purchaseOrder?.poNumber,
+        poDate: invoiceReceiving.purchaseOrder?.poDate
+      },
+      products: invoiceReceiving.products?.map(product => ({
+        productName: product.product?.name || product.productName || 'N/A',
+        categoryName: product.product?.category?.name || product.categoryName || 'N/A',
+        quantity: product.receivedQty || product.quantity || 0,
+        unit: product.product?.unit || product.unit || 'N/A',
+        unitPrice: product.unitPrice || 0,
+        taxPercentage: product.taxPercentage || 0,
+        totalAmount: product.totalAmount || (product.unitPrice * product.quantity) || 0
+      })) || [],
+      documents: invoiceReceiving.documents || []
+    };
+
+    // Generate PDF
+    const pdfBuffer = await pdfService.generateInvoiceReceivingPDF(pdfData);
+
+    // Set response headers for PDF download
+    const filename = `invoice-receiving-${invoiceReceiving.invoiceNumber || id}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    // Send PDF buffer
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ 
+      message: 'Failed to generate PDF', 
+      error: error.message 
+    });
+  }
+};
+
 export default {
   createInvoiceReceiving,
   getInvoiceReceiving,
@@ -849,5 +920,6 @@ export default {
   submitToQC,
   performQCCheck,
   updateQCStatus,
-  deleteInvoiceReceiving
+  deleteInvoiceReceiving,
+  downloadInvoiceReceivingPDF
 };
