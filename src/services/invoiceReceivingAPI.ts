@@ -577,18 +577,29 @@ export const invoiceReceivingAPI = {
         },
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('PDF download failed:', response.status, errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        } else {
+          const errorText = await response.text();
+          console.error('PDF download failed:', response.status, errorText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
       
       // Check if response is actually a PDF
       const contentType = response.headers.get('content-type');
+      console.log('Content-Type:', contentType);
+      
       if (!contentType || !contentType.includes('application/pdf')) {
         console.error('Response is not a PDF:', contentType);
         const responseText = await response.text();
-        console.error('Response body:', responseText);
+        console.error('Response body preview:', responseText.substring(0, 500));
         throw new Error('Server did not return a PDF file');
       }
       
@@ -599,8 +610,9 @@ export const invoiceReceivingAPI = {
         throw new Error('PDF file is empty');
       }
       
-      console.log('PDF blob created, size:', blob.size, 'bytes');
+      console.log('PDF blob created, size:', blob.size, 'bytes', 'type:', blob.type);
       
+      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -609,11 +621,13 @@ export const invoiceReceivingAPI = {
       const contentDisposition = response.headers.get('content-disposition');
       let filename = `invoice-receiving-${id}.pdf`;
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
         }
       }
+      
+      console.log('Download filename:', filename);
       
       link.download = filename;
       link.style.display = 'none';
@@ -624,17 +638,16 @@ export const invoiceReceivingAPI = {
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
+        console.log('Cleanup completed');
       }, 100);
       
-      console.log('PDF downloaded successfully:', filename);
+      console.log('PDF download initiated successfully');
     } catch (error) {
       console.error('Error downloading PDF:', error);
       throw error;
     }
-  }
+  },
 };
-
-export default invoiceReceivingAPI;
 
 // Helper functions for file operations
 const downloadFileWithAuth = async (filename: string, originalName?: string) => {
@@ -694,3 +707,5 @@ const viewFileWithAuth = (filename: string) => {
     throw error;
   });
 };
+
+// export default invoiceReceivingAPI;

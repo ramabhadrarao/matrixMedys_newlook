@@ -843,78 +843,146 @@ const updatePOReceivedQuantities = async (purchaseOrderId) => {
 };
 
 // Download invoice receiving as PDF
+// In server/controllers/invoiceReceivingController.js
+
 export const downloadInvoiceReceivingPDF = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    console.log('=== PDF Download Request ===');
+    console.log('Invoice Receiving ID:', id);
     
     // Get invoice receiving with all related data
     const invoiceReceiving = await InvoiceReceiving.findById(id)
       .populate({
         path: 'purchaseOrder',
-        populate: [
-          { path: 'principal', select: 'name address' },
-          { path: 'products.product', select: 'name category unit' },
-          { path: 'products.product.category', select: 'name' }
-        ]
+        select: 'poNumber poDate principal',
+        populate: {
+          path: 'principal',
+          select: 'name email mobile'
+        }
       })
-      .populate('products.product')
-      .populate('products.product.category');
+      .populate('receivedBy', 'name email')
+      .lean();
 
     if (!invoiceReceiving) {
+      console.error('Invoice receiving not found:', id);
       return res.status(404).json({ message: 'Invoice receiving not found' });
     }
 
+    console.log('Invoice receiving found:', {
+      invoiceNumber: invoiceReceiving.invoiceNumber,
+      productsCount: invoiceReceiving.products?.length || 0,
+      documentsCount: invoiceReceiving.documents?.length || 0
+    });
+
+    // Safely extract supplier info
+    const supplierName = invoiceReceiving.supplier || 
+                        invoiceReceiving.purchaseOrder?.principal?.name || 
+                        'N/A';
+    
+    const supplierAddress = invoiceReceiving.purchaseOrder?.principal?.address || 'N/A';
+
     // Prepare data for PDF generation
     const pdfData = {
-      invoiceNumber: invoiceReceiving.invoiceNumber,
+      invoiceNumber: invoiceReceiving.invoiceNumber || 'N/A',
       invoiceDate: invoiceReceiving.invoiceDate,
       receivedDate: invoiceReceiving.receivedDate,
-      status: invoiceReceiving.status,
-      supplierName: invoiceReceiving.purchaseOrder?.principal?.name || 'N/A',
-      supplierAddress: invoiceReceiving.purchaseOrder?.principal?.address || 'N/A',
+      status: invoiceReceiving.status || 'draft',
+      supplierName: supplierName,
+      supplierAddress: supplierAddress,
       totalAmount: invoiceReceiving.invoiceAmount || 0,
-      taxAmount: invoiceReceiving.taxAmount || 0,
-      grandTotal: invoiceReceiving.grandTotal || invoiceReceiving.invoiceAmount || 0,
-      purchaseOrder: {
-        poNumber: invoiceReceiving.purchaseOrder?.poNumber,
-        poDate: invoiceReceiving.purchaseOrder?.poDate
-      },
-      products: invoiceReceiving.products?.map(product => ({
-        productName: product.product?.name || product.productName || 'N/A',
-        categoryName: product.product?.category?.name || product.categoryName || 'N/A',
-        quantity: product.receivedQty || product.quantity || 0,
-        unit: product.product?.unit || product.unit || 'N/A',
+      taxAmount: 0, // Calculate if you have tax info
+      grandTotal: invoiceReceiving.invoiceAmount || 0,
+      purchaseOrder: invoiceReceiving.purchaseOrder ? {
+        poNumber: invoiceReceiving.purchaseOrder.poNumber || 'N/A',
+        poDate: invoiceReceiving.purchaseOrder.poDate
+      } : null,
+      products: (invoiceReceiving.products || []).map(product => ({
+        productName: product.productName || 'N/A',
+        categoryName: product.categoryName || 'General',
+        quantity: product.receivedQty || 0,
+        unit: product.unit || 'PCS',
         unitPrice: product.unitPrice || 0,
-        taxPercentage: product.taxPercentage || 0,
-        totalAmount: product.totalAmount || (product.unitPrice * product.quantity) || 0
-      })) || [],
-      documents: invoiceReceiving.documents || []
+        taxPercentage: 0,
+        totalAmount: (product.receivedQty || 0) * (product.unitPrice || 0)
+      })),
+      documents: (invoiceReceiving.documents || []).map(doc => ({
+        originalName: doc.originalName || doc.name || 'Document',
+        filename: doc.filename || '',
+        size: doc.size || 0
+      }))
     };
 
-    // Generate PDF
-    const pdfBuffer = await pdfService.generateInvoiceReceivingPDF(pdfData);
+    console.log('PDF data prepared:', {
+      invoiceNumber: pdfData.invoiceNumber,
+      productsCount: pdfData.products.length,
+      documentsCount: pdfData.documents.length
+    });
+
+    // Check if pdfService is available
+    if (!pdfService || typeof pdfService.generateInvoiceReceivingPDF !== 'function') {
+      console.error('PDF service not available');
+      return res.status(500).json({ 
+        message: 'PDF service not initialized',
+        error: 'PDF generation service is not available'
+      });
+    }
+
+    console.log('Calling PDF service...');
+
+    // Generate PDF with timeout
+    const pdfBuffer = await Promise.race([
+      pdfService.generateInvoiceReceivingPDF(pdfData),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('PDF generation timeout')), 30000)
+      )
+    ]);
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error('Generated PDF buffer is empty');
+    }
+
+    console.log('PDF generated successfully:', {
+      bufferSize: pdfBuffer.length,
+      sizeInKB: (pdfBuffer.length / 1024).toFixed(2)
+    });
 
     // Set response headers for PDF download
     const filename = `invoice-receiving-${invoiceReceiving.invoiceNumber || id}.pdf`;
+    
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', pdfBuffer.length);
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    console.log('Sending PDF response...');
 
     // Send PDF buffer
     res.send(pdfBuffer);
 
+    console.log('PDF sent successfully');
+
   } catch (error) {
-    console.error('Error generating PDF:', error);
+    console.error('=== PDF Generation Error ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Send appropriate error response
     res.status(500).json({ 
-      message: 'Failed to generate PDF', 
-      error: error.message 
+      message: 'Failed to generate PDF',
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        type: error.constructor.name
+      } : undefined
     });
   }
 };
-
 export default {
   createInvoiceReceiving,
   getInvoiceReceiving,
