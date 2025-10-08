@@ -573,14 +573,34 @@ export const invoiceReceivingAPI = {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Accept': 'application/pdf',
         },
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('PDF download failed:', response.status, errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+      
+      // Check if response is actually a PDF
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/pdf')) {
+        console.error('Response is not a PDF:', contentType);
+        const responseText = await response.text();
+        console.error('Response body:', responseText);
+        throw new Error('Server did not return a PDF file');
       }
       
       const blob = await response.blob();
+      
+      // Validate blob size
+      if (blob.size === 0) {
+        throw new Error('PDF file is empty');
+      }
+      
+      console.log('PDF blob created, size:', blob.size, 'bytes');
+      
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -596,12 +616,17 @@ export const invoiceReceivingAPI = {
       }
       
       link.download = filename;
+      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
       
-      console.log('PDF downloaded successfully');
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+      console.log('PDF downloaded successfully:', filename);
     } catch (error) {
       console.error('Error downloading PDF:', error);
       throw error;
