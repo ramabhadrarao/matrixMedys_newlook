@@ -37,6 +37,22 @@ const InvoiceReceivingForm: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [productImages, setProductImages] = useState<Record<number, File[]>>({});
+  const [documentTypes, setDocumentTypes] = useState<string[]>([]);
+  const [customDocumentTypes, setCustomDocumentTypes] = useState<string[]>([]);
+
+  // Predefined document types
+  const predefinedDocumentTypes = [
+    'Invoice',
+    'Delivery Note',
+    'Packing List',
+    'Quality Certificate',
+    'Test Report',
+    'Warranty Certificate',
+    'Purchase Order Copy',
+    'Transport Document',
+    'Insurance Certificate',
+    'Other'
+  ];
 
   const [formData, setFormData] = useState<InvoiceReceivingFormData>({
     purchaseOrder: preSelectedPO || '',
@@ -122,325 +138,314 @@ const InvoiceReceivingForm: React.FC = () => {
     }
   };
 
-  const loadInvoiceReceiving = async (receivingId: string) => {
+  const loadInvoiceReceiving = async (id: string) => {
     try {
-      setLoading(true);
-      const response = await invoiceReceivingAPI.getInvoiceReceiving(receivingId);
+      setIsLoading(true);
+      const response = await invoiceReceivingAPI.getInvoiceReceiving(id);
       const receiving = response.data;
+      
+      console.log('Loading invoice receiving data:', receiving);
       
       setFormData({
         purchaseOrder: typeof receiving.purchaseOrder === 'object' 
           ? receiving.purchaseOrder._id 
           : receiving.purchaseOrder,
         invoiceNumber: receiving.invoiceNumber,
-        invoiceDate: receiving.invoiceDate ? 
-          new Date(receiving.invoiceDate).toISOString().split('T')[0] : '',
-        invoiceAmount: receiving.invoiceAmount || 0,
-        supplier: receiving.supplier,
-        receivedDate: receiving.receivedDate ? 
-          new Date(receiving.receivedDate).toISOString().split('T')[0] : '',
-        receivedProducts: receiving.receivedProducts,
-        documents: receiving.documents || [],
+        invoiceDate: receiving.invoiceDate ? new Date(receiving.invoiceDate).toISOString().split('T')[0] : '',
+        invoiceAmount: receiving.invoiceAmount,
+        dueDate: receiving.dueDate ? new Date(receiving.dueDate).toISOString().split('T')[0] : '',
+        receivedDate: receiving.receivedDate ? new Date(receiving.receivedDate).toISOString().split('T')[0] : '',
         notes: receiving.notes || '',
-        qcRequired: receiving.qcRequired !== false
+        qcRequired: receiving.qcRequired || false,
+        receivedProducts: receiving.products || []
       });
       
-      setSelectedPO(typeof receiving.purchaseOrder === 'object' ? receiving.purchaseOrder : null);
-    } catch (error: any) {
-      toast.error('Failed to load invoice receiving');
-      navigate('/invoice-receiving');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  const handlePOChange = (poId: string) => {
-    if (poId) {
-      loadPurchaseOrderDetails(poId);
-    } else {
-      setSelectedPO(null);
-      setFormData(prev => ({
-        ...prev,
-        purchaseOrder: '',
-        supplier: '',
-        receivedProducts: []
-      }));
-    }
-  };
-
-  const updateReceivedProduct = (index: number, field: string, value: any) => {
-    // If updating receivedQty, validate against available quantity
-    if (field === 'receivedQty') {
-      const product = formData.receivedProducts[index];
-      const availableQty = product.remainingQuantity || 0;
+      // Set received products with proper image handling
+      const processedProducts = receiving.products?.map((product: any) => ({
+        ...product,
+        productImages: product.productImages || []
+      })) || [];
       
-      // Prevent exceeding available quantity
-      if (value > availableQty) {
-        toast.error(`Cannot receive ${value} items. Only ${availableQty} items available.`);
-        return; // Don't update if exceeding available quantity
+      setReceivedProducts(processedProducts);
+      
+      // Set uploaded files and document types from existing documents
+      if (receiving.documents && receiving.documents.length > 0) {
+        const existingFiles = receiving.documents.map((doc: any) => ({
+          name: doc.name || doc.originalName,
+          size: doc.size || 0,
+          type: doc.mimetype || 'application/octet-stream',
+          url: doc.url || `/api/files/${doc.filename}`
+        }));
+        
+        const existingDocumentTypes = receiving.documents.map((doc: any) => doc.type || '');
+        const existingCustomDocumentTypes = receiving.documents.map((doc: any) => 
+          predefinedDocumentTypes.includes(doc.type) ? '' : doc.type || ''
+        );
+        
+        setUploadedFiles(existingFiles);
+        setDocumentTypes(existingDocumentTypes);
+        setCustomDocumentTypes(existingCustomDocumentTypes);
       }
       
-      // Prevent negative quantities
-      if (value < 0) {
-        toast.error('Received quantity cannot be negative.');
-        return;
-      }
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      receivedProducts: prev.receivedProducts.map((product, i) => 
-        i === index ? { ...product, [field]: value } : product
-      )
-    }));
-  };
-
-  // Add new function to handle multiple batch entries
-  const addBatchEntry = (productIndex: number) => {
-    const product = formData.receivedProducts[productIndex];
-    const newBatchEntry = {
-      ...product,
-      receivedQty: 0,
-      batchNumber: '',
-      expiryDate: '',
-      manufacturingDate: '',
-      remarks: ''
-    };
-    
-    setFormData(prev => ({
-      ...prev,
-      receivedProducts: [
-        ...prev.receivedProducts.slice(0, productIndex + 1),
-        newBatchEntry,
-        ...prev.receivedProducts.slice(productIndex + 1)
-      ]
-    }));
-  };
-
-  // Add function to remove batch entry
-  const removeBatchEntry = (index: number) => {
-    if (formData.receivedProducts.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        receivedProducts: prev.receivedProducts.filter((_, i) => i !== index)
-      }));
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading invoice receiving:', error);
+      setErrors({ general: 'Failed to load invoice receiving data' });
+      setIsLoading(false);
     }
   };
 
-  // Add function to handle item substitution
-  const handleItemSubstitution = (index: number, substitutedProductId: string, substitutedProductName: string) => {
+const handleInputChange = (field: string, value: any) => {
+  setFormData(prev => ({ ...prev, [field]: value }));
+  // Clear error when user starts typing
+  if (errors[field]) {
+    setErrors(prev => ({ ...prev, [field]: '' }));
+  }
+};
+
+const handlePOChange = (poId: string) => {
+  if (poId) {
+    loadPurchaseOrderDetails(poId);
+  } else {
+    setSelectedPO(null);
     setFormData(prev => ({
       ...prev,
-      receivedProducts: prev.receivedProducts.map((product, i) => 
-        i === index ? { 
-          ...product, 
-          product: substitutedProductId,
-          productName: substitutedProductName,
-          remarks: `Substituted for ${product.productName}` 
-        } : product
-      )
+      purchaseOrder: '',
+      supplier: '',
+      receivedProducts: []
     }));
-  };
+  }
+};
 
-  // Add function to handle adding substituted product
-  const addSubstitutedProduct = (originalIndex: number) => {
-    const originalProduct = formData.receivedProducts[originalIndex];
-    const substitutedEntry = {
-      ...originalProduct,
-      receivedQty: 0,
-      batchNumber: '',
-      expiryDate: '',
-      manufacturingDate: '',
-      remarks: `Substituted for ${originalProduct.productName}`,
-      isSubstitution: true
-    };
+const updateReceivedProduct = (index: number, field: string, value: any) => {
+  // If updating receivedQty, validate against available quantity
+  if (field === 'receivedQty') {
+    const product = formData.receivedProducts[index];
+    const availableQty = product.remainingQuantity || 0;
     
-    setFormData(prev => ({
-      ...prev,
-      receivedProducts: [
-        ...prev.receivedProducts.slice(0, originalIndex + 1),
-        substitutedEntry,
-        ...prev.receivedProducts.slice(originalIndex + 1)
-      ]
-    }));
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setUploadedFiles(prev => [...prev, ...files]);
-    setFormData(prev => ({ ...prev, documents: [...(prev.documents || []), ...files] }));
-  };
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-    setFormData(prev => ({
-      ...prev,
-      documents: prev.documents?.filter((_, i) => i !== index) || []
-    }));
-  };
-
-  // Product images handling functions
-  const handleProductImageUpload = (productIndex: number, event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    const existingImages = productImages[productIndex] || [];
-    const totalImages = existingImages.length + files.length;
+    // Prevent exceeding available quantity
+    if (value > availableQty) {
+      toast.error(`Cannot receive ${value} items. Only ${availableQty} items available.`);
+      return; // Don't update if exceeding available quantity
+    }
     
-    if (totalImages > 10) {
-      toast.error('Maximum 10 images allowed per product');
+    // Prevent negative quantities
+    if (value < 0) {
+      toast.error('Received quantity cannot be negative.');
       return;
     }
-    
-    // Validate file types
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    const invalidFiles = files.filter(file => !validTypes.includes(file.type));
-    
-    if (invalidFiles.length > 0) {
-      toast.error('Only JPG, JPEG, and PNG images are allowed');
-      return;
-    }
-    
-    // Validate file sizes (5MB max per image)
-    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      toast.error('Each image must be less than 5MB');
-      return;
-    }
-    
-    setProductImages(prev => ({
-      ...prev,
-      [productIndex]: [...existingImages, ...files]
-    }));
-  };
+  }
+  
+  setFormData(prev => ({
+    ...prev,
+    receivedProducts: prev.receivedProducts.map((product, i) => 
+      i === index ? { ...product, [field]: value } : product
+    )
+  }));
+};
 
-  const removeProductImage = (productIndex: number, imageIndex: number) => {
-    setProductImages(prev => ({
-      ...prev,
-      [productIndex]: (prev[productIndex] || []).filter((_, i) => i !== imageIndex)
-    }));
+// Add new function to handle multiple batch entries
+const addBatchEntry = (productIndex: number) => {
+  const product = formData.receivedProducts[productIndex];
+  const newBatchEntry = {
+    ...product,
+    receivedQty: 0,
+    batchNumber: '',
+    expiryDate: '',
+    manufacturingDate: '',
+    remarks: ''
   };
+  
+  setFormData(prev => ({
+    ...prev,
+    receivedProducts: [
+      ...prev.receivedProducts.slice(0, productIndex + 1),
+      newBatchEntry,
+      ...prev.receivedProducts.slice(productIndex + 1)
+    ]
+  }));
+};
 
- const validateForm = (): boolean => {
+// Add function to remove batch entry
+const removeBatchEntry = (index: number) => {
+  if (formData.receivedProducts.length > 1) {
+    setFormData(prev => ({
+      ...prev,
+      receivedProducts: prev.receivedProducts.filter((_, i) => i !== index)
+    }));
+  }
+};
+
+// Add function to handle item substitution
+const handleItemSubstitution = (index: number, substitutedProductId: string, substitutedProductName: string) => {
+  setFormData(prev => ({
+    ...prev,
+    receivedProducts: prev.receivedProducts.map((product, i) => 
+      i === index ? { 
+        ...product, 
+        product: substitutedProductId,
+        productName: substitutedProductName,
+        remarks: `Substituted for ${product.productName}` 
+      } : product
+    )
+  }));
+};
+
+// Add function to handle adding substituted product
+const addSubstitutedProduct = (originalIndex: number) => {
+  const originalProduct = formData.receivedProducts[originalIndex];
+  const substitutedEntry = {
+    ...originalProduct,
+    receivedQty: 0,
+    batchNumber: '',
+    expiryDate: '',
+    manufacturingDate: '',
+    remarks: `Substituted for ${originalProduct.productName}`,
+    isSubstitution: true
+  };
+  
+  setFormData(prev => ({
+    ...prev,
+    receivedProducts: [
+      ...prev.receivedProducts.slice(0, originalIndex + 1),
+      substitutedEntry,
+      ...prev.receivedProducts.slice(originalIndex + 1)
+    ]
+  }));
+};
+
+const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = Array.from(event.target.files || []);
+  
+  // Initialize document types for new files
+  const newDocumentTypes = [...documentTypes];
+  const newCustomTypes = [...customDocumentTypes];
+  
+  files.forEach((_, index) => {
+    newDocumentTypes.push(''); // Empty string means no type selected yet
+    newCustomTypes.push('');
+  });
+  
+  setUploadedFiles(prev => [...prev, ...files]);
+  setDocumentTypes(newDocumentTypes);
+  setCustomDocumentTypes(newCustomTypes);
+  // Remove the documents update from formData since we're using uploadedFiles
+  // setFormData(prev => ({ ...prev, documents: [...(prev.documents || []), ...files] }));
+};
+
+const removeFile = (index: number) => {
+  setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  setDocumentTypes(prev => prev.filter((_, i) => i !== index));
+  setCustomDocumentTypes(prev => prev.filter((_, i) => i !== index));
+  // Remove the documents update from formData since we're using uploadedFiles
+  // setFormData(prev => ({
+  //   ...prev,
+  //   documents: prev.documents?.filter((_, i) => i !== index) || []
+  // }));
+};
+
+const handleDocumentTypeChange = (index: number, type: string) => {
+  const newTypes = [...documentTypes];
+  newTypes[index] = type;
+  setDocumentTypes(newTypes);
+  
+  // If "Other" is selected, clear the custom type for this index
+  if (type !== 'Other') {
+    const newCustomTypes = [...customDocumentTypes];
+    newCustomTypes[index] = '';
+    setCustomDocumentTypes(newCustomTypes);
+  }
+};
+
+const handleCustomDocumentTypeChange = (index: number, customType: string) => {
+  const newCustomTypes = [...customDocumentTypes];
+  newCustomTypes[index] = customType;
+  setCustomDocumentTypes(newCustomTypes);
+};
+
+// Product images handling functions
+const handleProductImageUpload = (productIndex: number, event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = Array.from(event.target.files || []);
+  const existingImages = productImages[productIndex] || [];
+  const totalImages = existingImages.length + files.length;
+  
+  if (totalImages > 10) {
+    toast.error('Maximum 10 images allowed per product');
+    return;
+  }
+  
+  // Validate file types
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  const invalidFiles = files.filter(file => !validTypes.includes(file.type));
+  
+  if (invalidFiles.length > 0) {
+    toast.error('Only JPG, JPEG, and PNG images are allowed');
+    return;
+  }
+  
+  // Validate file sizes (5MB max per image)
+  const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
+  if (oversizedFiles.length > 0) {
+    toast.error('Each image must be less than 5MB');
+    return;
+  }
+  
+  setProductImages(prev => ({
+    ...prev,
+    [productIndex]: [...existingImages, ...files]
+  }));
+};
+
+const removeProductImage = (productIndex: number, imageIndex: number) => {
+  setProductImages(prev => ({
+    ...prev,
+    [productIndex]: (prev[productIndex] || []).filter((_, i) => i !== imageIndex)
+  }));
+};
+
+const validateForm = (): boolean => {
   const newErrors: Record<string, string> = {};
 
-  // console.log('=== FORM VALIDATION DEBUG ===');
-    // console.log('Form data:', formData);
-
-  // Basic field validation
+  // Only validate critical fields for button enabling
+  // More detailed validation will happen on form submission
+  
+  // Basic field validation - only check truly required fields
   if (!formData.purchaseOrder) {
     newErrors.purchaseOrder = 'Purchase order is required';
   }
 
-  if (!formData.invoiceNumber.trim()) {
-    newErrors.invoiceNumber = 'Invoice number is required';
-  }
-
-  if (!formData.invoiceDate) {
-    newErrors.invoiceDate = 'Invoice date is required';
-  }
-
-  if (!formData.receivedDate) {
-    newErrors.receivedDate = 'Received date is required';
-  }
-
-  if (!formData.supplier.trim()) {
-    newErrors.supplier = 'Supplier is required';
-  }
+  // Remove validation for invoice fields to allow saving drafts
+  // These will be validated on form submission instead
 
   // Products validation - must have at least one product entry
   if (formData.receivedProducts.length === 0) {
     newErrors.receivedProducts = 'At least one product entry is required';
   } else {
-    // Group products by ID to check cumulative quantities
-    const productGroups = formData.receivedProducts.reduce((acc, product, index) => {
-      const key = product.product; // Use product ID as key
-      if (!acc[key]) {
-        acc[key] = {
-          productName: product.productName,
-          orderedQty: product.orderedQty,
-          remainingQuantity: product.remainingQuantity || product.orderedQty,
-          alreadyReceived: product.alreadyReceived || 0,
-          entries: []
-        };
-      }
-      acc[key].entries.push({ ...product, index });
-      return acc;
-    }, {} as Record<string, any>);
-
-    // console.log('Product groups for validation:', productGroups);
-
-    // Validate each product group
-    Object.entries(productGroups).forEach(([productId, group]) => {
-      // Calculate total being received in this invoice
-      const totalReceivingNow = group.entries.reduce((sum: number, entry: any) => 
-        sum + (entry.receivedQty || 0), 0
-      );
-      
-      // Calculate what would be the total after this receiving
-      const totalAfterReceiving = group.alreadyReceived + totalReceivingNow;
-      const orderedQty = group.orderedQty;
-      
-      // console.log(`Product ${group.productName}:`, {
-      //   ordered: orderedQty,
-      //   alreadyReceived: group.alreadyReceived,
-      //   receivingNow: totalReceivingNow,
-      //   totalAfter: totalAfterReceiving
-      // });
-      
-      // Validate individual entries
-      group.entries.forEach((entry: any) => {
-        // Check for negative quantities
-        if (entry.receivedQty < 0) {
-          newErrors[`product_${entry.index}_quantity`] = 'Quantity cannot be negative';
-        }
-        
-        // Batch number validation - make it optional or based on business rules
-        if (entry.receivedQty > 0 && formData.qcRequired && !entry.batchNumber?.trim()) {
-          // This is now a warning, not an error
-          // console.warn(`Product ${entry.index}: Consider adding batch number for QC tracking`);
-        }
-        
-        // Validate dates if provided
-        if (entry.expiryDate && entry.manufacturingDate) {
-          const mfgDate = new Date(entry.manufacturingDate);
-          const expDate = new Date(entry.expiryDate);
-          if (mfgDate >= expDate) {
-            newErrors[`product_${entry.index}_dates`] = 'Manufacturing date must be before expiry date';
-          }
-        }
-        
-        // Check if expiry date is in the past (only error for non-zero quantities)
-        if (entry.expiryDate) {
-          const expDate = new Date(entry.expiryDate);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          if (expDate < today && entry.receivedQty > 0) {
-            newErrors[`product_${entry.index}_expiry`] = 'Cannot receive expired products';
-          }
-        }
-      });
-      
-      // Allow 10% over-receiving tolerance
-      const tolerance = 0.1;
-      const maxAllowed = orderedQty * (1 + tolerance);
-      
-      if (totalAfterReceiving > maxAllowed) {
-        newErrors[`product_${productId}_excess`] = 
-          `Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`;
+    // Only validate critical errors that should prevent saving
+    formData.receivedProducts.forEach((product, index) => {
+      // Check for negative quantities
+      if (product.receivedQty < 0) {
+        newErrors[`product_${index}_quantity`] = 'Quantity cannot be negative';
       }
       
-      // Log if this is a zero receiving (informational only, not an error)
-      if (totalReceivingNow === 0) {
-        console.info(`Product ${group.productName}: Zero quantity receiving (backlog or documentation only)`);
-        // Allow zero quantity receiving - this is valid for backlog or documentation purposes
+      // Validate dates if provided
+      if (product.expiryDate && product.manufacturingDate) {
+        const mfgDate = new Date(product.manufacturingDate);
+        const expDate = new Date(product.expiryDate);
+        if (mfgDate >= expDate) {
+          newErrors[`product_${index}_dates`] = 'Manufacturing date must be before expiry date';
+        }
+      }
+      
+      // Check if expiry date is in the past (only error for non-zero quantities)
+      if (product.expiryDate && product.receivedQty > 0) {
+        const expDate = new Date(product.expiryDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (expDate < today) {
+          newErrors[`product_${index}_expiry`] = 'Cannot receive expired products';
+        }
       }
     });
   }
@@ -483,44 +488,249 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      toast.error('Please fix the errors before submitting');
+    console.log('=== FRONTEND FORM SUBMISSION DEBUG ===');
+    console.log('Form Data:', JSON.stringify(formData, null, 2));
+    console.log('Received Products:', formData.receivedProducts);
+    console.log('Received Products Length:', formData.receivedProducts.length);
+    console.log('Document Types:', documentTypes);
+    console.log('Custom Document Types:', customDocumentTypes);
+    console.log('Product Images:', productImages);
+    console.log('Uploaded Files:', uploadedFiles);
+    console.log('=====================================');
+    
+    // Comprehensive form validation
+    const newErrors: Record<string, string> = {};
+    
+    // Required field validations
+    if (!formData.purchaseOrder) {
+      newErrors.purchaseOrder = 'Purchase Order is required';
+    }
+    
+    if (!formData.invoiceNumber.trim()) {
+      newErrors.invoiceNumber = 'Invoice Number is required';
+    } else if (formData.invoiceNumber.trim().length < 3) {
+      newErrors.invoiceNumber = 'Invoice Number must be at least 3 characters long';
+    } else if (formData.invoiceNumber.trim().length > 50) {
+      newErrors.invoiceNumber = 'Invoice Number cannot exceed 50 characters';
+    }
+    
+    if (!formData.invoiceDate) {
+      newErrors.invoiceDate = 'Invoice Date is required';
+    } else {
+      const invoiceDate = new Date(formData.invoiceDate);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
+      
+      if (invoiceDate > today) {
+        newErrors.invoiceDate = 'Invoice Date cannot be in the future';
+      }
+      
+      // Check if invoice date is too far in the past (more than 2 years)
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(today.getFullYear() - 2);
+      if (invoiceDate < twoYearsAgo) {
+        newErrors.invoiceDate = 'Invoice Date cannot be more than 2 years in the past';
+      }
+    }
+    
+    if (!formData.receivedDate) {
+      newErrors.receivedDate = 'Received Date is required';
+    } else {
+      const receivedDate = new Date(formData.receivedDate);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
+      
+      if (receivedDate > today) {
+        newErrors.receivedDate = 'Received Date cannot be in the future';
+      }
+      
+      // Check if received date is before invoice date
+      if (formData.invoiceDate) {
+        const invoiceDate = new Date(formData.invoiceDate);
+        if (receivedDate < invoiceDate) {
+          newErrors.receivedDate = 'Received Date cannot be before Invoice Date';
+        }
+      }
+    }
+    
+    // Validate supplier field
+    if (!formData.supplier.trim()) {
+      newErrors.supplier = 'Supplier is required';
+    } else if (formData.supplier.trim().length < 2) {
+      newErrors.supplier = 'Supplier name must be at least 2 characters long';
+    }
+    
+    // Validate invoice amount if provided
+    if (formData.invoiceAmount !== undefined && formData.invoiceAmount < 0) {
+      newErrors.invoiceAmount = 'Invoice Amount cannot be negative';
+    }
+    
+    // Validate products
+    if (formData.receivedProducts.length === 0) {
+      newErrors.receivedProducts = 'At least one product must be received';
+    }
+    
+    // Validate individual products
+    let hasProductErrors = false;
+    formData.receivedProducts.forEach((product, index) => {
+      // Validate received quantity
+      if (product.receivedQty < 0) {
+        newErrors[`receivedQty_${index}`] = 'Received quantity cannot be negative';
+        hasProductErrors = true;
+      } else if (product.receivedQty > product.remainingQuantity) {
+        newErrors[`receivedQty_${index}`] = 'Received quantity cannot exceed remaining quantity';
+        hasProductErrors = true;
+      }
+      
+      // Validate unit price
+      if (product.unitPrice < 0) {
+        newErrors[`unitPrice_${index}`] = 'Unit price cannot be negative';
+        hasProductErrors = true;
+      }
+      
+      // Validate batch number if provided
+      if (product.batchNo && product.batchNo.length > 50) {
+        newErrors[`batchNo_${index}`] = 'Batch number cannot exceed 50 characters';
+        hasProductErrors = true;
+      }
+      
+      // Validate manufacturing date if provided
+      if (product.mfgDate) {
+        const mfgDate = new Date(product.mfgDate);
+        const today = new Date();
+        if (mfgDate > today) {
+          newErrors[`mfgDate_${index}`] = 'Manufacturing date cannot be in the future';
+          hasProductErrors = true;
+        }
+      }
+      
+      // Validate expiry date if provided
+      if (product.expDate) {
+        const expDate = new Date(product.expDate);
+        const today = new Date();
+        
+        // Check if expiry date is in the past
+        if (expDate < today) {
+          newErrors[`expDate_${index}`] = 'Product has already expired';
+          hasProductErrors = true;
+        }
+        
+        // Check if expiry date is after manufacturing date
+        if (product.mfgDate) {
+          const mfgDate = new Date(product.mfgDate);
+          if (expDate <= mfgDate) {
+            newErrors[`expDate_${index}`] = 'Expiry date must be after manufacturing date';
+            hasProductErrors = true;
+          }
+        }
+      }
+      
+      // Validate FOC quantity
+      if (product.foc && product.foc < 0) {
+        newErrors[`foc_${index}`] = 'FOC quantity cannot be negative';
+        hasProductErrors = true;
+      }
+      
+      // Validate remarks length
+      if (product.remarks && product.remarks.length > 500) {
+        newErrors[`remarks_${index}`] = 'Remarks cannot exceed 500 characters';
+        hasProductErrors = true;
+      }
+    });
+    
+    // Validate document types
+    uploadedFiles.forEach((file, index) => {
+      const docType = documentTypes[index];
+      const customType = customDocumentTypes[index];
+      
+      if (!docType) {
+        newErrors[`documentType_${index}`] = 'Document type is required';
+      } else if (docType === 'Other' && !customType?.trim()) {
+        newErrors[`customDocumentType_${index}`] = 'Custom document type is required';
+      } else if (docType === 'Other' && customType && customType.length > 100) {
+        newErrors[`customDocumentType_${index}`] = 'Custom document type cannot exceed 100 characters';
+      }
+      
+      // Validate file size (max 10MB per file)
+      if (file.size > 10 * 1024 * 1024) {
+        newErrors[`fileSize_${index}`] = 'File size cannot exceed 10MB';
+      }
+    });
+    
+    // Validate notes length
+    if (formData.notes && formData.notes.length > 1000) {
+      newErrors.notes = 'Notes cannot exceed 1000 characters';
+    }
+    
+    // Show validation errors
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      
+      // Count different types of errors for better user feedback
+      const fieldErrors = Object.keys(newErrors).filter(key => !key.includes('_')).length;
+      const productErrors = Object.keys(newErrors).filter(key => key.includes('_')).length;
+      
+      let errorMessage = 'Please fix the validation errors';
+      if (fieldErrors > 0 && productErrors > 0) {
+        errorMessage = `Please fix ${fieldErrors} field error(s) and ${productErrors} product error(s)`;
+      } else if (fieldErrors > 0) {
+        errorMessage = `Please fix ${fieldErrors} field error(s)`;
+      } else if (productErrors > 0) {
+        errorMessage = `Please fix ${productErrors} product error(s)`;
+      }
+      
+      toast.error(errorMessage);
+      
+      // Scroll to first error
+      const firstErrorKey = Object.keys(newErrors)[0];
+      const firstErrorElement = document.querySelector(`[name="${firstErrorKey}"]`) || 
+                               document.querySelector(`[data-error="${firstErrorKey}"]`);
+      if (firstErrorElement) {
+        firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
       return;
     }
-
+    
+    setErrors({});
+    setSaving(true);
+    
     try {
-      setSaving(true);
-      setUploadProgress(0);
-      
-      const submitData = { ...formData };
-      
-      // Prepare product images for submission
-      const productImagesArray: File[] = [];
-      const productImageMappings: Array<{ productIndex: number }> = [];
-      
+      // Prepare product images mapping
+      const productImageMapping: Array<{ productIndex: number }> = [];
       Object.entries(productImages).forEach(([productIndex, images]) => {
-        if (images.length > 0) {
-          images.forEach((image) => {
-            productImagesArray.push(image);
-            productImageMappings.push({ productIndex: parseInt(productIndex) });
-          });
-        }
+        images.forEach(() => {
+          productImageMapping.push({ productIndex: parseInt(productIndex) });
+        });
       });
       
+      // Flatten product images
+      const allProductImages = Object.values(productImages).flat();
+      
       if (isEdit && id) {
-        const response = await invoiceReceivingAPI.updateInvoiceReceiving(
-          id, 
-          submitData,
-          productImagesArray,
-          productImageMappings,
+        await invoiceReceivingAPI.updateInvoiceReceiving(
+          id,
+          {
+            ...formData,
+            documents: uploadedFiles // Use uploadedFiles instead of formData.documents
+          },
+          allProductImages,
+          productImageMapping,
+          documentTypes,
+          customDocumentTypes,
           (progress) => setUploadProgress(progress)
         );
         toast.success('Invoice receiving updated successfully');
       } else {
-        const response = await invoiceReceivingAPI.createInvoiceReceiving(
-          submitData,
-          productImagesArray,
-          productImageMappings,
+        await invoiceReceivingAPI.createInvoiceReceiving(
+          {
+            ...formData,
+            documents: uploadedFiles // Use uploadedFiles instead of formData.documents
+          },
+          allProductImages,
+          productImageMapping,
+          documentTypes,
+          customDocumentTypes,
           (progress) => setUploadProgress(progress)
         );
         toast.success('Invoice receiving created successfully');
@@ -528,8 +738,50 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
       
       navigate('/invoice-receiving');
     } catch (error: any) {
-      console.error('Save error:', error);
-      toast.error(error.response?.data?.message || 'Failed to save invoice receiving');
+      console.error('Submit error:', error);
+      
+      // Handle detailed validation errors from backend
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        const backendErrors: { [key: string]: string } = {};
+        
+        error.response.data.errors.forEach((err: any) => {
+          if (err.path) {
+            // Handle express-validator errors
+            backendErrors[err.path] = err.msg;
+          } else if (typeof err === 'string') {
+            // Handle custom validation error strings
+            toast.error(err);
+          }
+        });
+        
+        // Set field-specific errors if any
+        if (Object.keys(backendErrors).length > 0) {
+          setErrors(prev => ({ ...prev, ...backendErrors }));
+        }
+        
+        // Show main error message
+        const mainMessage = error.response?.data?.message || 'Validation failed';
+        toast.error(mainMessage);
+        
+        // Show detailed error summary
+        if (error.response.data.errors.length > 0) {
+          const errorMessages = error.response.data.errors
+            .map((err: any) => typeof err === 'string' ? err : err.msg || err.message)
+            .filter(Boolean);
+          
+          if (errorMessages.length > 0) {
+            setTimeout(() => {
+              errorMessages.forEach((msg: string, index: number) => {
+                setTimeout(() => toast.error(msg, { duration: 4000 }), index * 500);
+              });
+            }, 1000);
+          }
+        }
+      } else {
+        // Handle single error message
+        const errorMessage = error.response?.data?.message || 'Failed to save invoice receiving';
+        toast.error(errorMessage);
+      }
     } finally {
       setSaving(false);
       setUploadProgress(0);
@@ -998,6 +1250,7 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
         )}
 
         {/* Document Upload */}
+        {/* Document Upload */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <Upload className="w-5 h-5 mr-2" />
@@ -1023,22 +1276,71 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
             
             {uploadedFiles.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</h3>
-                <div className="space-y-2">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Uploaded Files:</h3>
+                <div className="space-y-3">
                   {uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <div className="flex items-center space-x-2">
-                        <FileText className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm text-gray-700">{file.name}</span>
-                        <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-2 flex-1">
+                          <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-gray-700 font-medium block truncate">{file.name}</span>
+                            <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="text-red-600 hover:text-red-800 p-1 flex-shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="text-red-600 hover:text-red-800 p-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Document Type *
+                          </label>
+                          <select
+                            value={documentTypes[index] || ''}
+                            onChange={(e) => handleDocumentTypeChange(index, e.target.value)}
+                            className={`w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent ${
+                              errors[`documentType_${index}`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            required
+                          >
+                            <option value="">Select document type</option>
+                            {predefinedDocumentTypes.map((type) => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                          {errors[`documentType_${index}`] && (
+                            <p className="text-xs text-red-600 mt-1">{errors[`documentType_${index}`]}</p>
+                          )}
+                        </div>
+                        
+                        {documentTypes[index] === 'Other' && (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Custom Document Type *
+                            </label>
+                            <input
+                              type="text"
+                              value={customDocumentTypes[index] || ''}
+                              onChange={(e) => handleCustomDocumentTypeChange(index, e.target.value)}
+                              placeholder="Enter document type"
+                              className={`w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent ${
+                                errors[`customDocumentType_${index}`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                              required
+                            />
+                            {errors[`customDocumentType_${index}`] && (
+                              <p className="text-xs text-red-600 mt-1">{errors[`customDocumentType_${index}`]}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1112,7 +1414,7 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
           
           <button
             type="submit"
-            disabled={saving || formData.receivedProducts.length === 0 || Object.keys(errors).length > 0}
+            disabled={saving || formData.receivedProducts.length === 0}
             className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? (

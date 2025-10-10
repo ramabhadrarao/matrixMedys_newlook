@@ -6,6 +6,11 @@ import pdfService from '../services/pdfService.js';
 
 export const createInvoiceReceiving = async (req, res) => {
   try {
+    console.log('=== CREATE INVOICE RECEIVING DEBUG ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Request files:', req.files);
+    console.log('=====================================');
+    
     const {
       purchaseOrder,
       invoiceNumber,
@@ -23,15 +28,72 @@ export const createInvoiceReceiving = async (req, res) => {
     console.log('receivedProducts:', receivedProducts);
     console.log('products:', products);
     
+    // Comprehensive validation with detailed error messages
+    const validationErrors = [];
+    
+    // Validate required fields
+    if (!purchaseOrder) {
+      validationErrors.push({ path: 'purchaseOrder', msg: 'Purchase order is required' });
+    }
+    
+    if (!invoiceNumber || invoiceNumber.trim() === '') {
+      validationErrors.push({ path: 'invoiceNumber', msg: 'Invoice number is required' });
+    }
+    
+    if (!invoiceDate) {
+      validationErrors.push({ path: 'invoiceDate', msg: 'Invoice date is required' });
+    }
+    
+    if (!receivedDate) {
+      validationErrors.push({ path: 'receivedDate', msg: 'Received date is required' });
+    }
+    
+    // Validate date formats
+    if (invoiceDate && isNaN(Date.parse(invoiceDate))) {
+      validationErrors.push({ path: 'invoiceDate', msg: 'Invalid invoice date format' });
+    }
+    
+    if (receivedDate && isNaN(Date.parse(receivedDate))) {
+      validationErrors.push({ path: 'receivedDate', msg: 'Invalid received date format' });
+    }
+    
+    // Validate invoice date is not in the future
+    if (invoiceDate && new Date(invoiceDate) > new Date()) {
+      validationErrors.push({ path: 'invoiceDate', msg: 'Invoice date cannot be in the future' });
+    }
+    
+    // Validate received date is not in the future
+    if (receivedDate && new Date(receivedDate) > new Date()) {
+      validationErrors.push({ path: 'receivedDate', msg: 'Received date cannot be in the future' });
+    }
+    
+    console.log('Validation errors so far:', validationErrors);
+    
+    // Return validation errors if any
+    if (validationErrors.length > 0) {
+      console.log('Returning validation errors:', validationErrors);
+      return res.status(400).json({ 
+        message: 'Validation failed - please check the following fields',
+        errors: validationErrors 
+      });
+    }
+    
     // Validate PO exists and is in correct status
     const po = await PurchaseOrder.findById(purchaseOrder);
     if (!po) {
-      return res.status(404).json({ message: 'Purchase order not found' });
+      return res.status(404).json({ 
+        message: 'Purchase order not found',
+        errors: [{ path: 'purchaseOrder', msg: 'The selected purchase order does not exist' }]
+      });
     }
     
     if (!['ordered', 'partial_received', 'received'].includes(po.status)) {
       return res.status(400).json({ 
-        message: 'Purchase order must be in ordered, partial_received, or received status' 
+        message: 'Invalid purchase order status',
+        errors: [{ 
+          path: 'purchaseOrder', 
+          msg: `Purchase order status is '${po.status}'. Only orders with status 'ordered', 'partial_received', or 'received' can be processed.` 
+        }]
       });
     }
     
@@ -42,7 +104,10 @@ export const createInvoiceReceiving = async (req, res) => {
         productsArray = JSON.parse(productsArray);
       } catch (e) {
         console.error('Error parsing products data:', e);
-        return res.status(400).json({ message: 'Invalid products data format' });
+        return res.status(400).json({ 
+          message: 'Invalid products data format',
+          errors: [{ path: 'receivedProducts', msg: 'Products data must be valid JSON format' }]
+        });
       }
     }
     
@@ -50,11 +115,69 @@ export const createInvoiceReceiving = async (req, res) => {
     
     // Validate received products - allow zero quantities but require products array
     if (!productsArray || !Array.isArray(productsArray)) {
-      return res.status(400).json({ message: 'Products data is required' });
+      return res.status(400).json({ 
+        message: 'Products data is required',
+        errors: [{ path: 'receivedProducts', msg: 'At least one product must be included in the receiving' }]
+      });
     }
     
     if (productsArray.length === 0) {
-      return res.status(400).json({ message: 'Product list cannot be empty' });
+      return res.status(400).json({ 
+        message: 'Product list cannot be empty',
+        errors: [{ path: 'receivedProducts', msg: 'At least one product must be selected for receiving' }]
+      });
+    }
+    
+    // Validate individual products
+    const productValidationErrors = [];
+    productsArray.forEach((product, index) => {
+      if (!product.productName || product.productName.trim() === '') {
+        productValidationErrors.push(`Product ${index + 1}: Product name is required`);
+      }
+      
+      if (!product.productCode || product.productCode.trim() === '') {
+        productValidationErrors.push(`Product ${index + 1}: Product code is required`);
+      }
+      
+      const receivedQty = product.receivedQuantity || product.receivedQty || 0;
+      if (receivedQty < 0) {
+        productValidationErrors.push(`Product ${index + 1} (${product.productName}): Received quantity cannot be negative`);
+      }
+      
+      const unitPrice = product.unitPrice || 0;
+      if (unitPrice < 0) {
+        productValidationErrors.push(`Product ${index + 1} (${product.productName}): Unit price cannot be negative`);
+      }
+      
+      // Validate batch number if provided
+      if (product.batchNo && product.batchNo.length > 50) {
+        productValidationErrors.push(`Product ${index + 1} (${product.productName}): Batch number is too long (max 50 characters)`);
+      }
+      
+      // Validate dates if provided
+      if (product.mfgDate && isNaN(Date.parse(product.mfgDate))) {
+        productValidationErrors.push(`Product ${index + 1} (${product.productName}): Invalid manufacturing date format`);
+      }
+      
+      if (product.expDate && isNaN(Date.parse(product.expDate))) {
+        productValidationErrors.push(`Product ${index + 1} (${product.productName}): Invalid expiry date format`);
+      }
+      
+      // Validate expiry date is after manufacturing date
+      if (product.mfgDate && product.expDate) {
+        const mfgDate = new Date(product.mfgDate);
+        const expDate = new Date(product.expDate);
+        if (expDate <= mfgDate) {
+          productValidationErrors.push(`Product ${index + 1} (${product.productName}): Expiry date must be after manufacturing date`);
+        }
+      }
+    });
+    
+    if (productValidationErrors.length > 0) {
+      return res.status(400).json({ 
+        message: 'Product validation errors found',
+        errors: productValidationErrors.map(error => ({ msg: error }))
+      });
     }
     
     // Get all existing invoice receivings for this PO (excluding draft status)
@@ -76,7 +199,7 @@ export const createInvoiceReceiving = async (req, res) => {
     
     // Validate that new receiving doesn't exceed ordered quantities
     let hasValidationErrors = false;
-    const validationErrors = [];
+    const quantityValidationErrors = [];
     
     productsArray.forEach(product => {
       const productId = product.product?.toString();
@@ -85,7 +208,7 @@ export const createInvoiceReceiving = async (req, res) => {
       // Find the corresponding product in the PO
       const poProduct = po.products.find(p => p.product?.toString() === productId);
       if (!poProduct) {
-        validationErrors.push(`Product ${product.productName} not found in purchase order`);
+        quantityValidationErrors.push(`Product ${product.productName} not found in purchase order`);
         hasValidationErrors = true;
         return;
       }
@@ -103,7 +226,7 @@ export const createInvoiceReceiving = async (req, res) => {
       const maxAllowed = orderedQty * (1 + tolerance);
       
       if (totalAfterReceiving > maxAllowed) {
-        validationErrors.push(
+        quantityValidationErrors.push(
           `Product ${product.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
         );
         hasValidationErrors = true;
@@ -112,8 +235,8 @@ export const createInvoiceReceiving = async (req, res) => {
     
     if (hasValidationErrors) {
       return res.status(400).json({ 
-        message: 'Validation errors found',
-        errors: validationErrors 
+        message: 'Quantity validation errors found',
+        errors: quantityValidationErrors.map(error => ({ msg: error }))
       });
     }
     
@@ -213,39 +336,77 @@ export const createInvoiceReceiving = async (req, res) => {
         ? req.files.documents 
         : [req.files.documents];
       
-      invoiceReceiving.documents = documentFiles.map(file => ({
-        name: file.originalname,
-        filename: file.filename,
-        originalName: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
-        uploadedBy: req.user._id,
-        uploadedAt: new Date()
-      }));
+      // Parse document types and custom document types from request body
+      let documentTypes = [];
+      let customDocumentTypes = [];
+      
+      if (req.body.documentTypes) {
+        try {
+          documentTypes = typeof req.body.documentTypes === 'string' 
+            ? JSON.parse(req.body.documentTypes) 
+            : req.body.documentTypes;
+        } catch (e) {
+          console.error('Error parsing documentTypes:', e);
+        }
+      }
+      
+      if (req.body.customDocumentTypes) {
+        try {
+          customDocumentTypes = typeof req.body.customDocumentTypes === 'string' 
+            ? JSON.parse(req.body.customDocumentTypes) 
+            : req.body.customDocumentTypes;
+        } catch (e) {
+          console.error('Error parsing customDocumentTypes:', e);
+        }
+      }
+      
+      // Add new documents to existing ones
+      const newDocuments = documentFiles.map((file, index) => {
+        const docType = documentTypes[index];
+        const customType = customDocumentTypes[index];
+        
+        return {
+          name: file.originalname,
+          type: docType === 'Other' ? customType : docType, // Use custom type if "Other" is selected
+          filename: file.filename,
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          uploadedBy: req.user._id,
+          uploadedAt: new Date()
+        };
+      });
+      
+      // Append new documents to existing ones
+      invoiceReceiving.documents = [...(invoiceReceiving.documents || []), ...newDocuments];
     }
+    
+    // Update other fields
+    Object.keys(updates).forEach(key => {
+      if (key !== '_id' && key !== 'products' && key !== 'receivedProducts' && updates[key] !== undefined) {
+        invoiceReceiving[key] = updates[key];
+      }
+    });
+    
+    invoiceReceiving.updatedBy = req.user._id;
     
     await invoiceReceiving.save();
     await invoiceReceiving.populate([
       { path: 'purchaseOrder', select: 'poNumber status' },
       { path: 'receivedBy', select: 'name email' },
-      { path: 'createdBy', select: 'name email' }
+      { path: 'updatedBy', select: 'name email' }
     ]);
     
-    // Update PO with received quantities (considering all receivings)
-    await updatePOReceivedQuantities(po._id);
+    // Update PO received quantities
+    await updatePOReceivedQuantities(invoiceReceiving.purchaseOrder._id || invoiceReceiving.purchaseOrder);
     
-    console.log('Invoice receiving created successfully:', invoiceReceiving._id);
-    
-    res.status(201).json({
-      message: 'Invoice receiving created successfully',
+    res.json({
+      message: 'Invoice receiving updated successfully',
       data: invoiceReceiving
     });
   } catch (error) {
-    console.error('Create invoice receiving error:', error);
-    res.status(500).json({ 
-      message: 'Failed to create invoice receiving',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+    console.error('Update invoice receiving error:', error);
+    res.status(500).json({ message: 'Failed to update invoice receiving' });
   }
 };
 
@@ -397,7 +558,7 @@ export const updateInvoiceReceiving = async (req, res) => {
       
       // Validate updated quantities
       let hasValidationErrors = false;
-      const validationErrors = [];
+      const updateValidationErrors = [];
       
       productsArray.forEach(product => {
         const productId = product.product?.toString();
@@ -405,7 +566,7 @@ export const updateInvoiceReceiving = async (req, res) => {
         
         const poProduct = po.products.find(p => p.product?.toString() === productId);
         if (!poProduct) {
-          validationErrors.push(`Product ${product.productName} not found in purchase order`);
+          updateValidationErrors.push(`Product ${product.productName} not found in purchase order`);
           hasValidationErrors = true;
           return;
         }
@@ -420,7 +581,7 @@ export const updateInvoiceReceiving = async (req, res) => {
         const maxAllowed = orderedQty * (1 + tolerance);
         
         if (totalAfterReceiving > maxAllowed) {
-          validationErrors.push(
+          updateValidationErrors.push(
             `Product ${product.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
           );
           hasValidationErrors = true;
@@ -430,7 +591,7 @@ export const updateInvoiceReceiving = async (req, res) => {
       if (hasValidationErrors) {
         return res.status(400).json({ 
           message: 'Validation errors found',
-          errors: validationErrors 
+          errors: updateValidationErrors 
         });
       }
       
@@ -495,6 +656,57 @@ export const updateInvoiceReceiving = async (req, res) => {
           }
         });
       }
+    }
+    
+    // Handle document uploads if any
+    if (req.files && req.files.documents) {
+      const documentFiles = Array.isArray(req.files.documents) 
+        ? req.files.documents 
+        : [req.files.documents];
+      
+      // Parse document types and custom document types from request body
+      let documentTypes = [];
+      let customDocumentTypes = [];
+      
+      if (req.body.documentTypes) {
+        try {
+          documentTypes = typeof req.body.documentTypes === 'string' 
+            ? JSON.parse(req.body.documentTypes) 
+            : req.body.documentTypes;
+        } catch (e) {
+          console.error('Error parsing documentTypes:', e);
+        }
+      }
+      
+      if (req.body.customDocumentTypes) {
+        try {
+          customDocumentTypes = typeof req.body.customDocumentTypes === 'string' 
+            ? JSON.parse(req.body.customDocumentTypes) 
+            : req.body.customDocumentTypes;
+        } catch (e) {
+          console.error('Error parsing customDocumentTypes:', e);
+        }
+      }
+      
+      // Add new documents to existing ones
+      const newDocuments = documentFiles.map((file, index) => {
+        const docType = documentTypes[index];
+        const customType = customDocumentTypes[index];
+        
+        return {
+          name: file.originalname,
+          type: docType === 'Other' ? customType : docType, // Use custom type if "Other" is selected
+          filename: file.filename,
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          uploadedBy: req.user._id,
+          uploadedAt: new Date()
+        };
+      });
+      
+      // Append new documents to existing ones
+      invoiceReceiving.documents = [...(invoiceReceiving.documents || []), ...newDocuments];
     }
     
     // Update other fields

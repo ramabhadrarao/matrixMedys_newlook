@@ -29,6 +29,7 @@ export interface InvoiceDocument {
   originalName: string;
   mimetype: string;
   size: number;
+  type?: string; // Document type (Invoice, Delivery Note, etc.)
   uploadedAt: string;
   uploadedBy: {
     _id: string;
@@ -188,7 +189,58 @@ const createFormDataRequest = async (
   });
 };
 
-// Invoice & Receiving API Service
+// Enhanced error handling utility
+const handleAPIError = (error: any, operation: string) => {
+  console.error(`Error ${operation}:`, error);
+  
+  // Extract meaningful error message
+  let errorMessage = `Failed to ${operation}`;
+  
+  if (error.response?.data?.message) {
+    errorMessage = error.response.data.message;
+  } else if (error.response?.data?.error) {
+    errorMessage = error.response.data.error;
+  } else if (error.message) {
+    errorMessage = error.message;
+  }
+  
+  // Handle specific error codes
+  if (error.response?.status === 400) {
+    if (error.response.data?.validationErrors) {
+      const validationErrors = error.response.data.validationErrors;
+      const errorMessages = Object.values(validationErrors).join(', ');
+      errorMessage = `Validation failed: ${errorMessages}`;
+    } else if (errorMessage.includes('duplicate')) {
+      errorMessage = 'This invoice number already exists. Please use a different invoice number.';
+    } else if (errorMessage.includes('quantity')) {
+      errorMessage = 'Invalid quantity: Received quantity cannot exceed remaining quantity.';
+    } else if (errorMessage.includes('date')) {
+      errorMessage = 'Invalid date: Please check your date entries.';
+    }
+  } else if (error.response?.status === 401) {
+    errorMessage = 'Authentication failed. Please log in again.';
+  } else if (error.response?.status === 403) {
+    errorMessage = 'You do not have permission to perform this action.';
+  } else if (error.response?.status === 404) {
+    errorMessage = 'The requested resource was not found.';
+  } else if (error.response?.status === 409) {
+    errorMessage = 'Conflict: This operation cannot be completed due to a data conflict.';
+  } else if (error.response?.status === 422) {
+    errorMessage = 'Invalid data provided. Please check your inputs and try again.';
+  } else if (error.response?.status >= 500) {
+    errorMessage = 'Server error occurred. Please try again later or contact support.';
+  } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+    errorMessage = 'Network error. Please check your internet connection and try again.';
+  }
+  
+  // Create enhanced error object
+  const enhancedError = new Error(errorMessage);
+  (enhancedError as any).originalError = error;
+  (enhancedError as any).statusCode = error.response?.status;
+  (enhancedError as any).validationErrors = error.response?.data?.validationErrors;
+  
+  throw enhancedError;
+};
 export const invoiceReceivingAPI = {
   // Get all invoice receivings
   getInvoiceReceivings: async (filters?: InvoiceReceivingFilters): Promise<{ 
@@ -205,8 +257,7 @@ export const invoiceReceivingAPI = {
       console.log('Invoice receivings response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching invoice receivings:', error);
-      throw error;
+      handleAPIError(error, 'fetch invoice receivings');
     }
   },
 
@@ -218,8 +269,7 @@ export const invoiceReceivingAPI = {
       console.log('Invoice receiving response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching invoice receiving:', error);
-      throw error;
+      handleAPIError(error, 'fetch invoice receiving details');
     }
   },
 
@@ -228,48 +278,56 @@ export const invoiceReceivingAPI = {
     data: InvoiceReceivingFormData,
     productImages?: File[],
     productImageMapping?: Array<{ productIndex: number }>,
+    documentTypes?: string[],
+    customDocumentTypes?: string[],
     onProgress?: (progress: number) => void
   ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
-      console.log('Creating invoice receiving:', data);
-      
-      // Always use FormData for consistency
       const formData = new FormData();
       
-      // Add regular fields
-      Object.keys(data).forEach(key => {
-        const value = (data as any)[key];
-        if (value !== undefined && value !== null) {
-          if (key === 'documents' && Array.isArray(value)) {
-            value.forEach((file: File) => {
-              formData.append('documents', file);
-            });
-          } else if (key === 'receivedProducts' && Array.isArray(value)) {
-            formData.append('products', JSON.stringify(value));
-          } else {
-            formData.append(key, value.toString());
-          }
-        }
-      });
+      // Add basic form data
+      formData.append('purchaseOrder', data.purchaseOrder);
+      formData.append('invoiceNumber', data.invoiceNumber);
+      formData.append('invoiceDate', data.invoiceDate);
+      formData.append('invoiceAmount', (data.invoiceAmount || 0).toString());
+      formData.append('supplier', data.supplier);
+      formData.append('receivedDate', data.receivedDate);
+      formData.append('notes', data.notes || '');
+      formData.append('qcRequired', (data.qcRequired !== false).toString());
       
-      // Add product images if provided
+      // Add received products
+      formData.append('receivedProducts', JSON.stringify(data.receivedProducts));
+      
+      // Add documents with types
+      if (data.documents && data.documents.length > 0) {
+        data.documents.forEach((file) => {
+          formData.append('documents', file);
+        });
+        
+        // Add document types as JSON strings
+        if (documentTypes && documentTypes.length > 0) {
+          formData.append('documentTypes', JSON.stringify(documentTypes));
+        }
+        
+        if (customDocumentTypes && customDocumentTypes.length > 0) {
+          formData.append('customDocumentTypes', JSON.stringify(customDocumentTypes));
+        }
+      }
+      
+      // Add product images
       if (productImages && productImages.length > 0) {
-        productImages.forEach((file: File) => {
+        productImages.forEach((file) => {
           formData.append('productImages', file);
         });
+        
+        if (productImageMapping) {
+          formData.append('productImageMapping', JSON.stringify(productImageMapping));
+        }
       }
-      
-      // Add product image mapping if provided
-      if (productImageMapping) {
-        formData.append('productImageMappings', JSON.stringify(productImageMapping));
-      }
-      
-      const response = await createFormDataRequest('/invoice-receiving', formData, 'POST', onProgress);
-      console.log('Create invoice receiving response:', response);
-      return response;
+
+      return createFormDataRequest('/invoice-receiving', formData, 'POST', onProgress);
     } catch (error) {
-      console.error('Error creating invoice receiving:', error);
-      throw error;
+      handleAPIError(error, 'create invoice receiving');
     }
   },
 
@@ -279,6 +337,8 @@ export const invoiceReceivingAPI = {
     data: Partial<InvoiceReceivingFormData>,
     productImages?: File[],
     productImageMapping?: Array<{ productIndex: number }>,
+    documentTypes?: string[],
+    customDocumentTypes?: string[],
     onProgress?: (progress: number) => void
   ): Promise<{ message: string; data: InvoiceReceiving }> => {
     try {
@@ -319,6 +379,15 @@ export const invoiceReceivingAPI = {
           formData.append('productImageMapping', JSON.stringify(productImageMapping));
         }
         
+        // Add document types as JSON strings
+        if (documentTypes && documentTypes.length > 0) {
+          formData.append('documentTypes', JSON.stringify(documentTypes));
+        }
+        
+        if (customDocumentTypes && customDocumentTypes.length > 0) {
+          formData.append('customDocumentTypes', JSON.stringify(customDocumentTypes));
+        }
+        
         const response = await createFormDataRequest(`/invoice-receiving/${id}`, formData, 'PUT', onProgress);
         console.log('Update invoice receiving response:', response);
         return response;
@@ -330,8 +399,7 @@ export const invoiceReceivingAPI = {
         return response.data;
       }
     } catch (error) {
-      console.error('Error updating invoice receiving:', error);
-      throw error;
+      handleAPIError(error, 'update invoice receiving');
     }
   },
 
@@ -343,8 +411,7 @@ export const invoiceReceivingAPI = {
       console.log('Submit to QC response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error submitting to QC:', error);
-      throw error;
+      handleAPIError(error, 'submit to QC');
     }
   },
 
@@ -356,8 +423,7 @@ export const invoiceReceivingAPI = {
       console.log('QC check response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error performing QC check:', error);
-      throw error;
+      handleAPIError(error, 'perform QC check');
     }
   },
 
@@ -369,8 +435,7 @@ export const invoiceReceivingAPI = {
       console.log('Update QC status response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error updating QC status:', error);
-      throw error;
+      handleAPIError(error, 'update QC status');
     }
   },
 
@@ -382,8 +447,7 @@ export const invoiceReceivingAPI = {
       console.log('Delete invoice receiving response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error deleting invoice receiving:', error);
-      throw error;
+      handleAPIError(error, 'delete invoice receiving');
     }
   },
 
@@ -396,8 +460,7 @@ export const invoiceReceivingAPI = {
       console.log('Invoice receivings by PO response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching invoice receivings by PO:', error);
-      throw error;
+      handleAPIError(error, 'fetch invoice receivings by purchase order');
     }
   },
 

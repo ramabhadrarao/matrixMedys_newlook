@@ -38,6 +38,7 @@ const receivedProductSchema = new mongoose.Schema({
 
 const documentSchema = new mongoose.Schema({
   name: String,
+  type: String, // Document type (Invoice, Delivery Note, etc.)
   filename: String,
   originalName: String,
   mimetype: String,
