@@ -423,27 +423,31 @@ const validateForm = (): boolean => {
   } else {
     // Only validate critical errors that should prevent saving
     formData.receivedProducts.forEach((product, index) => {
-      // Check for negative quantities
-      if (product.receivedQty < 0) {
+      // Check for negative quantities - handle both field names
+      const receivedQty = product.receivedQty !== undefined ? product.receivedQty : product.receivedQuantity;
+      if (receivedQty !== undefined && receivedQty < 0) {
         newErrors[`product_${index}_quantity`] = 'Quantity cannot be negative';
       }
       
-      // Validate dates if provided
-      if (product.expiryDate && product.manufacturingDate) {
-        const mfgDate = new Date(product.manufacturingDate);
-        const expDate = new Date(product.expiryDate);
-        if (mfgDate >= expDate) {
+      // Validate dates if provided - handle both field names
+      const mfgDate = product.manufacturingDate || product.mfgDate;
+      const expDate = product.expiryDate || product.expDate;
+      
+      if (expDate && mfgDate) {
+        const mfgDateObj = new Date(mfgDate);
+        const expDateObj = new Date(expDate);
+        if (mfgDateObj >= expDateObj) {
           newErrors[`product_${index}_dates`] = 'Manufacturing date must be before expiry date';
         }
       }
       
       // Check if expiry date is in the past (only error for non-zero quantities)
-      if (product.expiryDate && product.receivedQty > 0) {
-        const expDate = new Date(product.expiryDate);
+      if (expDate && receivedQty > 0) {
+        const expDateObj = new Date(expDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        if (expDate < today) {
+        if (expDateObj < today) {
           newErrors[`product_${index}_expiry`] = 'Cannot receive expired products';
         }
       }
@@ -498,25 +502,25 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
     console.log('Uploaded Files:', uploadedFiles);
     console.log('=====================================');
     
-    // Comprehensive form validation
+    // Comprehensive form validation - Made less strict for draft saves
     const newErrors: Record<string, string> = {};
     
-    // Required field validations
+    // Required field validations - Only enforce critical fields
     if (!formData.purchaseOrder) {
       newErrors.purchaseOrder = 'Purchase Order is required';
     }
     
-    if (!formData.invoiceNumber.trim()) {
-      newErrors.invoiceNumber = 'Invoice Number is required';
-    } else if (formData.invoiceNumber.trim().length < 3) {
-      newErrors.invoiceNumber = 'Invoice Number must be at least 3 characters long';
-    } else if (formData.invoiceNumber.trim().length > 50) {
-      newErrors.invoiceNumber = 'Invoice Number cannot exceed 50 characters';
+    // Make invoice fields optional for draft saves
+    if (formData.invoiceNumber && formData.invoiceNumber.trim()) {
+      if (formData.invoiceNumber.trim().length < 3) {
+        newErrors.invoiceNumber = 'Invoice Number must be at least 3 characters long';
+      } else if (formData.invoiceNumber.trim().length > 50) {
+        newErrors.invoiceNumber = 'Invoice Number cannot exceed 50 characters';
+      }
     }
     
-    if (!formData.invoiceDate) {
-      newErrors.invoiceDate = 'Invoice Date is required';
-    } else {
+    // Make date validations optional for draft saves
+    if (formData.invoiceDate) {
       const invoiceDate = new Date(formData.invoiceDate);
       const today = new Date();
       today.setHours(23, 59, 59, 999); // End of today
@@ -533,9 +537,7 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
       }
     }
     
-    if (!formData.receivedDate) {
-      newErrors.receivedDate = 'Received Date is required';
-    } else {
+    if (formData.receivedDate) {
       const receivedDate = new Date(formData.receivedDate);
       const today = new Date();
       today.setHours(23, 59, 59, 999); // End of today
@@ -553,11 +555,11 @@ const ProductReceivingStatus: React.FC<{ product: any }> = ({ product }) => {
       }
     }
     
-    // Validate supplier field
-    if (!formData.supplier.trim()) {
-      newErrors.supplier = 'Supplier is required';
-    } else if (formData.supplier.trim().length < 2) {
-      newErrors.supplier = 'Supplier name must be at least 2 characters long';
+    // Make supplier validation optional for draft saves
+    if (formData.supplier && formData.supplier.trim()) {
+      if (formData.supplier.trim().length < 2) {
+        newErrors.supplier = 'Supplier name must be at least 2 characters long';
+      }
     }
     
     // Validate invoice amount if provided

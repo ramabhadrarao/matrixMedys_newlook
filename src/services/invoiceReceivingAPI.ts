@@ -321,7 +321,7 @@ export const invoiceReceivingAPI = {
         });
         
         if (productImageMapping) {
-          formData.append('productImageMapping', JSON.stringify(productImageMapping));
+          formData.append('productImageMappings', JSON.stringify(productImageMapping));
         }
       }
 
@@ -376,7 +376,7 @@ export const invoiceReceivingAPI = {
         
         // Add product image mapping if provided
         if (productImageMapping) {
-          formData.append('productImageMapping', JSON.stringify(productImageMapping));
+          formData.append('productImageMappings', JSON.stringify(productImageMapping));
         }
         
         // Add document types as JSON strings

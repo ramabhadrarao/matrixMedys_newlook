@@ -381,10 +381,10 @@ export const createInvoiceReceiving = async (req, res) => {
       invoiceReceiving.documents = [...(invoiceReceiving.documents || []), ...newDocuments];
     }
     
-    // Update other fields
-    Object.keys(updates).forEach(key => {
-      if (key !== '_id' && key !== 'products' && key !== 'receivedProducts' && updates[key] !== undefined) {
-        invoiceReceiving[key] = updates[key];
+    // Update other fields from request body
+    Object.keys(req.body).forEach(key => {
+      if (key !== '_id' && key !== 'products' && key !== 'receivedProducts' && req.body[key] !== undefined) {
+        invoiceReceiving[key] = req.body[key];
       }
     });
     
