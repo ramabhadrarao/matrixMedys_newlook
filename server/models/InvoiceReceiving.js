@@ -102,6 +102,16 @@ const invoiceReceivingSchema = new mongoose.Schema({
     default: 'draft'
   },
   
+  // Additional Information
+  notes: {
+    type: String,
+    default: ''
+  },
+  qcRequired: {
+    type: Boolean,
+    default: true
+  },
+  
   // Metadata
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

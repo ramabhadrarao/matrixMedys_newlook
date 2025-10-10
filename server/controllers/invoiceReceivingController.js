@@ -424,12 +424,19 @@ export const getInvoiceReceiving = async (req, res) => {
       return res.status(404).json({ message: 'Invoice receiving not found' });
     }
     
+    console.log('Retrieved invoice receiving data:', JSON.stringify(invoiceReceiving, null, 2));
+    
     // Transform the data to match frontend expectations
     const transformedReceiving = {
       ...invoiceReceiving,
       receivedProducts: invoiceReceiving.products, // Map products to receivedProducts for frontend
-      supplier: invoiceReceiving.purchaseOrder?.supplier || 'Unknown Supplier'
+      supplier: invoiceReceiving.purchaseOrder?.supplier || 'Unknown Supplier',
+      // Ensure Additional Information fields are included
+      notes: invoiceReceiving.notes || '',
+      qcRequired: invoiceReceiving.qcRequired !== undefined ? invoiceReceiving.qcRequired : true
     };
+    
+    console.log('Transformed receiving data:', JSON.stringify(transformedReceiving, null, 2));
     
     res.json({ data: transformedReceiving });
   } catch (error) {

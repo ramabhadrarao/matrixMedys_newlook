@@ -140,7 +140,7 @@ const InvoiceReceivingForm: React.FC = () => {
 
   const loadInvoiceReceiving = async (id: string) => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       const response = await invoiceReceivingAPI.getInvoiceReceiving(id);
       const receiving = response.data;
       
@@ -153,20 +153,12 @@ const InvoiceReceivingForm: React.FC = () => {
         invoiceNumber: receiving.invoiceNumber,
         invoiceDate: receiving.invoiceDate ? new Date(receiving.invoiceDate).toISOString().split('T')[0] : '',
         invoiceAmount: receiving.invoiceAmount,
-        dueDate: receiving.dueDate ? new Date(receiving.dueDate).toISOString().split('T')[0] : '',
+        supplier: receiving.supplier || '',
         receivedDate: receiving.receivedDate ? new Date(receiving.receivedDate).toISOString().split('T')[0] : '',
         notes: receiving.notes || '',
         qcRequired: receiving.qcRequired || false,
-        receivedProducts: receiving.products || []
+        receivedProducts: receiving.receivedProducts || receiving.products || []
       });
-      
-      // Set received products with proper image handling
-      const processedProducts = receiving.products?.map((product: any) => ({
-        ...product,
-        productImages: product.productImages || []
-      })) || [];
-      
-      setReceivedProducts(processedProducts);
       
       // Set uploaded files and document types from existing documents
       if (receiving.documents && receiving.documents.length > 0) {
@@ -187,11 +179,19 @@ const InvoiceReceivingForm: React.FC = () => {
         setCustomDocumentTypes(existingCustomDocumentTypes);
       }
       
-      setIsLoading(false);
+      // Load the associated purchase order details if needed
+      if (receiving.purchaseOrder) {
+        const poId = typeof receiving.purchaseOrder === 'object' 
+          ? receiving.purchaseOrder._id 
+          : receiving.purchaseOrder;
+        await loadPurchaseOrderDetails(poId);
+      }
+      
+      setLoading(false);
     } catch (error) {
       console.error('Error loading invoice receiving:', error);
       setErrors({ general: 'Failed to load invoice receiving data' });
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
