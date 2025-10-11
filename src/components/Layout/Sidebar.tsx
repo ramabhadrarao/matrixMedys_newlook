@@ -115,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       permission: { resource: 'quality_control', action: 'view' },
     },
     {
-      path: '/warehouse-approval',
+      path: '/warehouse-approvals',
       name: 'Warehouse Approval',
       icon: ClipboardCheck,
       permission: { resource: 'warehouse_approval', action: 'view' },

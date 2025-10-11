@@ -67,6 +67,7 @@ import BranchDetails from './components/Branches/BranchDetails';
 import WarehousesList from './components/Warehouses/WarehousesList';
 import WarehouseForm from './components/Warehouses/WarehouseForm';
 import WarehouseDetails from './components/Warehouses/WarehouseDetails';
+import { WarehouseApprovalList, WarehouseApprovalDetails } from './components/Warehouses';
 
 // Quality Control Components
 import { 
@@ -210,7 +211,10 @@ function App() {
             <Route path="warehouses/new" element={<WarehouseForm />} />
             <Route path="warehouses/:id" element={<WarehouseDetails />} />
             <Route path="warehouses/:id/edit" element={<WarehouseForm />} />
-            
+             {/* Warehouse Approval Routes - Add these after Warehouse Routes */}
+  <Route path="warehouse-approvals" element={<WarehouseApprovalList />} />
+  <Route path="warehouse-approvals/:id" element={<WarehouseApprovalDetails />} />
+  
             {/* Principal Routes */}
             <Route path="principals" element={<PrincipalsList />} />
             <Route path="principals/new" element={<PrincipalForm />} />

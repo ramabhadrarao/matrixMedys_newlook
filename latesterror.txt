@@ -1,122 +1,119 @@
 react-dom.development.js:29895 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
-api.ts:28 API POST Request: {url: '/auth/login', data: {…}, headers: AxiosHeaders}
-api.ts:498 Fetching dashboard statistics...
-api.ts:511 Fetching recent activity...
-api.ts:498 Fetching dashboard statistics...
-api.ts:511 Fetching recent activity...
-api.ts:515 Recent activity response: {activities: Array(8), total: 24}
-api.ts:515 Recent activity response: {activities: Array(8), total: 24}
-api.ts:500 Dashboard stats response: {cards: Array(15), systemStats: {…}, userPermissions: {…}, totalCards: 15}
-api.ts:500 Dashboard stats response: {cards: Array(15), systemStats: {…}, userPermissions: {…}, totalCards: 15}
-qualityControlAPI.ts:179   GET http://localhost:5000/api/quality-control?search=&status=&overallResult=&dateFrom=&dateTo=&page=1&limit=10 400 (Bad Request)
-dispatchXhrRequest @ xhr.js:195
-xhr @ xhr.js:15
-dispatchRequest @ dispatchRequest.js:51
-Promise.then
-_request @ Axios.js:163
-request @ Axios.js:40
-Axios.<computed> @ Axios.js:213
-wrap @ bind.js:5
-getQCRecords @ qualityControlAPI.ts:179
-loadQCRecords @ QualityControlList.tsx:139
-(anonymous) @ QualityControlList.tsx:124
-commitHookEffectListMount @ react-dom.development.js:23189
-commitPassiveMountOnFiber @ react-dom.development.js:24965
-commitPassiveMountEffects_complete @ react-dom.development.js:24930
-commitPassiveMountEffects_begin @ react-dom.development.js:24917
-commitPassiveMountEffects @ react-dom.development.js:24905
-flushPassiveEffectsImpl @ react-dom.development.js:27078
-flushPassiveEffects @ react-dom.development.js:27023
-(anonymous) @ react-dom.development.js:26808
-workLoop @ scheduler.development.js:266
-flushWork @ scheduler.development.js:239
-performWorkUntilDeadline @ scheduler.development.js:533
+WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
+    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
+    at renderWithHooks (react-dom.development.js:15486:18)
+    at mountIndeterminateComponent (react-dom.development.js:20103:13)
+    at beginWork (react-dom.development.js:21626:16)
+    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
+    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
+    at invokeGuardedCallback (react-dom.development.js:4277:31)
+    at beginWork$1 (react-dom.development.js:27490:7)
+    at performUnitOfWork (react-dom.development.js:26596:12)
+    at workLoopSync (react-dom.development.js:26505:5)
+WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
+    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
+    at renderWithHooks (react-dom.development.js:15486:18)
+    at mountIndeterminateComponent (react-dom.development.js:20103:13)
+    at beginWork (react-dom.development.js:21626:16)
+    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
+    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
+    at invokeGuardedCallback (react-dom.development.js:4277:31)
+    at beginWork$1 (react-dom.development.js:27490:7)
+    at performUnitOfWork (react-dom.development.js:26596:12)
+    at workLoopSync (react-dom.development.js:26505:5)
+WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
+    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
+    at renderWithHooks (react-dom.development.js:15486:18)
+    at mountIndeterminateComponent (react-dom.development.js:20103:13)
+    at beginWork (react-dom.development.js:21626:16)
+    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
+    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
+    at invokeGuardedCallback (react-dom.development.js:4277:31)
+    at beginWork$1 (react-dom.development.js:27490:7)
+    at performUnitOfWork (react-dom.development.js:26596:12)
+    at workLoopSync (react-dom.development.js:26505:5)
+WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
+    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
+    at renderWithHooks (react-dom.development.js:15486:18)
+    at mountIndeterminateComponent (react-dom.development.js:20103:13)
+    at beginWork (react-dom.development.js:21626:16)
+    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
+    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
+    at invokeGuardedCallback (react-dom.development.js:4277:31)
+    at beginWork$1 (react-dom.development.js:27490:7)
+    at performUnitOfWork (react-dom.development.js:26596:12)
+    at workLoopSync (react-dom.development.js:26505:5)
+react-dom.development.js:18704  The above error occurred in the <ProductCheckDisplay> component:
+
+    at ProductCheckDisplay (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:1593:32)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
+    at div
+    at div
+    at div
+    at div
+    at WarehouseApprovalDetails (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:36:20)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
+    at Outlet (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4494:26)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
+    at main
+    at div
+    at div
+    at Layout (http://localhost:5173/src/components/Layout/Layout.tsx?t=1760172890836:26:41)
+    at ProtectedRoute (http://localhost:5173/src/App.tsx?t=1760172890836:71:27)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4558:5)
+    at div
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4501:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:5247:5)
+    at App (http://localhost:5173/src/App.tsx?t=1760172890836:113:68)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ react-dom.development.js:18704
+react-dom.development.js:18704  The above error occurred in the <ProductCheckDisplay> component:
+
+    at ProductCheckDisplay (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:1593:32)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
+    at div
+    at div
+    at div
+    at div
+    at WarehouseApprovalDetails (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:36:20)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
+    at Outlet (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4494:26)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
+    at main
+    at div
+    at div
+    at Layout (http://localhost:5173/src/components/Layout/Layout.tsx?t=1760172890836:26:41)
+    at ProtectedRoute (http://localhost:5173/src/App.tsx?t=1760172890836:71:27)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4558:5)
+    at div
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4501:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:5247:5)
+    at App (http://localhost:5173/src/App.tsx?t=1760172890836:113:68)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ react-dom.development.js:18704
+react-dom.development.js:26962  Uncaught ReferenceError: formatDate is not defined
+    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
+    at renderWithHooks (react-dom.development.js:15486:18)
+    at mountIndeterminateComponent (react-dom.development.js:20103:13)
+    at beginWork (react-dom.development.js:21626:16)
+    at beginWork$1 (react-dom.development.js:27465:14)
+    at performUnitOfWork (react-dom.development.js:26596:12)
+    at workLoopSync (react-dom.development.js:26505:5)
+    at renderRootSync (react-dom.development.js:26473:7)
+    at recoverFromConcurrentError (react-dom.development.js:25889:20)
+    at performConcurrentWorkOnRoot (react-dom.development.js:25789:22)
 [NEW] Explain Console errors by using Copilot in Edge: click
          
          to explain an error. 
         Learn more
         Don't show again
-api.ts:90  API Error Details: {message: 'Request failed with status code 400', response: {…}, status: 400, config: {…}}
-handleApiError @ api.ts:90
-getQCRecords @ qualityControlAPI.ts:182
-await in getQCRecords
-loadQCRecords @ QualityControlList.tsx:139
-(anonymous) @ QualityControlList.tsx:124
-commitHookEffectListMount @ react-dom.development.js:23189
-commitPassiveMountOnFiber @ react-dom.development.js:24965
-commitPassiveMountEffects_complete @ react-dom.development.js:24930
-commitPassiveMountEffects_begin @ react-dom.development.js:24917
-commitPassiveMountEffects @ react-dom.development.js:24905
-flushPassiveEffectsImpl @ react-dom.development.js:27078
-flushPassiveEffects @ react-dom.development.js:27023
-(anonymous) @ react-dom.development.js:26808
-workLoop @ scheduler.development.js:266
-flushWork @ scheduler.development.js:239
-performWorkUntilDeadline @ scheduler.development.js:533
-QualityControlList.tsx:145  Error loading QC records: Validation failed
-loadQCRecords @ QualityControlList.tsx:145
-await in loadQCRecords
-(anonymous) @ QualityControlList.tsx:124
-commitHookEffectListMount @ react-dom.development.js:23189
-commitPassiveMountOnFiber @ react-dom.development.js:24965
-commitPassiveMountEffects_complete @ react-dom.development.js:24930
-commitPassiveMountEffects_begin @ react-dom.development.js:24917
-commitPassiveMountEffects @ react-dom.development.js:24905
-flushPassiveEffectsImpl @ react-dom.development.js:27078
-flushPassiveEffects @ react-dom.development.js:27023
-(anonymous) @ react-dom.development.js:26808
-workLoop @ scheduler.development.js:266
-flushWork @ scheduler.development.js:239
-performWorkUntilDeadline @ scheduler.development.js:533
-qualityControlAPI.ts:179   GET http://localhost:5000/api/quality-control?search=&status=&overallResult=&dateFrom=&dateTo=&page=1&limit=10 400 (Bad Request)
-dispatchXhrRequest @ xhr.js:195
-xhr @ xhr.js:15
-dispatchRequest @ dispatchRequest.js:51
-Promise.then
-_request @ Axios.js:163
-request @ Axios.js:40
-Axios.<computed> @ Axios.js:213
-wrap @ bind.js:5
-getQCRecords @ qualityControlAPI.ts:179
-loadQCRecords @ QualityControlList.tsx:139
-(anonymous) @ QualityControlList.tsx:124
-commitHookEffectListMount @ react-dom.development.js:23189
-invokePassiveEffectMountInDEV @ react-dom.development.js:25193
-invokeEffectsInDev @ react-dom.development.js:27390
-commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
-flushPassiveEffectsImpl @ react-dom.development.js:27095
-flushPassiveEffects @ react-dom.development.js:27023
-(anonymous) @ react-dom.development.js:26808
-workLoop @ scheduler.development.js:266
-flushWork @ scheduler.development.js:239
-performWorkUntilDeadline @ scheduler.development.js:533
-api.ts:90  API Error Details: {message: 'Request failed with status code 400', response: {…}, status: 400, config: {…}}
-handleApiError @ api.ts:90
-getQCRecords @ qualityControlAPI.ts:182
-await in getQCRecords
-loadQCRecords @ QualityControlList.tsx:139
-(anonymous) @ QualityControlList.tsx:124
-commitHookEffectListMount @ react-dom.development.js:23189
-invokePassiveEffectMountInDEV @ react-dom.development.js:25193
-invokeEffectsInDev @ react-dom.development.js:27390
-commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
-flushPassiveEffectsImpl @ react-dom.development.js:27095
-flushPassiveEffects @ react-dom.development.js:27023
-(anonymous) @ react-dom.development.js:26808
-workLoop @ scheduler.development.js:266
-flushWork @ scheduler.development.js:239
-performWorkUntilDeadline @ scheduler.development.js:533
-QualityControlList.tsx:145  Error loading QC records: Validation failed
-loadQCRecords @ QualityControlList.tsx:145
-await in loadQCRecords
-(anonymous) @ QualityControlList.tsx:124
-commitHookEffectListMount @ react-dom.development.js:23189
-invokePassiveEffectMountInDEV @ react-dom.development.js:25193
-invokeEffectsInDev @ react-dom.development.js:27390
-commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
-flushPassiveEffectsImpl @ react-dom.development.js:27095
-flushPassiveEffects @ react-dom.development.js:27023
-(anonymous) @ react-dom.development.js:26808
-workLoop @ scheduler.development.js:266
-flushWork @ scheduler.development.js:239
-performWorkUntilDeadline @ scheduler.development.js:533

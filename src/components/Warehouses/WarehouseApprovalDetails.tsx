@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
+import { formatDate } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
 interface ProductCheck {
@@ -435,7 +436,7 @@ const WarehouseApprovalDetails: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDateLocal = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -517,7 +518,7 @@ const WarehouseApprovalDetails: React.FC = () => {
               </span>
               
               <span className="text-gray-500 text-sm">
-                Created {formatDate(approval.createdAt)}
+                Created {formatDateLocal(approval.createdAt)}
               </span>
             </div>
           </div>
@@ -597,7 +598,7 @@ const WarehouseApprovalDetails: React.FC = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Received Date</label>
-            <p className="text-gray-900">{formatDate(approval.invoiceReceiving.receivedDate)}</p>
+            <p className="text-gray-900">{formatDateLocal(approval.invoiceReceiving.receivedDate)}</p>
           </div>
           
           <div>
@@ -784,7 +785,7 @@ const WarehouseApprovalDetails: React.FC = () => {
                         <div className="text-sm text-gray-500 mt-1">
                           Category: {product.category} | Qty: {product.receivedQty} {product.unit}
                           {product.batchNumber && ` | Batch: ${product.batchNumber}`}
-                          {product.expiryDate && ` | Expires: ${formatDate(product.expiryDate)}`}
+                          {product.expiryDate && ` | Expires: ${formatDateLocal(product.expiryDate)}`}
                         </div>
                       </div>
                     </div>
@@ -885,7 +886,7 @@ const WarehouseApprovalDetails: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-gray-900">Warehouse Approval Created</div>
-                  <div className="text-sm text-gray-500">{formatDate(approval.createdAt)}</div>
+                  <div className="text-sm text-gray-500">{formatDateLocal(approval.createdAt)}</div>
                   <div className="text-sm text-gray-500">by {approval.invoiceReceiving.receivedBy.name}</div>
                 </div>
               </div>
@@ -897,7 +898,7 @@ const WarehouseApprovalDetails: React.FC = () => {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">Submitted for Manager Approval</div>
-                    <div className="text-sm text-gray-500">{formatDate(approval.submittedAt)}</div>
+                    <div className="text-sm text-gray-500">{formatDateLocal(approval.submittedAt)}</div>
                     {approval.submittedBy && <div className="text-sm text-gray-500">by {approval.submittedBy.name}</div>}
                   </div>
                 </div>
@@ -918,7 +919,7 @@ const WarehouseApprovalDetails: React.FC = () => {
                     <div className="text-sm font-medium text-gray-900">
                       {approval.status === 'approved' ? 'Approved by Manager' : 'Rejected by Manager'}
                     </div>
-                    <div className="text-sm text-gray-500">{formatDate(approval.approvedAt)}</div>
+                    <div className="text-sm text-gray-500">{formatDateLocal(approval.approvedAt)}</div>
                     {approval.approvedBy && <div className="text-sm text-gray-500">by {approval.approvedBy.name}</div>}
                     {approval.rejectionReason && (
                       <div className="text-sm text-red-600 mt-1">Reason: {approval.rejectionReason}</div>

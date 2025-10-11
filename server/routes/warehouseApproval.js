@@ -19,66 +19,89 @@ import {
 
 const router = express.Router();
 
-// Validation rules
-const warehouseChecksValidation = [
-  body('products').isArray().withMessage('Products must be an array'),
-  body('products.*.productId').isMongoId().withMessage('Valid product ID required'),
-  body('products.*.storageLocation').optional().isObject().withMessage('Storage location must be an object'),
-  body('products.*.storageLocation.zone').optional().isString().withMessage('Zone must be a string'),
-  body('products.*.storageLocation.rack').optional().isString().withMessage('Rack must be a string'),
-  body('products.*.storageLocation.shelf').optional().isString().withMessage('Shelf must be a string'),
-  body('products.*.storageLocation.bin').optional().isString().withMessage('Bin must be a string'),
-  body('products.*.physicalChecks').optional().isObject().withMessage('Physical checks must be an object'),
-  body('products.*.physicalChecks.packagingIntegrity').optional().isBoolean(),
-  body('products.*.physicalChecks.labelAccuracy').optional().isBoolean(),
-  body('products.*.physicalChecks.quantityVerification').optional().isBoolean(),
-  body('products.*.physicalChecks.storageConditions').optional().isBoolean(),
-  body('products.*.warehouseDecision').isIn(['approved', 'rejected', 'partial_approved']).withMessage('Valid warehouse decision required'),
-  body('products.*.warehouseRemarks').optional().isString().withMessage('Warehouse remarks must be a string'),
-  body('products.*.rejectionReason').optional().isString().withMessage('Rejection reason must be a string')
-];
+// IMPORTANT: Specific routes MUST come before dynamic routes (/:id)
 
-const managerApprovalValidation = [
-  body('managerDecision').isIn(['approved', 'rejected']).withMessage('Valid manager decision required'),
-  body('managerRemarks').optional().isString().withMessage('Manager remarks must be a string')
-];
+// Dashboard route - MUST be before /:id
+router.get('/dashboard', 
+  authenticate, 
+  checkPermission('warehouse_approval', 'view'),
+  [
+    query('timeframe').optional().isInt({ min: 1, max: 365 }),
+    query('warehouse').optional().isMongoId()
+  ],
+  validate,
+  getWarehouseApprovalDashboard
+);
 
-// Routes
+// Statistics route - MUST be before /:id
+router.get('/statistics', 
+  authenticate, 
+  checkPermission('warehouse_approval', 'view'),
+  [
+    query('dateFrom').optional().isISO8601(),
+    query('dateTo').optional().isISO8601()
+  ],
+  validate,
+  getWarehouseApprovalStatistics
+);
+
+// Workload route - MUST be before /:id
+router.get('/workload', 
+  authenticate, 
+  checkPermission('warehouse_approval', 'view'),
+  [
+    query('status').optional().isIn(['active', 'all'])
+  ],
+  validate,
+  getWarehouseApprovalWorkload
+);
+
+// Bulk assign route - MUST be before /:id
+router.post('/bulk-assign', 
+  authenticate, 
+  checkPermission('warehouse_approval', 'manage'),
+  [
+    body('warehouseApprovalIds').isArray({ min: 1 }),
+    body('warehouseApprovalIds.*').isMongoId(),
+    body('assignedTo').isMongoId(),
+    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent'])
+  ],
+  validate,
+  bulkAssignWarehouseApproval
+);
 
 // Get all warehouse approval records with filtering
 router.get('/', 
   authenticate, 
   checkPermission('warehouse_approval', 'view'),
   [
-    query('status').optional().isIn(['pending', 'in_progress', 'submitted', 'approved', 'rejected']),
+    query('status').optional().isIn(['pending', 'in_progress', 'pending_manager_approval', 'completed', 'rejected']),
     query('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
-    query('overallResult').optional().isIn(['approved', 'rejected', 'partial_approved']),
-    query('warehouse').optional().isMongoId().withMessage('Valid warehouse ID required'),
-    query('assignedTo').optional().isMongoId().withMessage('Valid user ID required'),
+    query('assignedTo').optional().isMongoId(),
     query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('sortBy').optional().isString(),
-    query('sortOrder').optional().isIn(['asc', 'desc'])
+    query('limit').optional().isInt({ min: 1, max: 100 })
   ],
   validate,
   getWarehouseApprovals
 );
 
-// Get single warehouse approval record
+// Get single warehouse approval record - Dynamic route comes after specific routes
 router.get('/:id', 
   authenticate, 
   checkPermission('warehouse_approval', 'view'),
-  [param('id').isMongoId().withMessage('Valid warehouse approval ID required')],
+  [param('id').isMongoId()],
   validate,
   getWarehouseApproval
 );
 
-// Update warehouse checks for products
-router.put('/:id/checks', 
+// Update product warehouse check
+router.put('/:warehouseApprovalId/product/:productIndex', 
   authenticate, 
   checkPermission('warehouse_approval', 'update'),
-  [param('id').isMongoId().withMessage('Valid warehouse approval ID required')],
-  warehouseChecksValidation,
+  [
+    param('warehouseApprovalId').isMongoId(),
+    param('productIndex').isInt({ min: 0 })
+  ],
   validate,
   updateProductWarehouseCheck
 );
@@ -87,11 +110,7 @@ router.put('/:id/checks',
 router.post('/:id/submit', 
   authenticate, 
   checkPermission('warehouse_approval', 'submit'),
-  [
-    param('id').isMongoId().withMessage('Valid warehouse approval ID required'),
-    body('warehouseRemarks').optional().isString().withMessage('Warehouse remarks must be a string'),
-    body('warehouseDocuments').optional().isArray().withMessage('Warehouse documents must be an array')
-  ],
+  [param('id').isMongoId()],
   validate,
   submitForManagerApproval
 );
@@ -99,9 +118,8 @@ router.post('/:id/submit',
 // Manager approve warehouse approval
 router.post('/:id/approve', 
   authenticate, 
-  checkPermission('warehouse_approval', 'manager_approve'),
-  [param('id').isMongoId().withMessage('Valid warehouse approval ID required')],
-  managerApprovalValidation,
+  checkPermission('warehouse_approval', 'approve'),
+  [param('id').isMongoId()],
   validate,
   approveWarehouseApproval
 );
@@ -109,62 +127,10 @@ router.post('/:id/approve',
 // Manager reject warehouse approval
 router.post('/:id/reject', 
   authenticate, 
-  checkPermission('warehouse_approval', 'manager_approve'),
-  [param('id').isMongoId().withMessage('Valid warehouse approval ID required')],
-  managerApprovalValidation,
+  checkPermission('warehouse_approval', 'approve'),
+  [param('id').isMongoId()],
   validate,
   rejectWarehouseApproval
-);
-
-// Get warehouse approval statistics
-router.get('/statistics/overview', 
-  authenticate, 
-  checkPermission('warehouse_approval', 'view'),
-  [
-    query('dateFrom').optional().isISO8601().withMessage('Valid from date required'),
-    query('dateTo').optional().isISO8601().withMessage('Valid to date required'),
-    query('warehouse').optional().isMongoId().withMessage('Valid warehouse ID required'),
-    query('assignedTo').optional().isMongoId().withMessage('Valid user ID required')
-  ],
-  validate,
-  getWarehouseApprovalStatistics
-);
-
-// Get warehouse approval dashboard
-router.get('/dashboard', 
-  authenticate, 
-  checkPermission('warehouse_approval', 'view'),
-  [
-    query('timeframe').optional().isInt({ min: 1, max: 365 }).withMessage('Timeframe must be between 1-365 days'),
-    query('warehouse').optional().isMongoId().withMessage('Valid warehouse ID required')
-  ],
-  validate,
-  getWarehouseApprovalDashboard
-);
-
-// Bulk assign warehouse approval records
-router.post('/bulk-assign', 
-  authenticate, 
-  checkPermission('warehouse_approval', 'manage'),
-  [
-    body('warehouseApprovalIds').isArray({ min: 1 }).withMessage('Warehouse approval IDs array is required'),
-    body('warehouseApprovalIds.*').isMongoId().withMessage('Valid warehouse approval ID required'),
-    body('assignedTo').isMongoId().withMessage('Valid user ID required'),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('Valid priority required')
-  ],
-  validate,
-  bulkAssignWarehouseApproval
-);
-
-// Get warehouse approval workload by user
-router.get('/workload', 
-  authenticate, 
-  checkPermission('warehouse_approval', 'view'),
-  [
-    query('status').optional().isIn(['active', 'all']).withMessage('Valid status filter required')
-  ],
-  validate,
-  getWarehouseApprovalWorkload
 );
 
 export default router;
