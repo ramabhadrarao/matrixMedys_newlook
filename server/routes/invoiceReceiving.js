@@ -12,6 +12,7 @@ import {
   updateInvoiceReceiving,
   submitToQC,
   performQCCheck,
+  updateQCStatus,
   deleteInvoiceReceiving,
   downloadInvoiceReceivingPDF
 } from '../controllers/invoiceReceivingController.js';
@@ -132,6 +133,12 @@ router.post('/:id/qc-check',
   authenticate, 
   checkPermission('invoice_receiving', 'qc_check'), 
   performQCCheck
+);
+
+router.put('/:id/qc-status', 
+  authenticate, 
+  checkPermission('invoice_receiving', 'qc_check'), 
+  updateQCStatus
 );
 
 // PDF download route
