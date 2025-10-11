@@ -11,7 +11,8 @@ import {
   Clock,
   AlertTriangle,
   ClipboardCheck,
-  BarChart3
+  BarChart3,
+  Check
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { qualityControlAPI } from '../../services/qualityControlAPI';
@@ -190,6 +191,30 @@ const QualityControlList: React.FC = () => {
 
   const handleEdit = (id: string) => {
     navigate(`/quality-control/${id}/edit`);
+  };
+
+  const handleMarkCompleted = async (qc: QualityControl) => {
+    if (!window.confirm(`Are you sure you want to mark QC ${qc.qcNumber} as completed?`)) {
+      return;
+    }
+
+    try {
+      // First submit for approval if not already submitted
+      if (qc.status === 'in_progress') {
+        await qualityControlAPI.submitQCForApproval(qc._id, {
+          qcRemarks: 'Auto-submitted for completion'
+        });
+      }
+      
+      // Then approve it to mark as completed
+      await qualityControlAPI.approveQC(qc._id, 'Auto-approved for completion');
+      
+      toast.success(`QC ${qc.qcNumber} marked as completed successfully`);
+      loadQCRecords(); // Reload the list
+    } catch (error: any) {
+      console.error('Error marking QC as completed:', error);
+      toast.error(error.message || 'Failed to mark QC as completed');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -518,6 +543,18 @@ const QualityControlList: React.FC = () => {
                               <Edit className="w-4 h-4" />
                             </button>
                           )}
+
+                          {hasPermission('quality_control', 'approve') && 
+                           qc.status === 'in_progress' && 
+                           qc.products.some(p => p.overallStatus === 'passed' || p.overallStatus === 'partial_pass') && (
+                            <button
+                              onClick={() => handleMarkCompleted(qc)}
+                              className="text-purple-600 hover:text-purple-900 transition-colors"
+                              title="Mark as Completed"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -565,6 +602,18 @@ const QualityControlList: React.FC = () => {
                           className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                         >
                           <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {hasPermission('quality_control', 'approve') && 
+                       qc.status === 'in_progress' && 
+                       qc.products.some(p => p.overallStatus === 'passed' || p.overallStatus === 'partial_pass') && (
+                        <button
+                          onClick={() => handleMarkCompleted(qc)}
+                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Mark as Completed"
+                        >
+                          <Check className="w-4 h-4" />
                         </button>
                       )}
                     </div>

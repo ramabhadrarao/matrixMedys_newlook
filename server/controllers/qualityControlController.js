@@ -2,6 +2,7 @@
 import QualityControl from '../models/QualityControl.js';
 import InvoiceReceiving from '../models/InvoiceReceiving.js';
 import WarehouseApproval from '../models/WarehouseApproval.js';
+import Warehouse from '../models/Warehouse.js';
 
 // Create QC record from Invoice Receiving
 export const createQCFromInvoice = async (req, res) => {
@@ -467,11 +468,30 @@ export const approveQC = async (req, res) => {
     );
 
     if (passedProducts.length > 0) {
+      // Find default warehouse if not specified
+      let warehouseId = qcRecord.warehouse;
+      if (!warehouseId) {
+        const defaultWarehouse = await Warehouse.findOne({ isDefault: true });
+        warehouseId = defaultWarehouse?._id;
+        console.log('Found default warehouse:', defaultWarehouse?.name, 'ID:', warehouseId);
+      }
+
+      // Validate that we have a warehouse
+      if (!warehouseId) {
+        throw new Error('No warehouse found. Please ensure at least one warehouse exists and is marked as default.');
+      }
+
+      console.log('Creating WarehouseApproval with warehouse ID:', warehouseId);
+
       const warehouseApproval = new WarehouseApproval({
         qualityControl: qcRecord._id,
         invoiceReceiving: qcRecord.invoiceReceiving,
         purchaseOrder: qcRecord.purchaseOrder,
+        warehouse: warehouseId, // Use the found warehouse ID
+        priority: 'medium',
+        assignedTo: req.user._id,
         products: passedProducts.map(product => ({
+          qualityControlProduct: product._id, // Add the required reference
           product: product.product,
           productCode: product.productCode,
           productName: product.productName,
@@ -483,6 +503,13 @@ export const approveQC = async (req, res) => {
           status: 'pending'
         })),
         createdBy: req.user._id
+      });
+
+      console.log('WarehouseApproval object before save:', {
+        warehouse: warehouseApproval.warehouse,
+        warehouseApprovalNumber: warehouseApproval.warehouseApprovalNumber,
+        qualityControl: warehouseApproval.qualityControl,
+        invoiceReceiving: warehouseApproval.invoiceReceiving
       });
 
       await warehouseApproval.save();

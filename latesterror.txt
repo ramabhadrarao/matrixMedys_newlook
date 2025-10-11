@@ -1,18 +1,113 @@
 react-dom.development.js:29895 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
-api.ts:28 API POST Request: Object
-api.ts:498 Fetching dashboard statistics...
-api.ts:511 Fetching recent activity...
-api.ts:498 Fetching dashboard statistics...
-api.ts:511 Fetching recent activity...
-api.ts:515 Recent activity response: Object
-api.ts:515 Recent activity response: Object
-api.ts:500 Dashboard stats response: Object
-api.ts:500 Dashboard stats response: Object
-QualityControlList.tsx:127 Fetching QC records with filters: Object
-QualityControlList.tsx:127 Fetching QC records with filters: Object
-QualityControlList.tsx:131 QC API Response: Object
-QualityControlList.tsx:138 First QC record: Object
-QualityControlList.tsx:131 QC API Response: Object
-QualityControlList.tsx:138 First QC record: ObjectassignedTo: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}id: "68ea0d7da689ee01dafe5258"invoiceReceiving: {_id: '68ea0c1b43f0f2640131cd0a', invoiceNumber: 'test', invoiceDate: '2025-10-09T00:00:00.000Z'}purchaseOrder: undefinedqcNumber: "QC000002"[[Prototype]]: Object
-QualityControlDetails.tsx:141 QC Record loaded: ObjectapprovalStatus: "pending"approvals: []assignedTo: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}checklist: []createdAt: "2025-10-11T07:55:41.612Z"createdBy: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}invoiceReceiving: {_id: '68ea0c1b43f0f2640131cd0a', invoiceNumber: 'test', invoiceDate: '2025-10-09T00:00:00.000Z', receivedBy: '68c840bc1875fdbb69fab00f'}overallResult: "pending"priority: "medium"products: (2) [{…}, {…}]qcDocuments: []qcEnvironment: {lightCondition: 'normal'}qcNumber: "QC000002"qcReport: {approvalRequired: false}qcTeam: []qcType: "standard"status: "in_progress"updatedAt: "2025-10-11T15:32:07.032Z"updatedBy: "68c840bc1875fdbb69fab00f"__v: 4_id: "68ea0d7da689ee01dafe5258"[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
-QualityControlDetails.tsx:141 QC Record loaded: ObjectapprovalStatus: "pending"approvals: []assignedTo: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}checklist: []createdAt: "2025-10-11T07:55:41.612Z"createdBy: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}invoiceReceiving: {_id: '68ea0c1b43f0f2640131cd0a', invoiceNumber: 'test', invoiceDate: '2025-10-09T00:00:00.000Z', receivedBy: '68c840bc1875fdbb69fab00f'}overallResult: "pending"priority: "medium"products: (2) [{…}, {…}]qcDocuments: []qcEnvironment: {lightCondition: 'normal'}qcNumber: "QC000002"qcReport: {approvalRequired: false}qcTeam: []qcType: "standard"status: "in_progress"updatedAt: "2025-10-11T15:32:07.032Z"updatedBy: "68c840bc1875fdbb69fab00f"__v: 4_id: "68ea0d7da689ee01dafe5258"[[Prototype]]: Object
+warehouseApprovalAPI.ts:181   GET http://localhost:5000/api/warehouse-approval?page=1&search=&status=&priority=&dateFrom=&dateTo= 400 (Bad Request)
+dispatchXhrRequest @ xhr.js:195
+xhr @ xhr.js:15
+dispatchRequest @ dispatchRequest.js:51
+Promise.then
+_request @ Axios.js:163
+request @ Axios.js:40
+Axios.<computed> @ Axios.js:213
+wrap @ bind.js:5
+getWarehouseApprovals @ warehouseApprovalAPI.ts:181
+loadApprovals @ WarehouseApprovalList.tsx:132
+(anonymous) @ WarehouseApprovalList.tsx:114
+commitHookEffectListMount @ react-dom.development.js:23189
+commitPassiveMountOnFiber @ react-dom.development.js:24965
+commitPassiveMountEffects_complete @ react-dom.development.js:24930
+commitPassiveMountEffects_begin @ react-dom.development.js:24917
+commitPassiveMountEffects @ react-dom.development.js:24905
+flushPassiveEffectsImpl @ react-dom.development.js:27078
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+api.ts:90  API Error Details: {message: 'Request failed with status code 400', response: {…}, status: 400, config: {…}}
+handleApiError @ api.ts:90
+getWarehouseApprovals @ warehouseApprovalAPI.ts:184
+await in getWarehouseApprovals
+loadApprovals @ WarehouseApprovalList.tsx:132
+(anonymous) @ WarehouseApprovalList.tsx:114
+commitHookEffectListMount @ react-dom.development.js:23189
+commitPassiveMountOnFiber @ react-dom.development.js:24965
+commitPassiveMountEffects_complete @ react-dom.development.js:24930
+commitPassiveMountEffects_begin @ react-dom.development.js:24917
+commitPassiveMountEffects @ react-dom.development.js:24905
+flushPassiveEffectsImpl @ react-dom.development.js:27078
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+WarehouseApprovalList.tsx:258  Error loading warehouse approvals: Validation failed
+loadApprovals @ WarehouseApprovalList.tsx:258
+await in loadApprovals
+(anonymous) @ WarehouseApprovalList.tsx:114
+commitHookEffectListMount @ react-dom.development.js:23189
+commitPassiveMountOnFiber @ react-dom.development.js:24965
+commitPassiveMountEffects_complete @ react-dom.development.js:24930
+commitPassiveMountEffects_begin @ react-dom.development.js:24917
+commitPassiveMountEffects @ react-dom.development.js:24905
+flushPassiveEffectsImpl @ react-dom.development.js:27078
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+warehouseApprovalAPI.ts:181   GET http://localhost:5000/api/warehouse-approval?page=1&search=&status=&priority=&dateFrom=&dateTo= 400 (Bad Request)
+dispatchXhrRequest @ xhr.js:195
+xhr @ xhr.js:15
+dispatchRequest @ dispatchRequest.js:51
+Promise.then
+_request @ Axios.js:163
+request @ Axios.js:40
+Axios.<computed> @ Axios.js:213
+wrap @ bind.js:5
+getWarehouseApprovals @ warehouseApprovalAPI.ts:181
+loadApprovals @ WarehouseApprovalList.tsx:132
+(anonymous) @ WarehouseApprovalList.tsx:114
+commitHookEffectListMount @ react-dom.development.js:23189
+invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+invokeEffectsInDev @ react-dom.development.js:27390
+commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+flushPassiveEffectsImpl @ react-dom.development.js:27095
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+api.ts:90  API Error Details: {message: 'Request failed with status code 400', response: {…}, status: 400, config: {…}}
+handleApiError @ api.ts:90
+getWarehouseApprovals @ warehouseApprovalAPI.ts:184
+await in getWarehouseApprovals
+loadApprovals @ WarehouseApprovalList.tsx:132
+(anonymous) @ WarehouseApprovalList.tsx:114
+commitHookEffectListMount @ react-dom.development.js:23189
+invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+invokeEffectsInDev @ react-dom.development.js:27390
+commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+flushPassiveEffectsImpl @ react-dom.development.js:27095
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+WarehouseApprovalList.tsx:258  Error loading warehouse approvals: Validation failed
+loadApprovals @ WarehouseApprovalList.tsx:258
+await in loadApprovals
+(anonymous) @ WarehouseApprovalList.tsx:114
+commitHookEffectListMount @ react-dom.development.js:23189
+invokePassiveEffectMountInDEV @ react-dom.development.js:25193
+invokeEffectsInDev @ react-dom.development.js:27390
+commitDoubleInvokeEffectsInDEV @ react-dom.development.js:27369
+flushPassiveEffectsImpl @ react-dom.development.js:27095
+flushPassiveEffects @ react-dom.development.js:27023
+(anonymous) @ react-dom.development.js:26808
+workLoop @ scheduler.development.js:266
+flushWork @ scheduler.development.js:239
+performWorkUntilDeadline @ scheduler.development.js:533
+[NEW] Explain Console errors by using Copilot in Edge: click
+         
+         to explain an error. 
+        Learn more
+        Don't show again

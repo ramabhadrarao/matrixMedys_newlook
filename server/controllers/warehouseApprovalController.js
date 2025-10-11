@@ -893,9 +893,11 @@ export const createWarehouseApproval = async (req, res) => {
       qualityControl: qcRecord._id,
       invoiceReceiving: qcRecord.invoiceReceiving._id,
       purchaseOrder: qcRecord.purchaseOrder._id,
+      warehouse: qcRecord.warehouse || null, // Add warehouse field if available
       priority,
       assignedTo: assignedTo || req.user._id,
       products: passedProducts.map(product => ({
+        qualityControlProduct: product._id, // Add the required reference
         product: product.product,
         productCode: product.productCode,
         productName: product.productName,

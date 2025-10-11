@@ -237,7 +237,7 @@ const warehouseApprovalSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Auto-generate Warehouse Approval Number
-warehouseApprovalSchema.pre('save', async function(next) {
+warehouseApprovalSchema.pre('validate', async function(next) {
   if (this.isNew && !this.warehouseApprovalNumber) {
     const count = await mongoose.models.WarehouseApproval.countDocuments();
     const currentDate = new Date();

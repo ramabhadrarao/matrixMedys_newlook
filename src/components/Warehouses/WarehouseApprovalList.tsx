@@ -24,6 +24,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
 import RoleBasedAccess from '../Auth/RoleBasedAccess';
 import { usePermissions } from '../../hooks/usePermissions';
+import { warehouseApprovalAPI } from '../../services/warehouseApprovalAPI';
 
 interface WarehouseApproval {
   _id: string;
@@ -128,21 +129,22 @@ const WarehouseApprovalList: React.FC = () => {
   const loadApprovals = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await warehouseApprovalAPI.getAll({
-      //   page: currentPage,
-      //   search: searchTerm,
-      //   status: statusFilter,
-      //   priority: priorityFilter,
-      //   dateFrom: dateRange.from,
-      //   dateTo: dateRange.to
-      // });
-      // setApprovals(response.data.approvals);
-      // setTotalPages(response.data.totalPages);
-      // setTotalApprovals(response.data.total);
+      const response = await warehouseApprovalAPI.getWarehouseApprovals({
+        page: currentPage,
+        search: searchTerm,
+        status: statusFilter,
+        priority: priorityFilter,
+        dateFrom: dateRange.from,
+        dateTo: dateRange.to
+      });
       
-      // Mock data for now
-      const mockApprovals: WarehouseApproval[] = [
+      setApprovals(response.data.warehouseApprovals);
+      setTotalPages(response.data.totalPages);
+      setTotalApprovals(response.data.totalCount);
+      
+      // Fallback mock data if no real data exists
+      if (!response.data.warehouseApprovals || response.data.warehouseApprovals.length === 0) {
+        const mockApprovals: WarehouseApproval[] = [
         {
           _id: '1',
           invoiceReceiving: {
@@ -251,6 +253,7 @@ const WarehouseApprovalList: React.FC = () => {
       setApprovals(mockApprovals);
       setTotalPages(1);
       setTotalApprovals(mockApprovals.length);
+      }
     } catch (error) {
       console.error('Error loading warehouse approvals:', error);
       toast.error('Failed to load warehouse approvals');
