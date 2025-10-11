@@ -1297,6 +1297,105 @@ export const getDashboardStats = async (req, res) => {
       }
     }
     
+    // ========== PERMISSIONS STATISTICS ==========
+    if (resourcePermissions.permissions && resourcePermissions.permissions.includes('view')) {
+      try {
+        const totalPermissions = await Permission.countDocuments();
+        const activePermissions = await Permission.countDocuments({ isActive: { $ne: false } });
+        const inactivePermissions = totalPermissions - activePermissions;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentPermissions = await Permission.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Get permissions by resource
+        const permissionsByResource = await Permission.aggregate([
+          {
+            $group: {
+              _id: '$resource',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 10 }
+        ]);
+        
+        // Get permissions by action
+        const permissionsByAction = await Permission.aggregate([
+          {
+            $group: {
+              _id: '$action',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } }
+        ]);
+        
+        // Get total unique resources
+        const totalResources = await Permission.distinct('resource').then(resources => resources.length);
+        
+        // Get user permissions count
+        const totalUserPermissions = await UserPermission.countDocuments();
+        const usersWithPermissions = await UserPermission.distinct('user').then(users => users.length);
+        
+        // Get most assigned permissions
+        const mostAssignedPermissions = await UserPermission.aggregate([
+          {
+            $group: {
+              _id: '$permission',
+              assignedCount: { $sum: 1 }
+            }
+          },
+          {
+            $lookup: {
+              from: 'permissions',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'permissionInfo'
+            }
+          },
+          { $unwind: '$permissionInfo' },
+          {
+            $project: {
+              name: '$permissionInfo.name',
+              resource: '$permissionInfo.resource',
+              action: '$permissionInfo.action',
+              assignedCount: 1
+            }
+          },
+          { $sort: { assignedCount: -1 } },
+          { $limit: 5 }
+        ]);
+        
+        dashboardCards.push({
+          id: 'permissions',
+          title: 'Permissions',
+          resource: 'permissions',
+          icon: 'Shield',
+          color: 'orange',
+          stats: {
+            total: totalPermissions,
+            active: activePermissions,
+            inactive: inactivePermissions,
+            recent: recentPermissions,
+            totalResources,
+            totalUserPermissions,
+            usersWithPermissions,
+            resourceBreakdown: permissionsByResource,
+            actionBreakdown: permissionsByAction,
+            mostAssigned: mostAssignedPermissions
+          },
+          actions: resourcePermissions.permissions,
+          route: '/permissions',
+          description: 'System permissions and access control'
+        });
+      } catch (error) {
+        console.error('Error fetching permissions stats:', error);
+      }
+    }
+    
     // ========== SYSTEM OVERVIEW ==========
     const systemStats = {
       totalPermissions: await Permission.countDocuments(),

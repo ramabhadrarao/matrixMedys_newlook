@@ -216,6 +216,32 @@ const permissions = [
     resource: 'warehouses',
     action: 'delete',
   },
+  
+  // Permissions module permissions
+  {
+    name: 'View Permissions',
+    description: 'Can view permissions list and details',
+    resource: 'permissions',
+    action: 'view',
+  },
+  {
+    name: 'Create Permissions',
+    description: 'Can create new permissions',
+    resource: 'permissions',
+    action: 'create',
+  },
+  {
+    name: 'Update Permissions',
+    description: 'Can update existing permissions',
+    resource: 'permissions',
+    action: 'update',
+  },
+  {
+    name: 'Delete Permissions',
+    description: 'Can delete permissions',
+    resource: 'permissions',
+    action: 'delete',
+  },
 ];
 
 const seedPermissions = async () => {

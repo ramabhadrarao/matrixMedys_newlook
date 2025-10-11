@@ -72,6 +72,11 @@ import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
 import ProfileInformation from './components/Settings/ProfileInformation';
 
+// Permission Components
+import PermissionsList from './components/Permissions/PermissionsList';
+import PermissionForm from './components/Permissions/PermissionForm';
+import PermissionDetails from './components/Permissions/PermissionDetails';
+
 // Protected Route Component
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -247,12 +252,18 @@ function App() {
             <Route path="users/:id/edit" element={<UserForm />} />
             <Route path="users/:id/permissions" element={<PermissionsManagement />} />
 
+            {/* Permissions Routes */}
+            <Route path="permissions" element={<PermissionsList />} />
+            <Route path="permissions/new" element={<PermissionForm />} />
+            <Route path="permissions/:id" element={<PermissionDetails />} />
+            <Route path="permissions/:id/edit" element={<PermissionForm />} />
+
             {/* Settings Routes */}
             <Route path="settings" element={<Settings />} />
             <Route path="settings/change-password" element={<ChangePassword />} />
             <Route path="settings/profile" element={<ProfileInformation />} />
             <Route path="settings/notifications" element={<div className="p-6 text-center text-gray-500">Notification settings coming soon...</div>} />
-            <Route path="settings/permissions" element={<div className="p-6 text-center text-gray-500">Permission management coming soon...</div>} />
+            <Route path="settings/permissions" element={<PermissionsList />} />
             <Route path="settings/appearance" element={<div className="p-6 text-center text-gray-500">Appearance settings coming soon...</div>} />
             <Route path="settings/language" element={<div className="p-6 text-center text-gray-500">Language settings coming soon...</div>} />
           </Route>

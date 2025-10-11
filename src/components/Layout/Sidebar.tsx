@@ -17,7 +17,8 @@ import {
   Truck,
   GitBranch,
   Warehouse,
-  Workflow
+  Workflow,
+  Shield
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -110,6 +111,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       icon: Users,
       permission: { resource: 'users', action: 'view' },
     },
+    {
+      path: '/permissions',
+      name: 'Permissions',
+      icon: Shield,
+      permission: { resource: 'permissions', action: 'view' },
+    },
   ];
 
   const filteredMenuItems = menuItems.filter(item => 
@@ -156,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-2">
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
