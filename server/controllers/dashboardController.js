@@ -16,6 +16,9 @@ import WorkflowStage from '../models/WorkflowStage.js';
 import Branch from '../models/Branch.js';
 import Warehouse from '../models/Warehouse.js';
 import BranchContact from '../models/BranchContact.js';
+import QualityControl from '../models/QualityControl.js';
+import WarehouseApproval from '../models/WarehouseApproval.js';
+import Inventory from '../models/Inventory.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -1294,6 +1297,176 @@ export const getDashboardStats = async (req, res) => {
         });
       } catch (error) {
         console.error('Error fetching warehouses stats:', error);
+      }
+    }
+    
+    // ========== QUALITY CONTROL STATISTICS ==========
+    if (resourcePermissions.qualityControl && resourcePermissions.qualityControl.includes('view')) {
+      try {
+        const totalQC = await QualityControl.countDocuments();
+        const pendingQC = await QualityControl.countDocuments({ status: 'pending' });
+        const approvedQC = await QualityControl.countDocuments({ status: 'approved' });
+        const rejectedQC = await QualityControl.countDocuments({ status: 'rejected' });
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentQC = await QualityControl.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // QC by status breakdown
+        const qcByStatus = await QualityControl.aggregate([
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } }
+        ]);
+        
+        // QC pass rate
+        const totalProcessed = approvedQC + rejectedQC;
+        const passRate = totalProcessed > 0 ? Math.round((approvedQC / totalProcessed) * 100) : 0;
+        
+        dashboardCards.push({
+          id: 'qualityControl',
+          title: 'Quality Control',
+          resource: 'qualityControl',
+          icon: 'CheckCircle',
+          color: 'green',
+          stats: {
+            total: totalQC,
+            pending: pendingQC,
+            approved: approvedQC,
+            rejected: rejectedQC,
+            recent: recentQC,
+            qcByStatus,
+            passRate
+          },
+          actions: resourcePermissions.qualityControl,
+          route: '/quality-control',
+          description: 'Product quality control and testing'
+        });
+      } catch (error) {
+        console.error('Error fetching quality control stats:', error);
+      }
+    }
+    
+    // ========== WAREHOUSE APPROVAL STATISTICS ==========
+    if (resourcePermissions.warehouseApproval && resourcePermissions.warehouseApproval.includes('view')) {
+      try {
+        const totalWA = await WarehouseApproval.countDocuments();
+        const pendingWA = await WarehouseApproval.countDocuments({ status: 'pending' });
+        const approvedWA = await WarehouseApproval.countDocuments({ status: 'approved' });
+        const rejectedWA = await WarehouseApproval.countDocuments({ status: 'rejected' });
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentWA = await WarehouseApproval.countDocuments({
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        // Warehouse approval by status
+        const waByStatus = await WarehouseApproval.aggregate([
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } }
+        ]);
+        
+        // Approval rate
+        const totalProcessedWA = approvedWA + rejectedWA;
+        const approvalRate = totalProcessedWA > 0 ? Math.round((approvedWA / totalProcessedWA) * 100) : 0;
+        
+        dashboardCards.push({
+          id: 'warehouseApproval',
+          title: 'Warehouse Approval',
+          resource: 'warehouseApproval',
+          icon: 'ClipboardCheck',
+          color: 'orange',
+          stats: {
+            total: totalWA,
+            pending: pendingWA,
+            approved: approvedWA,
+            rejected: rejectedWA,
+            recent: recentWA,
+            waByStatus,
+            approvalRate
+          },
+          actions: resourcePermissions.warehouseApproval,
+          route: '/warehouse-approval',
+          description: 'Warehouse storage and approval management'
+        });
+      } catch (error) {
+        console.error('Error fetching warehouse approval stats:', error);
+      }
+    }
+    
+    // ========== INVENTORY STATISTICS ==========
+    if (resourcePermissions.inventory && resourcePermissions.inventory.includes('view')) {
+      try {
+        const totalInventory = await Inventory.countDocuments({ isActive: true });
+        const lowStockItems = await Inventory.countDocuments({
+          isActive: true,
+          $expr: { $lte: ['$availableStock', '$minimumStock'] }
+        });
+        const outOfStockItems = await Inventory.countDocuments({
+          isActive: true,
+          availableStock: 0
+        });
+        
+        // Near expiry items (next 30 days)
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        const nearExpiryItems = await Inventory.countDocuments({
+          isActive: true,
+          expDate: { $lte: thirtyDaysFromNow, $gte: new Date() }
+        });
+        
+        // Total inventory value
+        const inventoryValue = await Inventory.aggregate([
+          { $match: { isActive: true } },
+          {
+            $group: {
+              _id: null,
+              totalValue: { $sum: '$totalValue' },
+              totalStock: { $sum: '$currentStock' }
+            }
+          }
+        ]);
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentInventory = await Inventory.countDocuments({
+          isActive: true,
+          createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        dashboardCards.push({
+          id: 'inventory',
+          title: 'Inventory',
+          resource: 'inventory',
+          icon: 'Archive',
+          color: 'indigo',
+          stats: {
+            total: totalInventory,
+            lowStock: lowStockItems,
+            outOfStock: outOfStockItems,
+            nearExpiry: nearExpiryItems,
+            recent: recentInventory,
+            totalValue: inventoryValue[0]?.totalValue || 0,
+            totalStock: inventoryValue[0]?.totalStock || 0
+          },
+          actions: resourcePermissions.inventory,
+          route: '/inventory',
+          description: 'Stock levels and inventory management'
+        });
+      } catch (error) {
+        console.error('Error fetching inventory stats:', error);
       }
     }
     

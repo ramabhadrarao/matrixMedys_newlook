@@ -18,7 +18,10 @@ import {
   GitBranch,
   Warehouse,
   Workflow,
-  Shield
+  Shield,
+  CheckCircle,
+  ClipboardCheck,
+  Archive
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -104,6 +107,24 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       name: 'Workflow',
       icon: Workflow,
       permission: { resource: 'workflow', action: 'view' },
+    },
+    {
+      path: '/quality-control',
+      name: 'Quality Control',
+      icon: CheckCircle,
+      permission: { resource: 'quality_control', action: 'view' },
+    },
+    {
+      path: '/warehouse-approval',
+      name: 'Warehouse Approval',
+      icon: ClipboardCheck,
+      permission: { resource: 'warehouse_approval', action: 'view' },
+    },
+    {
+      path: '/inventory',
+      name: 'Inventory',
+      icon: Archive,
+      permission: { resource: 'inventory', action: 'view' },
     },
     {
       path: '/users',

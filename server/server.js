@@ -27,6 +27,10 @@ import workflowRoutes from './routes/workflow.js';
 // Branch and Warehouse routes
 import branchRoutes from './routes/branches.js';
 import warehouseRoutes from './routes/warehouses.js';
+// QC, Warehouse Approval, and Inventory routes
+import qualityControlRoutes from './routes/qualityControl.js';
+import warehouseApprovalRoutes from './routes/warehouseApproval.js';
+import inventoryRoutes from './routes/inventory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,6 +106,10 @@ app.use('/api/workflow', workflowRoutes);
 // Branch and Warehouse routes
 app.use('/api/branches', branchRoutes);
 app.use('/api/warehouses', warehouseRoutes);
+// QC, Warehouse Approval, and Inventory routes
+app.use('/api/quality-control', qualityControlRoutes);
+app.use('/api/warehouse-approval', warehouseApprovalRoutes);
+app.use('/api/inventory', inventoryRoutes);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

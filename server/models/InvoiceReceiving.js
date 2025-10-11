@@ -85,7 +85,7 @@ const invoiceReceivingSchema = new mongoose.Schema({
   // Documents
   documents: [documentSchema],
   
-  // QC Status
+  // QC Information (Basic - Detailed QC in separate model)
   qcStatus: {
     type: String,
     enum: ['pending', 'in_progress', 'passed', 'failed', 'partial_pass'],
@@ -95,7 +95,29 @@ const invoiceReceivingSchema = new mongoose.Schema({
   qcBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   qcRemarks: String,
   
-  // Status
+  // References to detailed workflow models
+  qualityControl: { type: mongoose.Schema.Types.ObjectId, ref: 'QualityControl' },
+  warehouseApproval: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseApproval' },
+  inventoryEntries: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Inventory' }],
+  
+  // Workflow Status
+  workflowStatus: {
+    type: String,
+    enum: [
+      'received', // Just received, pending QC
+      'qc_in_progress', // QC is being performed
+      'qc_completed', // QC completed (passed/failed/partial)
+      'warehouse_pending', // Waiting for warehouse approval
+      'warehouse_in_progress', // Warehouse approval in progress
+      'warehouse_completed', // Warehouse approval completed
+      'inventory_updated', // Stock added to inventory
+      'completed', // Entire workflow completed
+      'rejected' // Rejected at any stage
+    ],
+    default: 'received'
+  },
+  
+  // Overall Status (Legacy - keeping for backward compatibility)
   status: {
     type: String,
     enum: ['draft', 'submitted', 'qc_pending', 'completed', 'rejected'],

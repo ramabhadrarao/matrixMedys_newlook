@@ -242,6 +242,126 @@ const permissions = [
     resource: 'permissions',
     action: 'delete',
   },
+
+  // Quality Control permissions
+  {
+    name: 'View Quality Control',
+    description: 'Can view quality control records and details',
+    resource: 'quality_control',
+    action: 'view',
+  },
+  {
+    name: 'Create Quality Control',
+    description: 'Can create new quality control records',
+    resource: 'quality_control',
+    action: 'create',
+  },
+  {
+    name: 'Update Quality Control',
+    description: 'Can update quality control item details and status',
+    resource: 'quality_control',
+    action: 'update',
+  },
+  {
+    name: 'Submit Quality Control',
+    description: 'Can submit quality control for approval',
+    resource: 'quality_control',
+    action: 'submit',
+  },
+  {
+    name: 'Approve Quality Control',
+    description: 'Can approve or reject quality control records',
+    resource: 'quality_control',
+    action: 'approve',
+  },
+  {
+    name: 'View QC Statistics',
+    description: 'Can view quality control statistics and reports',
+    resource: 'quality_control',
+    action: 'statistics',
+  },
+
+  // Warehouse Approval permissions
+  {
+    name: 'View Warehouse Approval',
+    description: 'Can view warehouse approval records and details',
+    resource: 'warehouse_approval',
+    action: 'view',
+  },
+  {
+    name: 'Update Warehouse Approval',
+    description: 'Can update warehouse approval product checks',
+    resource: 'warehouse_approval',
+    action: 'update',
+  },
+  {
+    name: 'Submit Warehouse Approval',
+    description: 'Can submit warehouse approval for manager review',
+    resource: 'warehouse_approval',
+    action: 'submit',
+  },
+  {
+    name: 'Approve Warehouse Approval',
+    description: 'Can approve or reject warehouse approval as manager',
+    resource: 'warehouse_approval',
+    action: 'approve',
+  },
+  {
+    name: 'View Warehouse Statistics',
+    description: 'Can view warehouse approval statistics and reports',
+    resource: 'warehouse_approval',
+    action: 'statistics',
+  },
+
+  // Inventory Management permissions
+  {
+    name: 'View Inventory',
+    description: 'Can view inventory records and stock levels',
+    resource: 'inventory',
+    action: 'view',
+  },
+  {
+    name: 'Update Inventory',
+    description: 'Can update inventory record details',
+    resource: 'inventory',
+    action: 'update',
+  },
+  {
+    name: 'Adjust Stock',
+    description: 'Can adjust inventory stock levels (add/remove)',
+    resource: 'inventory',
+    action: 'adjust',
+  },
+  {
+    name: 'Reserve Stock',
+    description: 'Can reserve and release inventory stock',
+    resource: 'inventory',
+    action: 'reserve',
+  },
+  {
+    name: 'Transfer Stock',
+    description: 'Can transfer stock between warehouses/locations',
+    resource: 'inventory',
+    action: 'transfer',
+  },
+  {
+    name: 'Record Utilization',
+    description: 'Can record stock utilization to hospitals/patients',
+    resource: 'inventory',
+    action: 'utilize',
+  },
+  {
+    name: 'View Inventory Statistics',
+    description: 'Can view inventory statistics and stock reports',
+    resource: 'inventory',
+    action: 'statistics',
+  },
+  {
+    name: 'View Stock Movement',
+    description: 'Can view stock movement history and audit trail',
+    resource: 'inventory',
+    action: 'movement_history',
+  },
 ];
 
 const seedPermissions = async () => {

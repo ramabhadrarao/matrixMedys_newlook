@@ -24,7 +24,13 @@ const workflowStageSchema = new mongoose.Schema({
   }],
   allowedActions: [{
     type: String,
-    enum: ['edit', 'approve', 'reject', 'return', 'cancel', 'receive', 'qc_check']
+    enum: [
+      'edit', 'approve', 'reject', 'return', 'cancel', 'receive', 
+      'qc_check', 'qc_assign', 'qc_start', 'qc_submit', 'qc_complete',
+      'warehouse_assign', 'warehouse_inspect', 'warehouse_approve', 
+      'warehouse_reject', 'warehouse_complete', 'inventory_create',
+      'inventory_update', 'stock_adjust', 'notification_send'
+    ]
   }],
   nextStages: [{
     type: mongoose.Schema.Types.ObjectId,
