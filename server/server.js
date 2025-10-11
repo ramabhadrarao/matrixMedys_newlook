@@ -141,5 +141,4 @@ app.listen(PORT, () => {
   console.log(`Auth rate limit: ${process.env.NODE_ENV === 'production' ? '5' : '50'} requests per 15 minutes`);
   console.log(`File uploads directory: ${path.join(__dirname, 'uploads')}`);
   console.log('Modules loaded: auth, states, users, permissions, hospitals, doctors, portfolios, principals, categories, products');
-  
 });

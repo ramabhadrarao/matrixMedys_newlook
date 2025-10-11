@@ -145,6 +145,8 @@ const InvoiceReceivingForm: React.FC = () => {
       const receiving = response.data;
       
       console.log('Loading invoice receiving data:', receiving);
+      console.log('Notes from backend:', receiving.notes);
+      console.log('QC Required from backend:', receiving.qcRequired);
       
       setFormData({
         purchaseOrder: typeof receiving.purchaseOrder === 'object' 
@@ -156,8 +158,15 @@ const InvoiceReceivingForm: React.FC = () => {
         supplier: receiving.supplier || '',
         receivedDate: receiving.receivedDate ? new Date(receiving.receivedDate).toISOString().split('T')[0] : '',
         notes: receiving.notes || '',
-        qcRequired: receiving.qcRequired || false,
+        qcRequired: receiving.qcRequired !== undefined ? receiving.qcRequired : true,
         receivedProducts: receiving.receivedProducts || receiving.products || []
+      });
+      
+      console.log('Form data after setting:', {
+        notes: receiving.notes || '',
+        qcRequired: receiving.qcRequired !== undefined ? receiving.qcRequired : true,
+        receivedProducts: receiving.receivedProducts || receiving.products || [],
+        receivedProductsLength: (receiving.receivedProducts || receiving.products || []).length
       });
       
       // Set uploaded files and document types from existing documents
