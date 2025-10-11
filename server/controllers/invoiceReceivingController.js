@@ -201,25 +201,47 @@ export const createInvoiceReceiving = async (req, res) => {
     let hasValidationErrors = false;
     const quantityValidationErrors = [];
     
+    // Group products by product ID to handle batch-based receiving
+    const productGroups = {};
     productsArray.forEach(product => {
       const productId = product.product?.toString();
       if (!productId) return;
       
+      if (!productGroups[productId]) {
+        productGroups[productId] = {
+          productName: product.productName,
+          totalNewReceiving: 0,
+          batches: []
+        };
+      }
+      
+      const receivedQty = product.receivedQuantity || product.receivedQty || 0;
+      productGroups[productId].totalNewReceiving += receivedQty;
+      productGroups[productId].batches.push({
+        batchNumber: product.batchNumber || product.batchNo || 'N/A',
+        quantity: receivedQty
+      });
+    });
+    
+    // Validate each product group
+    Object.keys(productGroups).forEach(productId => {
+      const productGroup = productGroups[productId];
+      
       // Find the corresponding product in the PO
       const poProduct = po.products.find(p => p.product?.toString() === productId);
       if (!poProduct) {
-        quantityValidationErrors.push(`Product ${product.productName} not found in purchase order`);
+        quantityValidationErrors.push(`Product ${productGroup.productName} not found in purchase order`);
         hasValidationErrors = true;
         return;
       }
       
       // Calculate total that would be received after this receiving
       const alreadyReceived = cumulativeReceived[productId] || 0;
-      const newReceiving = product.receivedQuantity || product.receivedQty || 0;
+      const newReceiving = productGroup.totalNewReceiving;
       const totalAfterReceiving = alreadyReceived + newReceiving;
       const orderedQty = poProduct.quantity;
       
-      console.log(`Product ${product.productName}: Ordered=${orderedQty}, Already Received=${alreadyReceived}, New Receiving=${newReceiving}, Total After=${totalAfterReceiving}`);
+      console.log(`Product ${productGroup.productName}: Ordered=${orderedQty}, Already Received=${alreadyReceived}, New Receiving=${newReceiving} (across ${productGroup.batches.length} batches), Total After=${totalAfterReceiving}`);
       
       // Allow up to 10% over-receiving tolerance
       const tolerance = 0.1;
@@ -227,7 +249,7 @@ export const createInvoiceReceiving = async (req, res) => {
       
       if (totalAfterReceiving > maxAllowed) {
         quantityValidationErrors.push(
-          `Product ${product.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
+          `Product ${productGroup.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
         );
         hasValidationErrors = true;
       }
@@ -567,19 +589,41 @@ export const updateInvoiceReceiving = async (req, res) => {
       let hasValidationErrors = false;
       const updateValidationErrors = [];
       
+      // Group products by product ID to handle batch-based receiving
+      const productGroups = {};
       productsArray.forEach(product => {
         const productId = product.product?.toString();
         if (!productId) return;
         
+        if (!productGroups[productId]) {
+          productGroups[productId] = {
+            productName: product.productName,
+            totalNewReceiving: 0,
+            batches: []
+          };
+        }
+        
+        const receivedQty = product.receivedQuantity || product.receivedQty || 0;
+        productGroups[productId].totalNewReceiving += receivedQty;
+        productGroups[productId].batches.push({
+          batchNumber: product.batchNumber || product.batchNo || 'N/A',
+          quantity: receivedQty
+        });
+      });
+      
+      // Validate each product group
+      Object.keys(productGroups).forEach(productId => {
+        const productGroup = productGroups[productId];
+        
         const poProduct = po.products.find(p => p.product?.toString() === productId);
         if (!poProduct) {
-          updateValidationErrors.push(`Product ${product.productName} not found in purchase order`);
+          updateValidationErrors.push(`Product ${productGroup.productName} not found in purchase order`);
           hasValidationErrors = true;
           return;
         }
         
         const alreadyReceived = cumulativeReceived[productId] || 0;
-        const newReceiving = product.receivedQuantity || product.receivedQty || 0;
+        const newReceiving = productGroup.totalNewReceiving;
         const totalAfterReceiving = alreadyReceived + newReceiving;
         const orderedQty = poProduct.quantity;
         
@@ -589,7 +633,7 @@ export const updateInvoiceReceiving = async (req, res) => {
         
         if (totalAfterReceiving > maxAllowed) {
           updateValidationErrors.push(
-            `Product ${product.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
+            `Product ${productGroup.productName}: Total received (${totalAfterReceiving}) would exceed ordered quantity (${orderedQty}) by more than ${tolerance * 100}%`
           );
           hasValidationErrors = true;
         }

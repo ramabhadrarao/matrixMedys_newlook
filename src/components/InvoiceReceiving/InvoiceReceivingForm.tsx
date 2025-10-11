@@ -1064,6 +1064,66 @@ const InvoiceReceivingForm: React.FC = () => {
             onChange={handleFileUpload}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
           />
+          
+          {/* Display uploaded files with document type selection */}
+          {uploadedFiles.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium mb-2">Uploaded Files:</p>
+              <div className="space-y-3">
+                {uploadedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {file.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <div className="min-w-0 flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Document Type
+                        </label>
+                        <select
+                          value={documentTypes[index] || ''}
+                          onChange={(e) => handleDocumentTypeChange(index, e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Select type...</option>
+                          {predefinedDocumentTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                        
+                        {documentTypes[index] === 'Other' && (
+                          <input
+                            type="text"
+                            value={customDocumentTypes[index] || ''}
+                            onChange={(e) => handleCustomDocumentTypeChange(index, e.target.value)}
+                            placeholder="Enter custom type..."
+                            className="w-full px-2 py-1 mt-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        )}
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="text-red-600 hover:text-red-800 p-1"
+                        title="Remove file"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Additional Information */}
