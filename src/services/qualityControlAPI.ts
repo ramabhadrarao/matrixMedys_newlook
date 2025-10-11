@@ -57,7 +57,7 @@ export interface QualityControl {
   qcType: 'standard' | 'urgent' | 'special';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'pending' | 'in_progress' | 'pending_approval' | 'completed' | 'rejected';
-  overallResult?: 'passed' | 'failed' | 'partial_pass';
+  overallResult?: 'pending' | 'passed' | 'failed' | 'partial_pass';
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   assignedTo: {
     _id: string;
@@ -119,62 +119,22 @@ export interface QCSubmissionData {
   };
 }
 
-export interface QCApprovalData {
-  action: 'approve' | 'reject';
-  approvalRemarks?: string;
-}
-
-export interface QCDashboardStats {
-  statistics: {
-    totalRecords: number;
-    pendingRecords: number;
-    inProgressRecords: number;
-    completedRecords: number;
-    rejectedRecords: number;
-    totalProducts: number;
-    passedProducts: number;
-    failedProducts: number;
-  };
-  recentActivities: Array<{
-    _id: string;
-    qcNumber: string;
-    status: string;
-    assignedTo: { name: string };
-    invoiceReceiving: { invoiceNumber: string };
-    updatedAt: string;
-    products: QCProduct[];
-  }>;
-  userPerformance: Array<{
-    userName: string;
-    totalProducts: number;
-    passedProducts: number;
-    passRate: number;
-    avgProcessingHours: number;
-  }>;
-}
-
-export interface QCStatistics {
-  statusBreakdown: Array<{ _id: string; count: number }>;
-  resultBreakdown: Array<{ _id: string; count: number }>;
-  typeBreakdown: Array<{ _id: string; count: number }>;
-  processingTime: {
-    avgProcessingHours: number;
-    minProcessingHours: number;
-    maxProcessingHours: number;
-  };
+export interface QCFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  result?: string;
+  qcType?: string;
+  priority?: string;
+  assignedTo?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export const qualityControlAPI = {
   // Get QC records with pagination and filters
-  getQCRecords: async (params?: { 
-    page?: number; 
-    limit?: number; 
-    search?: string; 
-    status?: string;
-    assignedTo?: string;
-    priority?: string;
-    qcType?: string;
-  }) => {
+  getQCRecords: async (params?: QCFilters) => {
     try {
       const response = await api.get('/quality-control', { params });
       return response.data;
@@ -223,16 +183,6 @@ export const qualityControlAPI = {
     }
   },
 
-  // Approve or reject QC
-  approveRejectQC: async (id: string, data: QCApprovalData) => {
-    try {
-      const response = await api.put(`/quality-control/${id}/approve-reject`, data);
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  },
-
   // Approve QC
   approveQC: async (id: string, approvalRemarks?: string) => {
     try {
@@ -244,7 +194,7 @@ export const qualityControlAPI = {
   },
 
   // Reject QC
-  rejectQC: async (id: string, approvalRemarks?: string) => {
+  rejectQC: async (id: string, approvalRemarks: string) => {
     try {
       const response = await api.put(`/quality-control/${id}/reject`, { approvalRemarks });
       return response.data;
@@ -266,7 +216,7 @@ export const qualityControlAPI = {
   // Bulk assign QC records
   bulkAssignQC: async (data: { qcIds: string[]; assignedTo: string; priority?: string }) => {
     try {
-      const response = await api.put('/quality-control/bulk-assign', data);
+      const response = await api.post('/quality-control/bulk-assign', data);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -274,7 +224,7 @@ export const qualityControlAPI = {
   },
 
   // Get QC workload for users
-  getQCWorkload: async (params?: { userId?: string; status?: string }) => {
+  getQCWorkload: async (params?: { status?: string }) => {
     try {
       const response = await api.get('/quality-control/workload', { params });
       return response.data;

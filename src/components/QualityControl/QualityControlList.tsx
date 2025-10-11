@@ -9,11 +9,6 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Package,
-  FileText,
-  Calendar,
-  User,
-  Building2,
   AlertTriangle,
   ClipboardCheck,
   BarChart3
@@ -21,19 +16,22 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { qualityControlAPI } from '../../services/qualityControlAPI';
 import toast from 'react-hot-toast';
-import RoleBasedAccess from '../Auth/RoleBasedAccess';
-import { usePermissions } from '../../hooks/usePermissions';
 
 interface QualityControl {
   _id: string;
   qcNumber: string;
-  invoiceReceiving: {
+  invoiceReceiving?: {
     _id: string;
     invoiceNumber: string;
     invoiceDate: string;
   };
-  status: 'pending' | 'in_progress' | 'completed' | 'on_hold' | 'cancelled';
-  qcType: 'incoming_inspection' | 'batch_testing' | 'random_sampling' | 'full_inspection';
+  purchaseOrder?: {
+    _id: string;
+    poNumber: string;
+    poDate: string;
+  };
+  status: 'pending' | 'in_progress' | 'pending_approval' | 'completed' | 'rejected';
+  qcType: 'standard' | 'urgent' | 'special';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   overallResult: 'pending' | 'passed' | 'failed' | 'partial_pass';
   assignedTo?: {
@@ -43,32 +41,8 @@ interface QualityControl {
   };
   products: Array<{
     _id: string;
-    product: string;
-    productCode: string;
     productName: string;
-    batchNo: string;
-    mfgDate: string | null;
-    expDate: string | null;
-    receivedQty: number;
-    qcPassedQty: number;
-    qcFailedQty: number;
-    qcPendingQty: number;
     overallStatus: 'pending' | 'in_progress' | 'passed' | 'failed' | 'partial_pass';
-    itemDetails: Array<{
-      itemNumber: number;
-      status: string;
-      reason?: string;
-      remarks?: string;
-    }>;
-    qcSummary: {
-      correctlyReceived: number;
-      damaged: number;
-      expired: number;
-      nearExpiry: number;
-      wrongProduct: number;
-      wrongQuantity: number;
-      other: number;
-    };
   }>;
   createdAt: string;
   updatedAt: string;
@@ -77,7 +51,9 @@ interface QualityControl {
 interface QCFilters {
   search: string;
   status: string;
-  overallResult: string;
+  result: string;
+  qcType: string;
+  priority: string;
   dateFrom: string;
   dateTo: string;
   page: number;
@@ -88,20 +64,6 @@ const QualityControlList: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useAuthStore();
-  const { canPerformQC, isQCManager, canAccessModule } = usePermissions();
-
-  // Check if user can access QC module
-  if (!canAccessModule('quality_control')) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to access Quality Control module.</p>
-        </div>
-      </div>
-    );
-  }
   
   const [qcRecords, setQcRecords] = useState<QualityControl[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,19 +75,38 @@ const QualityControlList: React.FC = () => {
   const [filters, setFilters] = useState<QCFilters>({
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || '',
-    overallResult: searchParams.get('overallResult') || '',
+    result: searchParams.get('result') || '',
+    qcType: searchParams.get('qcType') || '',
+    priority: searchParams.get('priority') || '',
     dateFrom: searchParams.get('dateFrom') || '',
     dateTo: searchParams.get('dateTo') || '',
     page: parseInt(searchParams.get('page') || '1'),
     limit: parseInt(searchParams.get('limit') || '10')
   });
 
+  // Normalize QC record to ensure all required fields exist
+  const normalizeQCRecord = (record: any): QualityControl => {
+    return {
+      _id: record._id || '',
+      qcNumber: record.qcNumber || 'N/A',
+      invoiceReceiving: record.invoiceReceiving || undefined,
+      purchaseOrder: record.purchaseOrder || undefined,
+      status: record.status || 'pending',
+      qcType: record.qcType || 'standard',
+      priority: record.priority || 'medium',
+      overallResult: record.overallResult || 'pending',
+      assignedTo: record.assignedTo || undefined,
+      products: Array.isArray(record.products) ? record.products : [],
+      createdAt: record.createdAt || new Date().toISOString(),
+      updatedAt: record.updatedAt || new Date().toISOString()
+    };
+  };
+
   useEffect(() => {
     loadQCRecords();
   }, [filters]);
 
   useEffect(() => {
-    // Update URL params when filters change
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value) params.set(key, value.toString());
@@ -136,14 +117,46 @@ const QualityControlList: React.FC = () => {
   const loadQCRecords = async () => {
     try {
       setLoading(true);
-      const response = await qualityControlAPI.getQCRecords(filters);
-      setQcRecords(response.data.qcRecords || []);
-      setTotalCount(response.data.totalCount || 0);
-      setTotalPages(response.data.totalPages || 1);
-      setCurrentPage(response.data.currentPage || 1);
-    } catch (error) {
+      
+      // Filter out empty values
+      const cleanFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+        if (value) acc[key] = value;
+        return acc;
+      }, {} as any);
+      
+      console.log('Fetching QC records with filters:', cleanFilters);
+      
+      const response = await qualityControlAPI.getQCRecords(cleanFilters);
+      
+      console.log('QC API Response:', response);
+      
+      if (response.success) {
+        const records = response.data.qcRecords || [];
+        
+        // Debug: Check first record structure
+        if (records.length > 0) {
+          console.log('First QC record:', {
+            id: records[0]._id,
+            qcNumber: records[0].qcNumber,
+            invoiceReceiving: records[0].invoiceReceiving,
+            purchaseOrder: records[0].purchaseOrder,
+            assignedTo: records[0].assignedTo
+          });
+        }
+        
+        // Normalize records to ensure safety
+        const normalizedRecords = records.map(normalizeQCRecord);
+        
+        setQcRecords(normalizedRecords);
+        setTotalCount(response.data.totalCount || 0);
+        setTotalPages(response.data.totalPages || 1);
+        setCurrentPage(response.data.currentPage || 1);
+      } else {
+        toast.error(response.message || 'Failed to load QC records');
+      }
+    } catch (error: any) {
       console.error('Error loading QC records:', error);
-      toast.error('Failed to load quality control records');
+      toast.error(error.message || 'Failed to load quality control records');
     } finally {
       setLoading(false);
     }
@@ -153,7 +166,7 @@ const QualityControlList: React.FC = () => {
     setFilters(prev => ({
       ...prev,
       [key]: value,
-      page: key !== 'page' ? 1 : value // Reset to page 1 when other filters change
+      page: key !== 'page' ? 1 : value
     }));
   };
 
@@ -162,6 +175,8 @@ const QualityControlList: React.FC = () => {
       search: '',
       status: '',
       result: '',
+      qcType: '',
+      priority: '',
       dateFrom: '',
       dateTo: '',
       page: 1,
@@ -183,11 +198,11 @@ const QualityControlList: React.FC = () => {
         return 'bg-yellow-100 text-yellow-800';
       case 'in_progress':
         return 'bg-blue-100 text-blue-800';
+      case 'pending_approval':
+        return 'bg-purple-100 text-purple-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
-      case 'on_hold':
-        return 'bg-orange-100 text-orange-800';
-      case 'cancelled':
+      case 'rejected':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -215,11 +230,11 @@ const QualityControlList: React.FC = () => {
         return <Clock className="w-3 h-3" />;
       case 'in_progress':
         return <ClipboardCheck className="w-3 h-3" />;
+      case 'pending_approval':
+        return <AlertTriangle className="w-3 h-3" />;
       case 'completed':
         return <CheckCircle className="w-3 h-3" />;
-      case 'on_hold':
-        return <AlertTriangle className="w-3 h-3" />;
-      case 'cancelled':
+      case 'rejected':
         return <XCircle className="w-3 h-3" />;
       default:
         return <Clock className="w-3 h-3" />;
@@ -232,6 +247,12 @@ const QualityControlList: React.FC = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const formatStatusLabel = (status: string) => {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
   };
 
   if (loading) {
@@ -252,7 +273,7 @@ const QualityControlList: React.FC = () => {
         </div>
         
         <div className="flex space-x-3">
-          <RoleBasedAccess resource="quality_control" action="statistics">
+          {hasPermission('quality_control', 'view') && (
             <Link
               to="/quality-control/statistics"
               className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -260,20 +281,19 @@ const QualityControlList: React.FC = () => {
               <BarChart3 className="w-4 h-4 mr-2" />
               Statistics
             </Link>
-          </RoleBasedAccess>
+          )}
         </div>
       </div>
 
       {/* Search and Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search */}
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search by invoice number, PO number, or principal..."
+                placeholder="Search by QC number or invoice number..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -281,7 +301,6 @@ const QualityControlList: React.FC = () => {
             </div>
           </div>
 
-          {/* Filter Toggle */}
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -291,10 +310,9 @@ const QualityControlList: React.FC = () => {
           </button>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
@@ -305,17 +323,17 @@ const QualityControlList: React.FC = () => {
                   <option value="">All Statuses</option>
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
+                  <option value="pending_approval">Pending Approval</option>
                   <option value="completed">Completed</option>
-                  <option value="on_hold">On Hold</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="rejected">Rejected</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Result</label>
                 <select
-                  value={filters.overallResult}
-                  onChange={(e) => handleFilterChange('overallResult', e.target.value)}
+                  value={filters.result}
+                  onChange={(e) => handleFilterChange('result', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">All Results</option>
@@ -327,21 +345,40 @@ const QualityControlList: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select
+                  value={filters.qcType}
+                  onChange={(e) => handleFilterChange('qcType', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Types</option>
+                  <option value="standard">Standard</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="special">Special</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select
+                  value={filters.priority}
+                  onChange={(e) => handleFilterChange('priority', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Priorities</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date From</label>
                 <input
                   type="date"
                   value={filters.dateFrom}
                   onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date To</label>
-                <input
-                  type="date"
-                  value={filters.dateTo}
-                  onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -396,186 +433,192 @@ const QualityControlList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {qcRecords.map((qc) => (
-                  <tr key={qc._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <ClipboardCheck className="w-8 h-8 text-blue-600" />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {qc.qcNumber}
+                {qcRecords.map((qc) => {
+                  const completedProducts = qc.products.filter(p => p.overallStatus !== 'pending').length;
+                  const progress = qc.products.length > 0 ? (completedProducts / qc.products.length) * 100 : 0;
+                  
+                  return (
+                    <tr key={qc._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <ClipboardCheck className="w-8 h-8 text-blue-600" />
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Created {formatDate(qc.createdAt)}
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {qc.qcNumber}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Created {formatDate(qc.createdAt)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {qc.invoiceReceiving.invoiceNumber}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Date: {formatDate(qc.invoiceReceiving.invoiceDate)}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {qc.assignedTo?.name || 'Unassigned'}
-                      </div>
-                    </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        getStatusColor(qc.status)
-                      }`}>
-                        {getStatusIcon(qc.status)}
-                        <span className="ml-1 capitalize">{qc.status.replace('_', ' ')}</span>
-                      </span>
-                    </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        getResultColor(qc.overallResult)
-                      }`}>
-                        <span className="capitalize">{qc.overallResult}</span>
-                      </span>
-                    </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {qc.products.filter(product => product.overallStatus !== 'pending').length} / {qc.products.length} products
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
-                          style={{ 
-                            width: `${(qc.products.filter(product => product.overallStatus !== 'pending').length / qc.products.length) * 100}%` 
-                          }}
-                        ></div>
-                      </div>
-                    </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleView(qc._id)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        
-                        {hasPermission('quality_control', 'update') && 
-                         (qc.status === 'pending' || qc.status === 'in_progress') && (
+                      </td>
+                      
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {qc.invoiceReceiving?.invoiceNumber || 'N/A'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          PO: {qc.purchaseOrder?.poNumber || 'N/A'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {qc.assignedTo?.name || 'Unassigned'}
+                        </div>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          getStatusColor(qc.status)
+                        }`}>
+                          {getStatusIcon(qc.status)}
+                          <span className="ml-1">{formatStatusLabel(qc.status)}</span>
+                        </span>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          getResultColor(qc.overallResult)
+                        }`}>
+                          <span className="capitalize">{formatStatusLabel(qc.overallResult)}</span>
+                        </span>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {completedProducts} / {qc.products.length} products
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full" 
+                            style={{ width: `${progress}%` }}
+                          ></div>
+                        </div>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => handleEdit(qc._id)}
-                            className="text-green-600 hover:text-green-900 transition-colors"
-                            title="Edit QC"
+                            onClick={() => handleView(qc._id)}
+                            className="text-blue-600 hover:text-blue-900 transition-colors"
+                            title="View Details"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          
+                          {hasPermission('quality_control', 'update') && 
+                           (qc.status === 'pending' || qc.status === 'in_progress') && (
+                            <button
+                              onClick={() => handleEdit(qc._id)}
+                              className="text-green-600 hover:text-green-900 transition-colors"
+                              title="Edit QC"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-4">
-            {qcRecords.map((qc) => (
-              <div key={qc._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center">
-                    <ClipboardCheck className="w-6 h-6 text-blue-600 mr-2" />
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {qc.qcNumber}
+            {qcRecords.map((qc) => {
+              const completedProducts = qc.products.filter(p => p.overallStatus !== 'pending').length;
+              const progress = qc.products.length > 0 ? (completedProducts / qc.products.length) * 100 : 0;
+              
+              return (
+                <div key={qc._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center">
+                      <ClipboardCheck className="w-6 h-6 text-blue-600 mr-2" />
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {qc.qcNumber}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatDate(qc.createdAt)}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {formatDate(qc.createdAt)}
-                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleView(qc._id)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      
+                      {hasPermission('quality_control', 'update') && 
+                       (qc.status === 'pending' || qc.status === 'in_progress') && (
+                        <button
+                          onClick={() => handleEdit(qc._id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleView(qc._id)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Invoice:</span>
+                      <span className="font-medium">{qc.invoiceReceiving?.invoiceNumber || 'N/A'}</span>
+                    </div>
                     
-                    {hasPermission('quality_control', 'update') && 
-                     (qc.status === 'pending' || qc.status === 'in_progress') && (
-                      <button
-                        onClick={() => handleEdit(qc._id)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Invoice:</span>
-                    <span className="font-medium">{qc.invoiceReceiving.invoiceNumber}</span>
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Date:</span>
-                    <span className="text-gray-900">{formatDate(qc.invoiceReceiving.invoiceDate)}</span>
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Assigned To:</span>
-                    <span className="text-gray-900">{qc.assignedTo?.name || 'Unassigned'}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">Status:</span>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      getStatusColor(qc.status)
-                    }`}>
-                      {getStatusIcon(qc.status)}
-                      <span className="ml-1 capitalize">{qc.status.replace('_', ' ')}</span>
-                    </span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">Result:</span>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      getResultColor(qc.overallResult)
-                    }`}>
-                      <span className="capitalize">{qc.overallResult}</span>
-                    </span>
-                  </div>
-                  
-                  <div className="mt-3">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-500">Progress:</span>
-                      <span className="text-gray-900">
-                        {qc.products.filter(product => product.overallStatus !== 'pending').length} / {qc.products.length} products
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">PO:</span>
+                      <span className="text-gray-900">{qc.purchaseOrder?.poNumber || 'N/A'}</span>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Assigned To:</span>
+                      <span className="text-gray-900">{qc.assignedTo?.name || 'Unassigned'}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Status:</span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        getStatusColor(qc.status)
+                      }`}>
+                        {getStatusIcon(qc.status)}
+                        <span className="ml-1">{formatStatusLabel(qc.status)}</span>
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full" 
-                        style={{ 
-                          width: `${(qc.products.filter(product => product.overallStatus !== 'pending').length / qc.products.length) * 100}%` 
-                        }}
-                      ></div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Result:</span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        getResultColor(qc.overallResult)
+                      }`}>
+                        <span className="capitalize">{formatStatusLabel(qc.overallResult)}</span>
+                      </span>
+                    </div>
+                    
+                    <div className="mt-3">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-500">Progress:</span>
+                        <span className="text-gray-900">
+                          {completedProducts} / {qc.products.length} products
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full" 
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}
@@ -583,7 +626,7 @@ const QualityControlList: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-3">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-700">
-                  Showing {((currentPage - 1) * (filters.limit || 10)) + 1} to {Math.min(currentPage * (filters.limit || 10), totalCount)} of {totalCount} results
+                  Showing {((currentPage - 1) * filters.limit) + 1} to {Math.min(currentPage * filters.limit, totalCount)} of {totalCount} results
                 </div>
                 
                 <div className="flex items-center space-x-2">

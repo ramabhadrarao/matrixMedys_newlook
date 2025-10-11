@@ -20,163 +20,151 @@ import {
 
 const router = express.Router();
 
-// Validation rules
-const qcItemUpdateValidation = [
-  body('items').isArray().withMessage('Items must be an array'),
-  body('items.*.itemId').isMongoId().withMessage('Valid item ID required'),
-  body('items.*.qcStatus').isIn([
-    'received_correctly', 'damaged_packaging', 'expired', 'near_expiry',
-    'wrong_product', 'quantity_mismatch', 'quality_issue', 'documentation_issue'
-  ]).withMessage('Valid QC status required'),
-  body('items.*.qcRemarks').optional().isString().withMessage('QC remarks must be a string'),
-  body('items.*.qcImages').optional().isArray().withMessage('QC images must be an array')
-];
+// IMPORTANT: Specific routes MUST come before dynamic routes (/:id)
 
-const qcSubmissionValidation = [
-  body('overallResult').isIn(['passed', 'failed', 'partial']).withMessage('Valid overall result required'),
-  body('qcRemarks').optional().isString().withMessage('QC remarks must be a string'),
-  body('qcDocuments').optional().isArray().withMessage('QC documents must be an array')
-];
+// Dashboard route - MUST be before /:id
+router.get('/dashboard', 
+  authenticate, 
+  checkPermission('quality_control', 'view'),
+  [
+    query('timeframe').optional().isInt({ min: 1, max: 365 }),
+    query('warehouse').optional().isMongoId()
+  ],
+  validate,
+  getQCDashboard
+);
 
-const qcApprovalValidation = [
-  body('approvalDecision').isIn(['approved', 'rejected']).withMessage('Valid approval decision required'),
-  body('approvalRemarks').optional().isString().withMessage('Approval remarks must be a string')
-];
+// Statistics route - MUST be before /:id
+router.get('/statistics', 
+  authenticate, 
+  checkPermission('quality_control', 'view'),
+  [
+    query('dateFrom').optional().isISO8601(),
+    query('dateTo').optional().isISO8601()
+  ],
+  validate,
+  getQCStatistics
+);
 
-// Routes
+// Workload route - MUST be before /:id
+router.get('/workload', 
+  authenticate, 
+  checkPermission('quality_control', 'view'),
+  [
+    query('status').optional().isIn(['active', 'all'])
+  ],
+  validate,
+  getQCWorkload
+);
+
+// Bulk assign route - MUST be before /:id
+router.post('/bulk-assign', 
+  authenticate, 
+  checkPermission('quality_control', 'manage'),
+  [
+    body('qcIds').isArray({ min: 1 }),
+    body('qcIds.*').isMongoId(),
+    body('assignedTo').isMongoId(),
+    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent'])
+  ],
+  validate,
+  bulkAssignQC
+);
 
 // Get all QC records with filtering
 router.get('/', 
   authenticate, 
   checkPermission('quality_control', 'view'),
   [
-    query('status').optional().isIn(['pending', 'in_progress', 'completed', 'approved', 'rejected']),
-    query('qcType').optional().isIn(['incoming', 'random', 'complaint', 'return']),
+    query('status').optional().isIn(['pending', 'in_progress', 'pending_approval', 'completed', 'rejected']),
+    query('qcType').optional().isIn(['standard', 'urgent', 'special']),
     query('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
-    query('overallResult').optional().isIn(['passed', 'failed', 'partial_pass']),
+    query('result').optional().isIn(['pending', 'passed', 'failed', 'partial_pass']),
+    query('assignedTo').optional().isMongoId(),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('sortBy').optional().isString(),
-    query('sortOrder').optional().isIn(['asc', 'desc'])
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601(),
+    query('dateTo').optional().isISO8601()
   ],
   validate,
   getQCRecords
 );
 
-// Get single QC record
-router.get('/:id', 
-  authenticate, 
-  checkPermission('quality_control', 'view'),
-  [param('id').isMongoId().withMessage('Valid QC ID required')],
-  validate,
-  getQCRecord
-);
-
 // Create QC record from invoice receiving
-router.post('/', 
+router.post('/from-invoice/:invoiceReceivingId', 
   authenticate, 
   checkPermission('quality_control', 'create'),
   [
-    body('invoiceReceiving').isMongoId().withMessage('Valid invoice receiving ID required'),
-    body('qcType').optional().isIn(['incoming', 'random', 'complaint', 'return']).withMessage('Valid QC type required'),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('Valid priority required'),
-    body('assignedTo').optional().isMongoId().withMessage('Valid user ID required for assignment'),
-    body('scheduledDate').optional().isISO8601().withMessage('Valid scheduled date required'),
-    body('remarks').optional().isString().withMessage('Remarks must be a string')
+    param('invoiceReceivingId').isMongoId(),
+    body('qcType').optional().isIn(['standard', 'urgent', 'special']),
+    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
+    body('assignedTo').optional().isMongoId()
   ],
   validate,
   createQCFromInvoice
 );
 
-// Update QC item details
-router.put('/:id/items', 
+// Get single QC record - Dynamic route comes after specific routes
+router.get('/:id', 
+  authenticate, 
+  checkPermission('quality_control', 'view'),
+  [param('id').isMongoId()],
+  validate,
+  getQCRecord
+);
+
+// Update item-level QC
+router.put('/:qcId/product/:productIndex/item/:itemIndex', 
   authenticate, 
   checkPermission('quality_control', 'update'),
-  [param('id').isMongoId().withMessage('Valid QC ID required')],
-  qcItemUpdateValidation,
+  [
+    param('qcId').isMongoId(),
+    param('productIndex').isInt({ min: 0 }),
+    param('itemIndex').isInt({ min: 0 }),
+    body('status').isIn(['passed', 'failed']),
+    body('qcReasons').optional().isArray(),
+    body('remarks').optional().isString()
+  ],
   validate,
   updateItemQC
 );
 
 // Submit QC for approval
-router.post('/:id/submit', 
+router.put('/:id/submit', 
   authenticate, 
   checkPermission('quality_control', 'submit'),
-  [param('id').isMongoId().withMessage('Valid QC ID required')],
-  qcSubmissionValidation,
+  [
+    param('id').isMongoId(),
+    body('qcRemarks').optional().isString(),
+    body('qcEnvironment').optional().isObject()
+  ],
   validate,
   submitQCForApproval
 );
 
 // Approve QC
-router.post('/:id/approve', 
+router.put('/:id/approve', 
   authenticate, 
   checkPermission('quality_control', 'approve'),
-  [param('id').isMongoId().withMessage('Valid QC ID required')],
-  qcApprovalValidation,
+  [
+    param('id').isMongoId(),
+    body('approvalRemarks').optional().isString()
+  ],
   validate,
   approveQC
 );
 
-// Reject QC record
-router.post('/:id/reject', 
+// Reject QC
+router.put('/:id/reject', 
   authenticate, 
   checkPermission('quality_control', 'approve'),
-  [param('id').isMongoId().withMessage('Valid QC ID required')],
-  qcApprovalValidation,
+  [
+    param('id').isMongoId(),
+    body('approvalRemarks').isString().notEmpty()
+  ],
   validate,
   rejectQC
-);
-
-// Get QC statistics
-router.get('/statistics/overview', 
-  authenticate, 
-  checkPermission('quality_control', 'view'),
-  [
-    query('dateFrom').optional().isISO8601().withMessage('Valid from date required'),
-    query('dateTo').optional().isISO8601().withMessage('Valid to date required'),
-    query('qcType').optional().isIn(['incoming', 'random', 'complaint', 'return']),
-    query('assignedTo').optional().isMongoId().withMessage('Valid user ID required')
-  ],
-  validate,
-  getQCStatistics
-);
-
-// Get QC dashboard for managers
-router.get('/dashboard', 
-  authenticate, 
-  checkPermission('quality_control', 'manage'),
-  [
-    query('timeframe').optional().isInt({ min: 1, max: 365 }).withMessage('Valid timeframe required'),
-    query('warehouse').optional().isMongoId().withMessage('Valid warehouse ID required')
-  ],
-  validate,
-  getQCDashboard
-);
-
-// Bulk assign QC records
-router.post('/bulk-assign', 
-  authenticate, 
-  checkPermission('quality_control', 'manage'),
-  [
-    body('qcIds').isArray({ min: 1 }).withMessage('QC IDs array is required'),
-    body('qcIds.*').isMongoId().withMessage('Valid QC ID required'),
-    body('assignedTo').isMongoId().withMessage('Valid user ID required'),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('Valid priority required')
-  ],
-  validate,
-  bulkAssignQC
-);
-
-// Get QC workload by user
-router.get('/workload', 
-  authenticate, 
-  checkPermission('quality_control', 'manage'),
-  [
-    query('status').optional().isIn(['active', 'all']).withMessage('Valid status filter required')
-  ],
-  validate,
-  getQCWorkload
 );
 
 export default router;

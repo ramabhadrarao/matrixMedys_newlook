@@ -7,107 +7,118 @@ import {
   Package,
   FileText,
   Calendar,
-  Building2,
   CheckCircle,
   XCircle,
   Clock,
   AlertTriangle,
-  Eye,
-  User,
   ClipboardCheck,
-  MessageSquare,
   Send,
-  Save,
-  Camera,
-  Download
+  User,
+  TrendingUp
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { qualityControlAPI } from '../../services/qualityControlAPI';
 import toast from 'react-hot-toast';
 
-interface QCItem {
-  _id: string;
-  productId: string;
-  productName: string;
-  receivedQty: number;
-  unit: string;
-  batchNumber?: string;
-  expiryDate?: string;
-  result: 'pending' | 'passed' | 'failed';
-  visualInspection: {
-    packaging: 'good' | 'damaged' | 'acceptable';
-    labeling: 'correct' | 'incorrect' | 'missing';
-    appearance: 'normal' | 'abnormal' | 'acceptable';
-  };
-  quantityCheck: {
-    actualQty: number;
-    variance: number;
-    acceptable: boolean;
-  };
-  documentationCheck: {
-    batchCertificate: boolean;
-    testReports: boolean;
-    coa: boolean; // Certificate of Analysis
-  };
+interface QCItemDetail {
+  itemNumber: number;
+  status: 'pending' | 'passed' | 'failed';
+  qcReasons: string[];
   remarks: string;
-  images: Array<{
-    filename: string;
-    originalName: string;
-    uploadedAt: string;
-  }>;
-  qcBy?: string;
   qcDate?: string;
+  qcBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+}
+
+interface QCProduct {
+  product: string;
+  productCode: string;
+  productName: string;
+  batchNo: string;
+  mfgDate: string;
+  expDate: string;
+  receivedQty: number;
+  qcQty: number;
+  passedQty: number;
+  failedQty: number;
+  itemDetails: QCItemDetail[];
+  overallStatus: 'pending' | 'in_progress' | 'passed' | 'failed' | 'partial_pass';
+  qcSummary: {
+    received_correctly: number;
+    damaged_packaging: number;
+    damaged_product: number;
+    expired: number;
+    near_expiry: number;
+    wrong_product: number;
+    quantity_mismatch: number;
+    quality_issue: number;
+    labeling_issue: number;
+    other: number;
+  };
 }
 
 interface QualityControl {
   _id: string;
+  qcNumber: string;
   invoiceReceiving: {
     _id: string;
     invoiceNumber: string;
-    receivedDate: string;
-    purchaseOrder: {
-      _id: string;
-      poNumber: string;
-      principal: {
-        name: string;
-        email: string;
-      };
-    };
-    warehouse: {
-      name: string;
-      location: string;
-    };
-    receivedBy: {
+    invoiceDate: string;
+    receivedBy?: {
       name: string;
     };
   };
-  status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
-  overallResult: 'pending' | 'passed' | 'failed' | 'partial';
-  items: QCItem[];
+  purchaseOrder?: {
+    _id: string;
+    poNumber: string;
+    poDate: string;
+  };
+  status: 'pending' | 'in_progress' | 'pending_approval' | 'completed' | 'rejected';
+  qcType: 'standard' | 'urgent' | 'special';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  overallResult?: 'pending' | 'passed' | 'failed' | 'partial_pass';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  assignedTo?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  products: QCProduct[];
+  qcEnvironment: {
+    temperature?: number;
+    humidity?: number;
+    lightCondition: 'normal' | 'bright' | 'dim';
+  };
+  qcDate?: string;
   qcBy?: {
+    _id: string;
     name: string;
+    email: string;
   };
+  qcRemarks?: string;
+  approvalDate?: string;
   approvedBy?: {
+    _id: string;
     name: string;
+    email: string;
   };
-  submittedAt?: string;
-  approvedAt?: string;
-  rejectionReason?: string;
-  generalRemarks: string;
+  approvalRemarks?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 const QualityControlDetails: React.FC = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { user, hasPermission } = useAuthStore();
   
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [qc, setQc] = useState<QualityControl | null>(null);
-  const [activeTab, setActiveTab] = useState('items');
-  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('products');
+  const [submitting, setSubmitting] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalRemarks, setApprovalRemarks] = useState('');
@@ -121,46 +132,21 @@ const QualityControlDetails: React.FC = () => {
   const loadQualityControl = async (qcId: string) => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await qualityControlAPI.getById(qcId);
-      // setQc(response.data);
+      const response = await qualityControlAPI.getQCRecord(qcId);
       
-      // Mock data for now
-      setQc(null);
-    } catch (error) {
+      if (response.success) {
+        console.log('QC Record loaded:', response.data);
+        setQc(response.data);
+      } else {
+        toast.error('Failed to load quality control details');
+        navigate('/quality-control');
+      }
+    } catch (error: any) {
       console.error('Error loading quality control:', error);
-      toast.error('Failed to load quality control details');
+      toast.error(error.message || 'Failed to load quality control details');
+      navigate('/quality-control');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateQCItem = async (itemId: string, updates: Partial<QCItem>) => {
-    if (!qc) return;
-
-    try {
-      setSaving(true);
-      // TODO: Replace with actual API call
-      // await qualityControlAPI.updateItem(qc._id, itemId, updates);
-      
-      // Update local state
-      setQc(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          items: prev.items.map(item => 
-            item._id === itemId ? { ...item, ...updates } : item
-          )
-        };
-      });
-      
-      toast.success('QC item updated successfully');
-      setEditingItem(null);
-    } catch (error) {
-      console.error('Error updating QC item:', error);
-      toast.error('Failed to update QC item');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -169,14 +155,20 @@ const QualityControlDetails: React.FC = () => {
 
     try {
       setSubmitting(true);
-      // TODO: Replace with actual API call
-      // await qualityControlAPI.submit(qc._id);
+      const response = await qualityControlAPI.submitQCForApproval(qc._id, {
+        qcRemarks: qc.qcRemarks,
+        qcEnvironment: qc.qcEnvironment
+      });
       
-      setQc(prev => prev ? { ...prev, status: 'submitted', submittedAt: new Date().toISOString() } : prev);
-      toast.success('Quality control submitted for approval');
-    } catch (error) {
+      if (response.success) {
+        toast.success('Quality control submitted for approval');
+        await loadQualityControl(qc._id);
+      } else {
+        toast.error(response.message || 'Failed to submit quality control');
+      }
+    } catch (error: any) {
       console.error('Error submitting QC:', error);
-      toast.error('Failed to submit quality control');
+      toast.error(error.message || 'Failed to submit quality control');
     } finally {
       setSubmitting(false);
     }
@@ -185,39 +177,41 @@ const QualityControlDetails: React.FC = () => {
   const handleApproval = async () => {
     if (!qc) return;
 
+    if (approvalAction === 'reject' && !approvalRemarks.trim()) {
+      toast.error('Please provide a reason for rejection');
+      return;
+    }
+
     try {
-      // TODO: Replace with actual API call
-      // await qualityControlAPI.approve(qc._id, {
-      //   action: approvalAction,
-      //   remarks: approvalRemarks
-      // });
+      const apiCall = approvalAction === 'approve' 
+        ? qualityControlAPI.approveQC(qc._id, approvalRemarks)
+        : qualityControlAPI.rejectQC(qc._id, approvalRemarks);
       
-      setQc(prev => prev ? {
-        ...prev,
-        status: approvalAction === 'approve' ? 'approved' : 'rejected',
-        approvedAt: new Date().toISOString(),
-        approvedBy: { name: user?.name || 'Current User' },
-        rejectionReason: approvalAction === 'reject' ? approvalRemarks : undefined
-      } : prev);
+      const response = await apiCall;
       
-      toast.success(`Quality control ${approvalAction}d successfully`);
-      setShowApprovalModal(false);
-      setApprovalRemarks('');
-    } catch (error) {
+      if (response.success) {
+        toast.success(`Quality control ${approvalAction}d successfully`);
+        setShowApprovalModal(false);
+        setApprovalRemarks('');
+        await loadQualityControl(qc._id);
+      } else {
+        toast.error(response.message || `Failed to ${approvalAction} quality control`);
+      }
+    } catch (error: any) {
       console.error('Error processing approval:', error);
-      toast.error(`Failed to ${approvalAction} quality control`);
+      toast.error(error.message || `Failed to ${approvalAction} quality control`);
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-yellow-100 text-yellow-800';
       case 'in_progress':
         return 'bg-blue-100 text-blue-800';
-      case 'submitted':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'approved':
+      case 'pending_approval':
+        return 'bg-purple-100 text-purple-800';
+      case 'completed':
         return 'bg-green-100 text-green-800';
       case 'rejected':
         return 'bg-red-100 text-red-800';
@@ -234,7 +228,7 @@ const QualityControlDetails: React.FC = () => {
         return 'bg-green-100 text-green-800';
       case 'failed':
         return 'bg-red-100 text-red-800';
-      case 'partial':
+      case 'partial_pass':
         return 'bg-yellow-100 text-yellow-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -247,9 +241,9 @@ const QualityControlDetails: React.FC = () => {
         return <Clock className="w-4 h-4" />;
       case 'in_progress':
         return <ClipboardCheck className="w-4 h-4" />;
-      case 'submitted':
-        return <Send className="w-4 h-4" />;
-      case 'approved':
+      case 'pending_approval':
+        return <AlertTriangle className="w-4 h-4" />;
+      case 'completed':
         return <CheckCircle className="w-4 h-4" />;
       case 'rejected':
         return <XCircle className="w-4 h-4" />;
@@ -268,20 +262,26 @@ const QualityControlDetails: React.FC = () => {
     });
   };
 
-  const canEdit = () => {
-    return hasPermission('quality_control', 'update') && 
-           qc && (qc.status === 'pending' || qc.status === 'in_progress');
+  const formatStatusLabel = (status: string) => {
+    return status.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
   };
 
   const canSubmit = () => {
     return hasPermission('quality_control', 'submit') && 
            qc && qc.status === 'in_progress' &&
-           qc.items.every(item => item.result !== 'pending');
+           qc.products.every(p => p.overallStatus !== 'pending' && p.overallStatus !== 'in_progress');
   };
 
   const canApprove = () => {
     return hasPermission('quality_control', 'approve') && 
-           qc && qc.status === 'submitted';
+           qc && qc.status === 'pending_approval';
+  };
+
+  const canEdit = () => {
+    return hasPermission('quality_control', 'update') && 
+           qc && (qc.status === 'pending' || qc.status === 'in_progress');
   };
 
   if (loading) {
@@ -297,6 +297,12 @@ const QualityControlDetails: React.FC = () => {
       <div className="text-center py-12">
         <ClipboardCheck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         <p className="text-gray-500">Quality control record not found</p>
+        <button
+          onClick={() => navigate('/quality-control')}
+          className="mt-4 text-blue-600 hover:text-blue-800"
+        >
+          Back to Quality Control
+        </button>
       </div>
     );
   }
@@ -315,21 +321,23 @@ const QualityControlDetails: React.FC = () => {
           
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Quality Control - QC-{qc._id.slice(-6).toUpperCase()}
+              {qc.qcNumber}
             </h1>
             <div className="flex items-center space-x-4 mt-1">
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 getStatusColor(qc.status)
               }`}>
                 {getStatusIcon(qc.status)}
-                <span className="ml-1 capitalize">{qc.status.replace('_', ' ')}</span>
+                <span className="ml-1">{formatStatusLabel(qc.status)}</span>
               </span>
               
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                getResultColor(qc.overallResult)
-              }`}>
-                <span className="capitalize">{qc.overallResult}</span>
-              </span>
+              {qc.overallResult && (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  getResultColor(qc.overallResult)
+                }`}>
+                  <span className="capitalize">{formatStatusLabel(qc.overallResult)}</span>
+                </span>
+              )}
               
               <span className="text-gray-500 text-sm">
                 Created {formatDate(qc.createdAt)}
@@ -339,6 +347,16 @@ const QualityControlDetails: React.FC = () => {
         </div>
         
         <div className="flex space-x-3">
+          {canEdit() && (
+            <button
+              onClick={() => navigate(`/quality-control/${qc._id}/edit`)}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </button>
+          )}
+          
           {canSubmit() && (
             <button
               onClick={submitForApproval}
@@ -378,47 +396,81 @@ const QualityControlDetails: React.FC = () => {
         </div>
       </div>
 
-      {/* Invoice Information */}
+      {/* Basic Information */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Information</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Invoice Number</label>
-            <p className="text-gray-900 font-medium">{qc.invoiceReceiving.invoiceNumber}</p>
+            <p className="text-gray-900 font-medium">{qc.invoiceReceiving?.invoiceNumber || 'N/A'}</p>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Purchase Order</label>
-            <Link 
-              to={`/purchase-orders/${qc.invoiceReceiving.purchaseOrder._id}`}
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              {qc.invoiceReceiving.purchaseOrder.poNumber}
-            </Link>
+            {qc.purchaseOrder ? (
+              <Link 
+                to={`/purchase-orders/${qc.purchaseOrder._id}`}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                {qc.purchaseOrder.poNumber}
+              </Link>
+            ) : (
+              <p className="text-gray-900">N/A</p>
+            )}
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">Principal</label>
-            <p className="text-gray-900">{qc.invoiceReceiving.purchaseOrder.principal.name}</p>
+            <label className="block text-sm font-medium text-gray-500 mb-1">QC Type</label>
+            <p className="text-gray-900 capitalize">{qc.qcType}</p>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">Warehouse</label>
-            <p className="text-gray-900">{qc.invoiceReceiving.warehouse.name}</p>
-            <p className="text-sm text-gray-500">{qc.invoiceReceiving.warehouse.location}</p>
+            <label className="block text-sm font-medium text-gray-500 mb-1">Priority</label>
+            <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+              qc.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+              qc.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+              qc.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {qc.priority.toUpperCase()}
+            </span>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">Received Date</label>
-            <p className="text-gray-900">{formatDate(qc.invoiceReceiving.receivedDate)}</p>
+            <label className="block text-sm font-medium text-gray-500 mb-1">Assigned To</label>
+            <p className="text-gray-900">{qc.assignedTo?.name || 'Unassigned'}</p>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">Received By</label>
-            <p className="text-gray-900">{qc.invoiceReceiving.receivedBy.name}</p>
+            <label className="block text-sm font-medium text-gray-500 mb-1">Invoice Date</label>
+            <p className="text-gray-900">{formatDate(qc.invoiceReceiving.invoiceDate)}</p>
           </div>
         </div>
+
+        {qc.qcEnvironment && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h4 className="font-medium text-gray-900 mb-3">QC Environment</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {qc.qcEnvironment.temperature && (
+                <div>
+                  <label className="block text-sm text-gray-500">Temperature</label>
+                  <p className="text-gray-900">{qc.qcEnvironment.temperature}°C</p>
+                </div>
+              )}
+              {qc.qcEnvironment.humidity && (
+                <div>
+                  <label className="block text-sm text-gray-500">Humidity</label>
+                  <p className="text-gray-900">{qc.qcEnvironment.humidity}%</p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm text-gray-500">Light Condition</label>
+                <p className="text-gray-900 capitalize">{qc.qcEnvironment.lightCondition}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -426,14 +478,14 @@ const QualityControlDetails: React.FC = () => {
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6">
             <button
-              onClick={() => setActiveTab('items')}
+              onClick={() => setActiveTab('products')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'items'
+                activeTab === 'products'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              QC Items ({qc.items.length})
+              Products ({qc.products.length})
             </button>
             
             <button
@@ -460,50 +512,68 @@ const QualityControlDetails: React.FC = () => {
           </nav>
         </div>
 
-        {/* QC Items Tab */}
-        {activeTab === 'items' && (
+        {/* Products Tab */}
+        {activeTab === 'products' && (
           <div className="p-6">
             <div className="space-y-6">
-              {qc.items.map((item, index) => (
-                <div key={item._id} className="border border-gray-200 rounded-lg p-6">
+              {qc.products.map((product, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
-                      <h4 className="text-lg font-medium text-gray-900">{item.productName}</h4>
+                      <h4 className="text-lg font-medium text-gray-900">{product.productName}</h4>
                       <div className="text-sm text-gray-500 mt-1">
-                        Received: {item.receivedQty} {item.unit}
-                        {item.batchNumber && ` | Batch: ${item.batchNumber}`}
-                        {item.expiryDate && ` | Expires: ${formatDate(item.expiryDate)}`}
+                        Code: {product.productCode} | Batch: {product.batchNo}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Received: {product.receivedQty} units
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        getResultColor(item.result)
-                      }`}>
-                        <span className="capitalize">{item.result}</span>
-                      </span>
-                      
-                      {canEdit() && (
-                        <button
-                          onClick={() => setEditingItem(editingItem === item._id ? null : item._id)}
-                          className="inline-flex items-center px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          {editingItem === item._id ? 'Cancel' : 'Edit'}
-                        </button>
-                      )}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      getResultColor(product.overallStatus)
+                    }`}>
+                      <span className="capitalize">{formatStatusLabel(product.overallStatus)}</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="bg-green-50 rounded p-3">
+                      <div className="text-2xl font-bold text-green-600">{product.passedQty}</div>
+                      <div className="text-xs text-gray-600">Passed</div>
+                    </div>
+                    <div className="bg-red-50 rounded p-3">
+                      <div className="text-2xl font-bold text-red-600">{product.failedQty}</div>
+                      <div className="text-xs text-gray-600">Failed</div>
+                    </div>
+                    <div className="bg-yellow-50 rounded p-3">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {product.receivedQty - product.passedQty - product.failedQty}
+                      </div>
+                      <div className="text-xs text-gray-600">Pending</div>
+                    </div>
+                    <div className="bg-blue-50 rounded p-3">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {product.passedQty > 0 ? Math.round((product.passedQty / product.receivedQty) * 100) : 0}%
+                      </div>
+                      <div className="text-xs text-gray-600">Pass Rate</div>
                     </div>
                   </div>
 
-                  {editingItem === item._id ? (
-                    <QCItemEditForm
-                      item={item}
-                      onSave={(updates) => updateQCItem(item._id, updates)}
-                      onCancel={() => setEditingItem(null)}
-                      saving={saving}
-                    />
-                  ) : (
-                    <QCItemDisplay item={item} />
+                  {/* QC Summary */}
+                  {Object.values(product.qcSummary).some(v => v > 0) && (
+                    <div className="border-t border-gray-200 pt-4">
+                      <h5 className="font-medium text-gray-900 mb-3">QC Issue Breakdown</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        {Object.entries(product.qcSummary).map(([key, value]) => 
+                          value > 0 && (
+                            <div key={key} className="text-sm">
+                              <span className="text-gray-600">{key.replace(/_/g, ' ')}: </span>
+                              <span className="font-medium text-gray-900">{value}</span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
@@ -515,32 +585,41 @@ const QualityControlDetails: React.FC = () => {
         {activeTab === 'summary' && (
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-gray-900">
-                  {qc.items.filter(item => item.result === 'passed').length}
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600">
+                  {qc.products.filter(p => p.overallStatus === 'passed').length}
                 </div>
-                <div className="text-sm text-gray-600">Items Passed</div>
+                <div className="text-sm text-gray-600">Products Passed</div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-red-50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-red-600">
-                  {qc.items.filter(item => item.result === 'failed').length}
+                  {qc.products.filter(p => p.overallStatus === 'failed').length}
                 </div>
-                <div className="text-sm text-gray-600">Items Failed</div>
+                <div className="text-sm text-gray-600">Products Failed</div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-yellow-50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-yellow-600">
-                  {qc.items.filter(item => item.result === 'pending').length}
+                  {qc.products.filter(p => p.overallStatus === 'partial_pass').length}
                 </div>
-                <div className="text-sm text-gray-600">Items Pending</div>
+                <div className="text-sm text-gray-600">Partial Pass</div>
               </div>
             </div>
 
-            {qc.generalRemarks && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-2">General Remarks</h4>
-                <p className="text-gray-700">{qc.generalRemarks}</p>
+            {qc.qcRemarks && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <h4 className="font-medium text-gray-900 mb-2">QC Remarks</h4>
+                <p className="text-gray-700">{qc.qcRemarks}</p>
+              </div>
+            )}
+
+            {qc.approvalRemarks && (
+              <div className={`rounded-lg p-4 ${
+                qc.approvalStatus === 'approved' ? 'bg-green-50' : 'bg-red-50'
+              }`}>
+                <h4 className="font-medium text-gray-900 mb-2">Approval Remarks</h4>
+                <p className="text-gray-700">{qc.approvalRemarks}</p>
               </div>
             )}
           </div>
@@ -557,28 +636,31 @@ const QualityControlDetails: React.FC = () => {
                 <div className="flex-1">
                   <div className="text-sm font-medium text-gray-900">QC Record Created</div>
                   <div className="text-sm text-gray-500">{formatDate(qc.createdAt)}</div>
+                  {qc.assignedTo && (
+                    <div className="text-sm text-gray-500">Assigned to: {qc.assignedTo.name}</div>
+                  )}
                 </div>
               </div>
 
-              {qc.submittedAt && (
+              {qc.qcDate && qc.qcBy && (
                 <div className="flex items-start space-x-3">
                   <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
                     <Send className="w-4 h-4 text-yellow-600" />
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">Submitted for Approval</div>
-                    <div className="text-sm text-gray-500">{formatDate(qc.submittedAt)}</div>
-                    {qc.qcBy && <div className="text-sm text-gray-500">by {qc.qcBy.name}</div>}
+                    <div className="text-sm text-gray-500">{formatDate(qc.qcDate)}</div>
+                    <div className="text-sm text-gray-500">by {qc.qcBy.name}</div>
                   </div>
                 </div>
               )}
 
-              {qc.approvedAt && (
+              {qc.approvalDate && qc.approvedBy && (
                 <div className="flex items-start space-x-3">
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                    qc.status === 'approved' ? 'bg-green-100' : 'bg-red-100'
+                    qc.status === 'completed' ? 'bg-green-100' : 'bg-red-100'
                   }`}>
-                    {qc.status === 'approved' ? (
+                    {qc.status === 'completed' ? (
                       <CheckCircle className="w-4 h-4 text-green-600" />
                     ) : (
                       <XCircle className="w-4 h-4 text-red-600" />
@@ -586,13 +668,10 @@ const QualityControlDetails: React.FC = () => {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">
-                      {qc.status === 'approved' ? 'Approved' : 'Rejected'}
+                      {qc.status === 'completed' ? 'Approved' : 'Rejected'}
                     </div>
-                    <div className="text-sm text-gray-500">{formatDate(qc.approvedAt)}</div>
-                    {qc.approvedBy && <div className="text-sm text-gray-500">by {qc.approvedBy.name}</div>}
-                    {qc.rejectionReason && (
-                      <div className="text-sm text-red-600 mt-1">Reason: {qc.rejectionReason}</div>
-                    )}
+                    <div className="text-sm text-gray-500">{formatDate(qc.approvalDate)}</div>
+                    <div className="text-sm text-gray-500">by {qc.approvedBy.name}</div>
                   </div>
                 </div>
               )}
@@ -611,7 +690,7 @@ const QualityControlDetails: React.FC = () => {
             
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {approvalAction === 'approve' ? 'Approval Comments' : 'Rejection Reason'}
+                {approvalAction === 'approve' ? 'Approval Comments (Optional)' : 'Rejection Reason (Required)'}
               </label>
               <textarea
                 value={approvalRemarks}
@@ -650,362 +729,6 @@ const QualityControlDetails: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
-
-// QC Item Display Component
-const QCItemDisplay: React.FC<{ item: QCItem }> = ({ item }) => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Visual Inspection */}
-      <div>
-        <h5 className="font-medium text-gray-900 mb-3">Visual Inspection</h5>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Packaging:</span>
-            <span className={`text-sm font-medium ${
-              item.visualInspection.packaging === 'good' ? 'text-green-600' :
-              item.visualInspection.packaging === 'damaged' ? 'text-red-600' : 'text-yellow-600'
-            }`}>
-              {item.visualInspection.packaging}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Labeling:</span>
-            <span className={`text-sm font-medium ${
-              item.visualInspection.labeling === 'correct' ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {item.visualInspection.labeling}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Appearance:</span>
-            <span className={`text-sm font-medium ${
-              item.visualInspection.appearance === 'normal' ? 'text-green-600' :
-              item.visualInspection.appearance === 'abnormal' ? 'text-red-600' : 'text-yellow-600'
-            }`}>
-              {item.visualInspection.appearance}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Quantity Check */}
-      <div>
-        <h5 className="font-medium text-gray-900 mb-3">Quantity Check</h5>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Actual Qty:</span>
-            <span className="text-sm font-medium text-gray-900">{item.quantityCheck.actualQty}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Variance:</span>
-            <span className={`text-sm font-medium ${
-              item.quantityCheck.variance === 0 ? 'text-green-600' : 'text-yellow-600'
-            }`}>
-              {item.quantityCheck.variance > 0 ? '+' : ''}{item.quantityCheck.variance}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Acceptable:</span>
-            <span className={`text-sm font-medium ${
-              item.quantityCheck.acceptable ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {item.quantityCheck.acceptable ? 'Yes' : 'No'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Documentation Check */}
-      <div>
-        <h5 className="font-medium text-gray-900 mb-3">Documentation</h5>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Batch Certificate:</span>
-            <span className={`text-sm font-medium ${
-              item.documentationCheck.batchCertificate ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {item.documentationCheck.batchCertificate ? 'Available' : 'Missing'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Test Reports:</span>
-            <span className={`text-sm font-medium ${
-              item.documentationCheck.testReports ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {item.documentationCheck.testReports ? 'Available' : 'Missing'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">COA:</span>
-            <span className={`text-sm font-medium ${
-              item.documentationCheck.coa ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {item.documentationCheck.coa ? 'Available' : 'Missing'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Remarks and Images */}
-      {(item.remarks || item.images.length > 0) && (
-        <div className="md:col-span-2 lg:col-span-3">
-          {item.remarks && (
-            <div className="mb-4">
-              <h5 className="font-medium text-gray-900 mb-2">Remarks</h5>
-              <p className="text-sm text-gray-700 bg-gray-50 rounded p-3">{item.remarks}</p>
-            </div>
-          )}
-          
-          {item.images.length > 0 && (
-            <div>
-              <h5 className="font-medium text-gray-900 mb-2">Images ({item.images.length})</h5>
-              <div className="grid grid-cols-4 gap-2">
-                {item.images.map((image, idx) => (
-                  <div key={idx} className="relative group">
-                    <img
-                      src={`http://localhost:5000/api/files/public/view/${image.filename}`}
-                      alt={`QC Image ${idx + 1}`}
-                      className="w-full aspect-square object-cover rounded border"
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity rounded flex items-center justify-center">
-                      <Eye className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// QC Item Edit Form Component
-const QCItemEditForm: React.FC<{
-  item: QCItem;
-  onSave: (updates: Partial<QCItem>) => void;
-  onCancel: () => void;
-  saving: boolean;
-}> = ({ item, onSave, onCancel, saving }) => {
-  const [formData, setFormData] = useState({
-    result: item.result,
-    visualInspection: { ...item.visualInspection },
-    quantityCheck: { ...item.quantityCheck },
-    documentationCheck: { ...item.documentationCheck },
-    remarks: item.remarks
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Result */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">QC Result</label>
-        <select
-          value={formData.result}
-          onChange={(e) => setFormData(prev => ({ ...prev, result: e.target.value as any }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          required
-        >
-          <option value="pending">Pending</option>
-          <option value="passed">Passed</option>
-          <option value="failed">Failed</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Visual Inspection */}
-        <div>
-          <h5 className="font-medium text-gray-900 mb-3">Visual Inspection</h5>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Packaging</label>
-              <select
-                value={formData.visualInspection.packaging}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  visualInspection: { ...prev.visualInspection, packaging: e.target.value as any }
-                }))}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="good">Good</option>
-                <option value="acceptable">Acceptable</option>
-                <option value="damaged">Damaged</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Labeling</label>
-              <select
-                value={formData.visualInspection.labeling}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  visualInspection: { ...prev.visualInspection, labeling: e.target.value as any }
-                }))}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="correct">Correct</option>
-                <option value="incorrect">Incorrect</option>
-                <option value="missing">Missing</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Appearance</label>
-              <select
-                value={formData.visualInspection.appearance}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  visualInspection: { ...prev.visualInspection, appearance: e.target.value as any }
-                }))}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="normal">Normal</option>
-                <option value="acceptable">Acceptable</option>
-                <option value="abnormal">Abnormal</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Quantity Check */}
-        <div>
-          <h5 className="font-medium text-gray-900 mb-3">Quantity Check</h5>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Actual Quantity</label>
-              <input
-                type="number"
-                value={formData.quantityCheck.actualQty}
-                onChange={(e) => {
-                  const actualQty = parseFloat(e.target.value) || 0;
-                  const variance = actualQty - item.receivedQty;
-                  setFormData(prev => ({
-                    ...prev,
-                    quantityCheck: { 
-                      ...prev.quantityCheck, 
-                      actualQty,
-                      variance,
-                      acceptable: Math.abs(variance) <= (item.receivedQty * 0.05) // 5% tolerance
-                    }
-                  }));
-                }}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                step="0.01"
-                min="0"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Variance</label>
-              <input
-                type="number"
-                value={formData.quantityCheck.variance}
-                readOnly
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-50"
-              />
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.quantityCheck.acceptable}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  quantityCheck: { ...prev.quantityCheck, acceptable: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">Acceptable</label>
-            </div>
-          </div>
-        </div>
-
-        {/* Documentation Check */}
-        <div>
-          <h5 className="font-medium text-gray-900 mb-3">Documentation</h5>
-          <div className="space-y-3">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.documentationCheck.batchCertificate}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  documentationCheck: { ...prev.documentationCheck, batchCertificate: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">Batch Certificate</label>
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.documentationCheck.testReports}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  documentationCheck: { ...prev.documentationCheck, testReports: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">Test Reports</label>
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.documentationCheck.coa}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  documentationCheck: { ...prev.documentationCheck, coa: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">Certificate of Analysis</label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Remarks */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
-        <textarea
-          value={formData.remarks}
-          onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Add any additional comments or observations..."
-        />
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          Cancel
-        </button>
-        
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          <Save className="w-4 h-4 mr-2" />
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </div>
-    </form>
   );
 };
 

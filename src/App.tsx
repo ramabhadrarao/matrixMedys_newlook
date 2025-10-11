@@ -69,8 +69,11 @@ import WarehouseForm from './components/Warehouses/WarehouseForm';
 import WarehouseDetails from './components/Warehouses/WarehouseDetails';
 
 // Quality Control Components
-import { QualityControlList, QualityControlDetails } from './components/QualityControl';
-
+import { 
+  QualityControlList, 
+  QualityControlDetails,
+  QualityControlEdit 
+} from './components/QualityControl';
 import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
 import ProfileInformation from './components/Settings/ProfileInformation';
@@ -246,7 +249,11 @@ function App() {
           {/* Quality Control Routes */}
           <Route path="quality-control" element={<QualityControlList />} />
           <Route path="quality-control/:id" element={<QualityControlDetails />} />
-          
+          <Route path="/quality-control/:id/edit" element={
+  <ProtectedRoute>
+    <QualityControlEdit />
+  </ProtectedRoute>
+} />
             {/* States Routes - Moved to Settings/Masters */}
             <Route path="states" element={<StatesList />} />
             <Route path="states/new" element={<StateForm />} />

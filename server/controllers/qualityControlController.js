@@ -2,8 +2,6 @@
 import QualityControl from '../models/QualityControl.js';
 import InvoiceReceiving from '../models/InvoiceReceiving.js';
 import WarehouseApproval from '../models/WarehouseApproval.js';
-import WorkflowStage from '../models/WorkflowStage.js';
-import PurchaseOrder from '../models/PurchaseOrder.js';
 
 // Create QC record from Invoice Receiving
 export const createQCFromInvoice = async (req, res) => {
@@ -11,7 +9,6 @@ export const createQCFromInvoice = async (req, res) => {
     const { invoiceReceivingId } = req.params;
     const { qcType = 'standard', priority = 'medium', assignedTo } = req.body;
 
-    // Get invoice receiving data
     const invoiceReceiving = await InvoiceReceiving.findById(invoiceReceivingId)
       .populate('purchaseOrder');
 
@@ -32,9 +29,8 @@ export const createQCFromInvoice = async (req, res) => {
       mfgDate: product.mfgDate,
       expDate: product.expDate,
       receivedQty: product.receivedQty,
-      qcQty: product.receivedQty, // Initially all received qty goes for QC
+      qcQty: product.receivedQty,
       
-      // Create item details for each unit
       itemDetails: Array.from({ length: product.receivedQty }, (_, index) => ({
         itemNumber: index + 1,
         status: 'pending',
@@ -57,7 +53,6 @@ export const createQCFromInvoice = async (req, res) => {
       }
     }));
 
-    // Create QC record
     const qualityControl = new QualityControl({
       invoiceReceiving: invoiceReceivingId,
       purchaseOrder: invoiceReceiving.purchaseOrder._id,
@@ -75,7 +70,6 @@ export const createQCFromInvoice = async (req, res) => {
 
     await qualityControl.save();
 
-    // Update invoice receiving
     invoiceReceiving.qualityControl = qualityControl._id;
     invoiceReceiving.workflowStatus = 'qc_in_progress';
     invoiceReceiving.qcStatus = 'in_progress';
@@ -89,13 +83,18 @@ export const createQCFromInvoice = async (req, res) => {
     ]);
 
     res.status(201).json({
+      success: true,
       message: 'QC record created successfully',
       data: qualityControl
     });
 
   } catch (error) {
     console.error('Create QC error:', error);
-    res.status(500).json({ message: 'Failed to create QC record' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to create QC record',
+      error: error.message 
+    });
   }
 };
 
@@ -113,14 +112,24 @@ export const getQCRecord = async (req, res) => {
       .populate('createdBy', 'name email');
 
     if (!qcRecord) {
-      return res.status(404).json({ message: 'QC record not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'QC record not found' 
+      });
     }
 
-    res.json({ data: qcRecord });
+    res.json({ 
+      success: true,
+      data: qcRecord 
+    });
 
   } catch (error) {
     console.error('Get QC record error:', error);
-    res.status(500).json({ message: 'Failed to fetch QC record' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch QC record',
+      error: error.message 
+    });
   }
 };
 
@@ -132,7 +141,7 @@ export const getQCRecords = async (req, res) => {
       qcType,
       priority,
       assignedTo,
-      result, // Changed from overallResult to result
+      result,
       page = 1,
       limit = 10,
       search,
@@ -146,12 +155,16 @@ export const getQCRecords = async (req, res) => {
     if (qcType) query.qcType = qcType;
     if (priority) query.priority = priority;
     if (assignedTo) query.assignedTo = assignedTo;
-    if (result) query.overallResult = result; // Map result parameter to overallResult field
+    if (result) query.overallResult = result;
 
     if (search) {
+      const invoiceRecords = await InvoiceReceiving.find({
+        invoiceNumber: { $regex: search, $options: 'i' }
+      }).select('_id');
+      
       query.$or = [
         { qcNumber: { $regex: search, $options: 'i' } },
-        { 'invoiceReceiving.invoiceNumber': { $regex: search, $options: 'i' } }
+        { invoiceReceiving: { $in: invoiceRecords.map(r => r._id) } }
       ];
     }
 
@@ -163,17 +176,35 @@ export const getQCRecords = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    console.log('QC Query:', JSON.stringify(query, null, 2));
+
     const qcRecords = await QualityControl.find(query)
       .populate('invoiceReceiving', 'invoiceNumber invoiceDate')
+      .populate('purchaseOrder', 'poNumber poDate')
       .populate('assignedTo', 'name email')
-      .populate('products.qcBy', 'name email')
+      .populate('qcBy', 'name email')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
 
+    console.log('QC Records found:', qcRecords.length);
+    
+    // Debug: Check if purchaseOrder is populated
+    if (qcRecords.length > 0) {
+      console.log('First record sample:', {
+        id: qcRecords[0]._id,
+        qcNumber: qcRecords[0].qcNumber,
+        hasInvoiceReceiving: !!qcRecords[0].invoiceReceiving,
+        hasPurchaseOrder: !!qcRecords[0].purchaseOrder,
+        purchaseOrderType: typeof qcRecords[0].purchaseOrder,
+        purchaseOrderId: qcRecords[0].purchaseOrder?._id || qcRecords[0].purchaseOrder
+      });
+    }
+
     const totalCount = await QualityControl.countDocuments(query);
 
     res.json({
+      success: true,
       data: {
         qcRecords,
         totalCount,
@@ -184,7 +215,11 @@ export const getQCRecords = async (req, res) => {
 
   } catch (error) {
     console.error('Get QC records error:', error);
-    res.status(500).json({ message: 'Failed to fetch QC records' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch QC records',
+      error: error.message 
+    });
   }
 };
 
@@ -196,21 +231,33 @@ export const updateItemQC = async (req, res) => {
 
     const qcRecord = await QualityControl.findById(qcId);
     if (!qcRecord) {
-      return res.status(404).json({ message: 'QC record not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'QC record not found' 
+      });
     }
 
     if (qcRecord.status === 'completed') {
-      return res.status(400).json({ message: 'Cannot update completed QC record' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Cannot update completed QC record' 
+      });
     }
 
     const product = qcRecord.products[productIndex];
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Product not found' 
+      });
     }
 
     const item = product.itemDetails[itemIndex];
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Item not found' 
+      });
     }
 
     // Update item details
@@ -220,7 +267,7 @@ export const updateItemQC = async (req, res) => {
     item.qcDate = new Date();
     item.qcBy = req.user._id;
 
-    // Update QC summary for the product
+    // Reset and recalculate QC summary
     product.qcSummary = {
       received_correctly: 0,
       damaged_packaging: 0,
@@ -234,10 +281,9 @@ export const updateItemQC = async (req, res) => {
       other: 0
     };
 
-    // Count statuses
     product.itemDetails.forEach(itemDetail => {
       if (itemDetail.status !== 'pending') {
-        if (itemDetail.qcReasons.length === 0) {
+        if (itemDetail.qcReasons.length === 0 || itemDetail.status === 'passed') {
           product.qcSummary.received_correctly++;
         } else {
           itemDetail.qcReasons.forEach(reason => {
@@ -251,9 +297,7 @@ export const updateItemQC = async (req, res) => {
 
     // Update product overall status
     const completedItems = product.itemDetails.filter(item => item.status !== 'pending');
-    const passedItems = product.itemDetails.filter(item => 
-      item.status === 'passed' || (item.status !== 'pending' && item.qcReasons.length === 0)
-    );
+    const passedItems = product.itemDetails.filter(item => item.status === 'passed');
 
     if (completedItems.length === 0) {
       product.overallStatus = 'pending';
@@ -272,7 +316,12 @@ export const updateItemQC = async (req, res) => {
     product.passedQty = passedItems.length;
     product.failedQty = completedItems.length - passedItems.length;
 
-    // Update overall QC status
+    // Update QC record status
+    if (qcRecord.status === 'pending') {
+      qcRecord.status = 'in_progress';
+    }
+
+    // Update overall QC result
     const allProductsCompleted = qcRecord.products.every(p => 
       p.overallStatus !== 'pending' && p.overallStatus !== 'in_progress'
     );
@@ -294,6 +343,7 @@ export const updateItemQC = async (req, res) => {
     await qcRecord.save();
 
     res.json({
+      success: true,
       message: 'Item QC updated successfully',
       data: {
         item,
@@ -309,7 +359,11 @@ export const updateItemQC = async (req, res) => {
 
   } catch (error) {
     console.error('Update item QC error:', error);
-    res.status(500).json({ message: 'Failed to update item QC' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to update item QC',
+      error: error.message 
+    });
   }
 };
 
@@ -321,23 +375,30 @@ export const submitQCForApproval = async (req, res) => {
 
     const qcRecord = await QualityControl.findById(id);
     if (!qcRecord) {
-      return res.status(404).json({ message: 'QC record not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'QC record not found' 
+      });
     }
 
     if (qcRecord.status !== 'in_progress') {
-      return res.status(400).json({ message: 'QC record is not in progress' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'QC record is not in progress' 
+      });
     }
 
-    // Check if all items are QC'd
     const allItemsCompleted = qcRecord.products.every(product =>
       product.itemDetails.every(item => item.status !== 'pending')
     );
 
     if (!allItemsCompleted) {
-      return res.status(400).json({ message: 'All items must be QC checked before submission' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'All items must be QC checked before submission' 
+      });
     }
 
-    // Update QC record
     qcRecord.status = 'pending_approval';
     qcRecord.qcDate = new Date();
     qcRecord.qcBy = req.user._id;
@@ -350,7 +411,6 @@ export const submitQCForApproval = async (req, res) => {
     qcRecord.updatedBy = req.user._id;
     await qcRecord.save();
 
-    // Update invoice receiving status
     const invoiceReceiving = await InvoiceReceiving.findById(qcRecord.invoiceReceiving);
     if (invoiceReceiving) {
       invoiceReceiving.workflowStatus = 'qc_completed';
@@ -363,102 +423,18 @@ export const submitQCForApproval = async (req, res) => {
     ]);
 
     res.json({
+      success: true,
       message: 'QC submitted for approval successfully',
       data: qcRecord
     });
 
   } catch (error) {
     console.error('Submit QC for approval error:', error);
-    res.status(500).json({ message: 'Failed to submit QC for approval' });
-  }
-};
-
-// Approve/Reject QC
-export const approveRejectQC = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { action, approvalRemarks } = req.body; // action: 'approve' or 'reject'
-
-    const qcRecord = await QualityControl.findById(id);
-    if (!qcRecord) {
-      return res.status(404).json({ message: 'QC record not found' });
-    }
-
-    if (qcRecord.status !== 'pending_approval') {
-      return res.status(400).json({ message: 'QC record is not pending approval' });
-    }
-
-    if (action === 'approve') {
-      qcRecord.status = 'completed';
-      qcRecord.approvalStatus = 'approved';
-      
-      // Create warehouse approval for passed products
-      const passedProducts = qcRecord.products.filter(p => 
-        p.overallStatus === 'passed' || p.overallStatus === 'partial_pass'
-      );
-
-      if (passedProducts.length > 0) {
-        const warehouseApproval = new WarehouseApproval({
-          qualityControl: qcRecord._id,
-          invoiceReceiving: qcRecord.invoiceReceiving,
-          purchaseOrder: qcRecord.purchaseOrder,
-          products: passedProducts.map(product => ({
-            product: product.product,
-            productCode: product.productCode,
-            productName: product.productName,
-            batchNo: product.batchNo,
-            mfgDate: product.mfgDate,
-            expDate: product.expDate,
-            qcPassedQty: product.passedQty,
-            warehouseQty: product.passedQty,
-            status: 'pending'
-          })),
-          createdBy: req.user._id
-        });
-
-        await warehouseApproval.save();
-
-        // Update invoice receiving with warehouse approval reference
-        const invoiceReceiving = await InvoiceReceiving.findById(qcRecord.invoiceReceiving);
-        if (invoiceReceiving) {
-          invoiceReceiving.warehouseApproval = warehouseApproval._id;
-          invoiceReceiving.workflowStatus = 'warehouse_pending';
-          await invoiceReceiving.save();
-        }
-      }
-
-    } else if (action === 'reject') {
-      qcRecord.status = 'rejected';
-      qcRecord.approvalStatus = 'rejected';
-
-      // Update invoice receiving status
-      const invoiceReceiving = await InvoiceReceiving.findById(qcRecord.invoiceReceiving);
-      if (invoiceReceiving) {
-        invoiceReceiving.workflowStatus = 'rejected';
-        invoiceReceiving.status = 'rejected';
-        await invoiceReceiving.save();
-      }
-    }
-
-    qcRecord.approvalDate = new Date();
-    qcRecord.approvedBy = req.user._id;
-    qcRecord.approvalRemarks = approvalRemarks;
-    qcRecord.updatedBy = req.user._id;
-
-    await qcRecord.save();
-
-    await qcRecord.populate([
-      { path: 'approvedBy', select: 'name email' }
-    ]);
-
-    res.json({
-      message: `QC ${action}d successfully`,
-      data: qcRecord
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to submit QC for approval',
+      error: error.message 
     });
-
-  } catch (error) {
-    console.error('Approve/Reject QC error:', error);
-    res.status(500).json({ message: `Failed to ${action} QC` });
   }
 };
 
@@ -470,17 +446,22 @@ export const approveQC = async (req, res) => {
 
     const qcRecord = await QualityControl.findById(id);
     if (!qcRecord) {
-      return res.status(404).json({ message: 'QC record not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'QC record not found' 
+      });
     }
 
     if (qcRecord.status !== 'pending_approval') {
-      return res.status(400).json({ message: 'QC record is not pending approval' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'QC record is not pending approval' 
+      });
     }
 
     qcRecord.status = 'completed';
     qcRecord.approvalStatus = 'approved';
     
-    // Create warehouse approval for passed products
     const passedProducts = qcRecord.products.filter(p => 
       p.overallStatus === 'passed' || p.overallStatus === 'partial_pass'
     );
@@ -506,7 +487,6 @@ export const approveQC = async (req, res) => {
 
       await warehouseApproval.save();
 
-      // Update invoice receiving with warehouse approval reference
       const invoiceReceiving = await InvoiceReceiving.findById(qcRecord.invoiceReceiving);
       if (invoiceReceiving) {
         invoiceReceiving.warehouseApproval = warehouseApproval._id;
@@ -527,13 +507,18 @@ export const approveQC = async (req, res) => {
     ]);
 
     res.json({
+      success: true,
       message: 'QC approved successfully',
       data: qcRecord
     });
 
   } catch (error) {
     console.error('Approve QC error:', error);
-    res.status(500).json({ message: 'Failed to approve QC' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to approve QC',
+      error: error.message 
+    });
   }
 };
 
@@ -545,17 +530,22 @@ export const rejectQC = async (req, res) => {
 
     const qcRecord = await QualityControl.findById(id);
     if (!qcRecord) {
-      return res.status(404).json({ message: 'QC record not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'QC record not found' 
+      });
     }
 
     if (qcRecord.status !== 'pending_approval') {
-      return res.status(400).json({ message: 'QC record is not pending approval' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'QC record is not pending approval' 
+      });
     }
 
     qcRecord.status = 'rejected';
     qcRecord.approvalStatus = 'rejected';
 
-    // Update invoice receiving status
     const invoiceReceiving = await InvoiceReceiving.findById(qcRecord.invoiceReceiving);
     if (invoiceReceiving) {
       invoiceReceiving.workflowStatus = 'rejected';
@@ -575,17 +565,22 @@ export const rejectQC = async (req, res) => {
     ]);
 
     res.json({
+      success: true,
       message: 'QC rejected successfully',
       data: qcRecord
     });
 
   } catch (error) {
     console.error('Reject QC error:', error);
-    res.status(500).json({ message: 'Failed to reject QC' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to reject QC',
+      error: error.message 
+    });
   }
 };
 
-// Get QC dashboard statistics for managers
+// Get QC dashboard statistics
 export const getQCDashboard = async (req, res) => {
   try {
     const { timeframe = '30', warehouse } = req.query;
@@ -598,7 +593,6 @@ export const getQCDashboard = async (req, res) => {
       matchFilter.warehouse = warehouse;
     }
 
-    // Get QC statistics
     const stats = await QualityControl.aggregate([
       { $match: matchFilter },
       {
@@ -634,7 +628,6 @@ export const getQCDashboard = async (req, res) => {
       }
     ]);
 
-    // Get recent QC activities
     const recentActivities = await QualityControl.find(matchFilter)
       .populate('assignedTo', 'name')
       .populate('invoiceReceiving', 'invoiceNumber')
@@ -642,7 +635,6 @@ export const getQCDashboard = async (req, res) => {
       .limit(10)
       .select('status qcNumber assignedTo invoiceReceiving updatedAt products');
 
-    // Get QC performance by user
     const userPerformance = await QualityControl.aggregate([
       { $match: { ...matchFilter, status: 'completed' } },
       { $unwind: '$products' },
@@ -651,7 +643,7 @@ export const getQCDashboard = async (req, res) => {
           _id: '$assignedTo',
           totalProducts: { $sum: 1 },
           passedProducts: { $sum: { $cond: [{ $eq: ['$products.overallStatus', 'passed'] }, 1, 0] } },
-          avgProcessingTime: { $avg: { $subtract: ['$completedAt', '$createdAt'] } }
+          avgProcessingTime: { $avg: { $subtract: ['$qcDate', '$createdAt'] } }
         }
       },
       {
@@ -702,20 +694,26 @@ export const getQCDashboard = async (req, res) => {
   }
 };
 
-// Bulk assign QC records to users
+// Bulk assign QC records
 export const bulkAssignQC = async (req, res) => {
   try {
     const { qcIds, assignedTo, priority } = req.body;
 
     if (!qcIds || !Array.isArray(qcIds) || qcIds.length === 0) {
-      return res.status(400).json({ message: 'QC IDs array is required' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'QC IDs array is required' 
+      });
     }
 
     if (!assignedTo) {
-      return res.status(400).json({ message: 'Assigned user is required' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Assigned user is required' 
+      });
     }
 
-    const updateData = { assignedTo };
+    const updateData = { assignedTo, updatedBy: req.user._id };
     if (priority) {
       updateData.priority = priority;
     }
@@ -816,7 +814,6 @@ export const getQCStatistics = async (req, res) => {
       if (dateTo) dateFilter.createdAt.$lte = new Date(dateTo);
     }
 
-    // Status breakdown
     const statusStats = await QualityControl.aggregate([
       { $match: dateFilter },
       {
@@ -827,7 +824,6 @@ export const getQCStatistics = async (req, res) => {
       }
     ]);
 
-    // Overall result breakdown
     const resultStats = await QualityControl.aggregate([
       { $match: { ...dateFilter, status: 'completed' } },
       {
@@ -838,7 +834,6 @@ export const getQCStatistics = async (req, res) => {
       }
     ]);
 
-    // QC type breakdown
     const typeStats = await QualityControl.aggregate([
       { $match: dateFilter },
       {
@@ -849,7 +844,6 @@ export const getQCStatistics = async (req, res) => {
       }
     ]);
 
-    // Average processing time
     const processingTimeStats = await QualityControl.aggregate([
       { 
         $match: { 
@@ -863,7 +857,7 @@ export const getQCStatistics = async (req, res) => {
           processingHours: {
             $divide: [
               { $subtract: ['$qcDate', '$createdAt'] },
-              1000 * 60 * 60 // Convert to hours
+              3600000
             ]
           }
         }
@@ -879,6 +873,7 @@ export const getQCStatistics = async (req, res) => {
     ]);
 
     res.json({
+      success: true,
       data: {
         statusBreakdown: statusStats,
         resultBreakdown: resultStats,
@@ -893,7 +888,11 @@ export const getQCStatistics = async (req, res) => {
 
   } catch (error) {
     console.error('Get QC statistics error:', error);
-    res.status(500).json({ message: 'Failed to fetch QC statistics' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch QC statistics',
+      error: error.message 
+    });
   }
 };
 
@@ -903,7 +902,6 @@ export default {
   getQCRecords,
   updateItemQC,
   submitQCForApproval,
-  approveRejectQC,
   approveQC,
   rejectQC,
   getQCDashboard,
