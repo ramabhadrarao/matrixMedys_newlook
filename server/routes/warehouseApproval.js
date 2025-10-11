@@ -76,11 +76,14 @@ router.get('/',
   authenticate, 
   checkPermission('warehouse_approval', 'view'),
   [
-    query('status').optional().isIn(['pending', 'in_progress', 'pending_manager_approval', 'completed', 'rejected']),
-    query('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
-    query('assignedTo').optional().isMongoId(),
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 })
+    query('status').optional({ values: 'falsy' }).isIn(['pending', 'in_progress', 'pending_manager_approval', 'completed', 'rejected']),
+    query('priority').optional({ values: 'falsy' }).isIn(['low', 'medium', 'high', 'urgent']),
+    query('assignedTo').optional({ values: 'falsy' }).isMongoId(),
+    query('page').optional({ values: 'falsy' }).isInt({ min: 1 }),
+    query('limit').optional({ values: 'falsy' }).isInt({ min: 1, max: 100 }),
+    query('search').optional({ values: 'falsy' }),
+    query('dateFrom').optional({ values: 'falsy' }).isISO8601(),
+    query('dateTo').optional({ values: 'falsy' }).isISO8601()
   ],
   validate,
   getWarehouseApprovals

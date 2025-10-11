@@ -391,23 +391,23 @@ const WarehouseApprovalDetails: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Purchase Order</label>
             <Link 
-              to={`/purchase-orders/${approval.invoiceReceiving.purchaseOrder._id}`}
+              to={`/purchase-orders/${approval.invoiceReceiving?.purchaseOrder?._id || '#'}`}
               className="text-blue-600 hover:text-blue-800 font-medium"
             >
-              {approval.invoiceReceiving.purchaseOrder.poNumber}
+              {approval.invoiceReceiving?.purchaseOrder?.poNumber || 'N/A'}
             </Link>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Principal</label>
-            <p className="text-gray-900">{approval.invoiceReceiving.purchaseOrder.principal.name}</p>
-            <p className="text-sm text-gray-500">{approval.invoiceReceiving.purchaseOrder.principal.email}</p>
+            <p className="text-gray-900">{approval.invoiceReceiving?.purchaseOrder?.principal?.name || 'N/A'}</p>
+            <p className="text-sm text-gray-500">{approval.invoiceReceiving?.purchaseOrder?.principal?.email || 'N/A'}</p>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Warehouse</label>
-            <p className="text-gray-900">{approval.invoiceReceiving.warehouse.name}</p>
-            <p className="text-sm text-gray-500">{approval.invoiceReceiving.warehouse.location}</p>
+            <p className="text-gray-900">{approval.invoiceReceiving?.warehouse?.name || 'N/A'}</p>
+            <p className="text-sm text-gray-500">{approval.invoiceReceiving?.warehouse?.location || 'N/A'}</p>
           </div>
           
           <div>

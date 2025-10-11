@@ -662,14 +662,14 @@ const WarehouseApprovalList: React.FC = () => {
                               {approval.invoiceReceiving.invoiceNumber}
                             </div>
                             <div className="text-sm text-gray-500">
-                              PO: {approval.invoiceReceiving.purchaseOrder.poNumber}
+                              PO: {approval.invoiceReceiving?.purchaseOrder?.poNumber || 'N/A'}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {approval.invoiceReceiving.purchaseOrder.principal.name}
+                              {approval.invoiceReceiving?.purchaseOrder?.principal?.name || 'N/A'}
                             </div>
                             <div className="text-xs text-gray-400 flex items-center mt-1">
                               <Building2 className="w-3 h-3 mr-1" />
-                              {approval.invoiceReceiving.warehouse.name}
+                              {approval.invoiceReceiving?.warehouse?.name || 'N/A'}
                             </div>
                           </div>
                         </div>
@@ -772,7 +772,7 @@ const WarehouseApprovalList: React.FC = () => {
                           {approval.invoiceReceiving.invoiceNumber}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {approval.invoiceReceiving.purchaseOrder.poNumber}
+                          {approval.invoiceReceiving?.purchaseOrder?.poNumber || 'N/A'}
                         </div>
                       </div>
                     </div>
@@ -795,11 +795,11 @@ const WarehouseApprovalList: React.FC = () => {
                   
                   <div className="space-y-2 mb-3">
                     <div className="text-sm text-gray-600">
-                      <span className="font-medium">Principal:</span> {approval.invoiceReceiving.purchaseOrder.principal.name}
+                      <span className="font-medium">Principal:</span> {approval.invoiceReceiving?.purchaseOrder?.principal?.name || 'N/A'}
                     </div>
                     <div className="text-sm text-gray-600 flex items-center">
                       <Building2 className="w-4 h-4 mr-1" />
-                      {approval.invoiceReceiving.warehouse.name}
+                      {approval.invoiceReceiving?.warehouse?.name || 'N/A'}
                     </div>
                     <div className="text-sm text-gray-600">
                       <span className="font-medium">Received:</span> {formatDate(approval.invoiceReceiving.receivedDate)}

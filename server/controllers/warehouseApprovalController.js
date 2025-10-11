@@ -12,11 +12,22 @@ export const getWarehouseApproval = async (req, res) => {
 
     const warehouseApproval = await WarehouseApproval.findById(id)
       .populate('qualityControl', 'qcNumber qcDate overallResult')
-      .populate('invoiceReceiving', 'invoiceNumber invoiceDate')
-      .populate('purchaseOrder', 'poNumber poDate')
+      .populate({
+        path: 'invoiceReceiving',
+        select: 'invoiceNumber invoiceDate receivedDate receivedBy',
+        populate: {
+          path: 'purchaseOrder',
+          select: 'poNumber poDate',
+          populate: {
+            path: 'principal',
+            select: 'name email'
+          }
+        }
+      })
+      .populate('warehouse', 'name location')
       .populate('assignedTo', 'name email')
-      .populate('warehouseBy', 'name email')
-      .populate('managerApprovals.approvedBy', 'name email')
+      .populate('warehouseTeam', 'name email')
+      .populate('managerApprovals.manager', 'name email')
       .populate('createdBy', 'name email');
 
     if (!warehouseApproval) {
@@ -68,10 +79,21 @@ export const getWarehouseApprovals = async (req, res) => {
 
     const warehouseApprovals = await WarehouseApproval.find(query)
       .populate('qualityControl', 'qcNumber qcDate')
-      .populate('invoiceReceiving', 'invoiceNumber invoiceDate')
-      .populate('purchaseOrder', 'poNumber poDate')
+      .populate({
+        path: 'invoiceReceiving',
+        select: 'invoiceNumber invoiceDate receivedDate receivedBy',
+        populate: {
+          path: 'purchaseOrder',
+          select: 'poNumber poDate',
+          populate: {
+            path: 'principal',
+            select: 'name email'
+          }
+        }
+      })
+      .populate('warehouse', 'name location')
       .populate('assignedTo', 'name email')
-      .populate('warehouseBy', 'name email')
+      .populate('warehouseTeam', 'name email')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
