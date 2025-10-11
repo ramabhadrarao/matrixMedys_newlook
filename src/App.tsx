@@ -68,6 +68,9 @@ import WarehousesList from './components/Warehouses/WarehousesList';
 import WarehouseForm from './components/Warehouses/WarehouseForm';
 import WarehouseDetails from './components/Warehouses/WarehouseDetails';
 
+// Quality Control Components
+import { QualityControlList, QualityControlDetails } from './components/QualityControl';
+
 import Settings from './components/Settings/Settings';
 import ChangePassword from './components/Settings/ChangePassword';
 import ProfileInformation from './components/Settings/ProfileInformation';
@@ -239,6 +242,10 @@ function App() {
           <Route path="workflow/stages/new" element={<WorkflowStageForm />} />
           <Route path="workflow/stages/:id/edit" element={<WorkflowStageForm />} />
           <Route path="workflow/stages/:id/permissions" element={<UserAssignmentModal isOpen={true} onClose={() => {}} stageId="" stageName="" />} />
+          
+          {/* Quality Control Routes */}
+          <Route path="quality-control" element={<QualityControlList />} />
+          <Route path="quality-control/:id" element={<QualityControlDetails />} />
           
             {/* States Routes - Moved to Settings/Masters */}
             <Route path="states" element={<StatesList />} />

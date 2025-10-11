@@ -3,6 +3,7 @@ import InvoiceReceiving from '../models/InvoiceReceiving.js';
 import PurchaseOrder from '../models/PurchaseOrder.js';
 import WorkflowStage from '../models/WorkflowStage.js';
 import pdfService from '../services/pdfService.js';
+import QualityControl from '../models/QualityControl.js';
 
 export const createInvoiceReceiving = async (req, res) => {
   try {
@@ -834,6 +835,74 @@ export const submitToQC = async (req, res) => {
           
           await po.save();
         }
+      }
+      
+      // Create QC record automatically
+      try {
+        // Check if QC record already exists
+        const existingQC = await QualityControl.findOne({ invoiceReceiving: id });
+        
+        if (!existingQC) {
+          // Generate QC Number
+          const qcCount = await QualityControl.countDocuments();
+          const qcNumber = `QC${String(qcCount + 1).padStart(6, '0')}`;
+          
+          // Create QC products from received products
+          const qcProducts = invoiceReceiving.products.map((product, index) => ({
+            invoiceReceivingProduct: product._id, // Reference to the invoice receiving product
+            product: product.product,
+            productCode: product.productCode,
+            productName: product.productName,
+            batchNo: product.batchNo,
+            mfgDate: product.mfgDate,
+            expDate: product.expDate,
+            receivedQty: product.receivedQty,
+            qcPendingQty: product.receivedQty, // Initially all received qty is pending QC
+            
+            // Create item details for each unit - using 'received_correctly' as default status
+            itemDetails: Array.from({ length: product.receivedQty }, (_, itemIndex) => ({
+              itemNumber: itemIndex + 1,
+              status: 'received_correctly', // Using valid enum value
+              reason: '',
+              remarks: ''
+            })),
+            
+            overallStatus: 'pending',
+            qcSummary: {
+              correctlyReceived: 0,
+              damaged: 0,
+              expired: 0,
+              nearExpiry: 0,
+              wrongProduct: 0,
+              wrongQuantity: 0,
+              other: 0
+            }
+          }));
+
+          // Create QC record
+          const qualityControl = new QualityControl({
+            invoiceReceiving: id,
+            qcNumber: qcNumber,
+            qcType: 'incoming_inspection', // Using valid enum value
+            priority: 'medium',
+            assignedTo: req.user._id,
+            products: qcProducts,
+            createdBy: req.user._id
+          });
+
+          await qualityControl.save();
+
+          // Update invoice receiving with QC reference
+          invoiceReceiving.qualityControl = qualityControl._id;
+          invoiceReceiving.workflowStatus = 'qc_in_progress';
+          invoiceReceiving.qcStatus = 'in_progress';
+          await invoiceReceiving.save();
+          
+          console.log(`QC record created automatically for invoice receiving ${id} with QC Number: ${qcNumber}`);
+        }
+      } catch (qcError) {
+        console.error('Error creating QC record:', qcError);
+        // Don't fail the entire operation if QC creation fails
       }
     }
     

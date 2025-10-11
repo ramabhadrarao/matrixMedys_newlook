@@ -19,37 +19,59 @@ import {
   BarChart3
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { qualityControlAPI } from '../../services/qualityControlAPI';
 import toast from 'react-hot-toast';
 import RoleBasedAccess from '../Auth/RoleBasedAccess';
 import { usePermissions } from '../../hooks/usePermissions';
 
 interface QualityControl {
   _id: string;
+  qcNumber: string;
   invoiceReceiving: {
     _id: string;
     invoiceNumber: string;
-    purchaseOrder: {
-      poNumber: string;
-      principal: {
-        name: string;
-      };
-    };
+    invoiceDate: string;
   };
-  status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
-  overallResult: 'pending' | 'passed' | 'failed' | 'partial';
-  qcBy?: {
+  status: 'pending' | 'in_progress' | 'completed' | 'on_hold' | 'cancelled';
+  qcType: 'incoming_inspection' | 'batch_testing' | 'random_sampling' | 'full_inspection';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  overallResult: 'pending' | 'passed' | 'failed' | 'partial_pass';
+  assignedTo?: {
+    _id: string;
     name: string;
+    email: string;
   };
-  approvedBy?: {
-    name: string;
-  };
-  createdAt: string;
-  submittedAt?: string;
-  approvedAt?: string;
-  items: Array<{
+  products: Array<{
+    _id: string;
+    product: string;
+    productCode: string;
     productName: string;
-    result: 'pending' | 'passed' | 'failed';
+    batchNo: string;
+    mfgDate: string | null;
+    expDate: string | null;
+    receivedQty: number;
+    qcPassedQty: number;
+    qcFailedQty: number;
+    qcPendingQty: number;
+    overallStatus: 'pending' | 'in_progress' | 'passed' | 'failed' | 'partial_pass';
+    itemDetails: Array<{
+      itemNumber: number;
+      status: string;
+      reason?: string;
+      remarks?: string;
+    }>;
+    qcSummary: {
+      correctlyReceived: number;
+      damaged: number;
+      expired: number;
+      nearExpiry: number;
+      wrongProduct: number;
+      wrongQuantity: number;
+      other: number;
+    };
   }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface QCFilters {
@@ -114,18 +136,11 @@ const QualityControlList: React.FC = () => {
   const loadQCRecords = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await qualityControlAPI.getAll(filters);
-      // setQcRecords(response.data);
-      // setTotalCount(response.totalCount);
-      // setTotalPages(response.totalPages);
-      // setCurrentPage(response.currentPage);
-      
-      // Mock data for now
-      setQcRecords([]);
-      setTotalCount(0);
-      setTotalPages(1);
-      setCurrentPage(1);
+      const response = await qualityControlAPI.getQCRecords(filters);
+      setQcRecords(response.data.qcRecords || []);
+      setTotalCount(response.data.totalCount || 0);
+      setTotalPages(response.data.totalPages || 1);
+      setCurrentPage(response.data.currentPage || 1);
     } catch (error) {
       console.error('Error loading QC records:', error);
       toast.error('Failed to load quality control records');
@@ -165,14 +180,14 @@ const QualityControlList: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-yellow-100 text-yellow-800';
       case 'in_progress':
         return 'bg-blue-100 text-blue-800';
-      case 'submitted':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'approved':
+      case 'completed':
         return 'bg-green-100 text-green-800';
-      case 'rejected':
+      case 'on_hold':
+        return 'bg-orange-100 text-orange-800';
+      case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -187,7 +202,7 @@ const QualityControlList: React.FC = () => {
         return 'bg-green-100 text-green-800';
       case 'failed':
         return 'bg-red-100 text-red-800';
-      case 'partial':
+      case 'partial_pass':
         return 'bg-yellow-100 text-yellow-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -200,11 +215,11 @@ const QualityControlList: React.FC = () => {
         return <Clock className="w-3 h-3" />;
       case 'in_progress':
         return <ClipboardCheck className="w-3 h-3" />;
-      case 'submitted':
-        return <FileText className="w-3 h-3" />;
-      case 'approved':
+      case 'completed':
         return <CheckCircle className="w-3 h-3" />;
-      case 'rejected':
+      case 'on_hold':
+        return <AlertTriangle className="w-3 h-3" />;
+      case 'cancelled':
         return <XCircle className="w-3 h-3" />;
       default:
         return <Clock className="w-3 h-3" />;
@@ -290,9 +305,9 @@ const QualityControlList: React.FC = () => {
                   <option value="">All Statuses</option>
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
+                  <option value="completed">Completed</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
 
@@ -307,7 +322,7 @@ const QualityControlList: React.FC = () => {
                   <option value="pending">Pending</option>
                   <option value="passed">Passed</option>
                   <option value="failed">Failed</option>
-                  <option value="partial">Partial</option>
+                  <option value="partial_pass">Partial Pass</option>
                 </select>
               </div>
 
@@ -390,7 +405,7 @@ const QualityControlList: React.FC = () => {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            QC-{qc._id.slice(-6).toUpperCase()}
+                            {qc.qcNumber}
                           </div>
                           <div className="text-sm text-gray-500">
                             Created {formatDate(qc.createdAt)}
@@ -404,10 +419,10 @@ const QualityControlList: React.FC = () => {
                         {qc.invoiceReceiving.invoiceNumber}
                       </div>
                       <div className="text-sm text-gray-500">
-                        PO: {qc.invoiceReceiving.purchaseOrder.poNumber}
+                        Date: {formatDate(qc.invoiceReceiving.invoiceDate)}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {qc.invoiceReceiving.purchaseOrder.principal.name}
+                        {qc.assignedTo?.name || 'Unassigned'}
                       </div>
                     </td>
                     
@@ -430,13 +445,13 @@ const QualityControlList: React.FC = () => {
                     
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {qc.items.filter(item => item.result !== 'pending').length} / {qc.items.length} items
+                        {qc.products.filter(product => product.overallStatus !== 'pending').length} / {qc.products.length} products
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                         <div 
                           className="bg-blue-600 h-2 rounded-full" 
                           style={{ 
-                            width: `${(qc.items.filter(item => item.result !== 'pending').length / qc.items.length) * 100}%` 
+                            width: `${(qc.products.filter(product => product.overallStatus !== 'pending').length / qc.products.length) * 100}%` 
                           }}
                         ></div>
                       </div>
@@ -479,7 +494,7 @@ const QualityControlList: React.FC = () => {
                     <ClipboardCheck className="w-6 h-6 text-blue-600 mr-2" />
                     <div>
                       <div className="font-medium text-gray-900">
-                        QC-{qc._id.slice(-6).toUpperCase()}
+                        {qc.qcNumber}
                       </div>
                       <div className="text-sm text-gray-500">
                         {formatDate(qc.createdAt)}
@@ -514,13 +529,13 @@ const QualityControlList: React.FC = () => {
                   </div>
                   
                   <div className="flex justify-between">
-                    <span className="text-gray-500">PO:</span>
-                    <span className="text-gray-900">{qc.invoiceReceiving.purchaseOrder.poNumber}</span>
+                    <span className="text-gray-500">Date:</span>
+                    <span className="text-gray-900">{formatDate(qc.invoiceReceiving.invoiceDate)}</span>
                   </div>
                   
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Principal:</span>
-                    <span className="text-gray-900">{qc.invoiceReceiving.purchaseOrder.principal.name}</span>
+                    <span className="text-gray-500">Assigned To:</span>
+                    <span className="text-gray-900">{qc.assignedTo?.name || 'Unassigned'}</span>
                   </div>
                   
                   <div className="flex justify-between items-center">
@@ -546,14 +561,14 @@ const QualityControlList: React.FC = () => {
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-gray-500">Progress:</span>
                       <span className="text-gray-900">
-                        {qc.items.filter(item => item.result !== 'pending').length} / {qc.items.length} items
+                        {qc.products.filter(product => product.overallStatus !== 'pending').length} / {qc.products.length} products
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="bg-blue-600 h-2 rounded-full" 
                         style={{ 
-                          width: `${(qc.items.filter(item => item.result !== 'pending').length / qc.items.length) * 100}%` 
+                          width: `${(qc.products.filter(product => product.overallStatus !== 'pending').length / qc.products.length) * 100}%` 
                         }}
                       ></div>
                     </div>

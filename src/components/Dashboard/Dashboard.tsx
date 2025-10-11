@@ -413,7 +413,7 @@ const Dashboard: React.FC = () => {
             
             return (
               <motion.div
-                key={card.id}
+                key={`card-${card.id}-${index}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -514,10 +514,10 @@ const Dashboard: React.FC = () => {
             ) : activities.length === 0 ? (
               <div className="text-gray-500 text-sm text-center py-4">No recent activity</div>
             ) : (
-              activities.slice(0, 6).map((activity) => {
+              activities.slice(0, 6).map((activity, index) => {
                 const ActivityIcon = iconMap[activity.icon as keyof typeof iconMap] || Activity;
                 return (
-                  <div key={activity.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                  <div key={`activity-${activity.id}-${index}`} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                     <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                       <ActivityIcon className="w-4 h-4 text-blue-600" />
                     </div>

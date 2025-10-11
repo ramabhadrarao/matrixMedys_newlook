@@ -132,6 +132,7 @@ export const getQCRecords = async (req, res) => {
       qcType,
       priority,
       assignedTo,
+      result, // Changed from overallResult to result
       page = 1,
       limit = 10,
       search,
@@ -145,6 +146,7 @@ export const getQCRecords = async (req, res) => {
     if (qcType) query.qcType = qcType;
     if (priority) query.priority = priority;
     if (assignedTo) query.assignedTo = assignedTo;
+    if (result) query.overallResult = result; // Map result parameter to overallResult field
 
     if (search) {
       query.$or = [
@@ -163,9 +165,8 @@ export const getQCRecords = async (req, res) => {
 
     const qcRecords = await QualityControl.find(query)
       .populate('invoiceReceiving', 'invoiceNumber invoiceDate')
-      .populate('purchaseOrder', 'poNumber poDate')
       .populate('assignedTo', 'name email')
-      .populate('qcBy', 'name email')
+      .populate('products.qcBy', 'name email')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
