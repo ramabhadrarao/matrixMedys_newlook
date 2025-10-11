@@ -936,9 +936,25 @@ export const updateQCStatus = async (req, res) => {
       
       await invoiceReceiving.save();
       
+      // Populate related fields and transform data like getInvoiceReceiving does
+      const populatedReceiving = await InvoiceReceiving.findById(id)
+        .populate('purchaseOrder', 'poNumber status supplier')
+        .populate('receivedBy', 'name email')
+        .populate('qcBy', 'name email')
+        .lean();
+      
+      // Transform the data to match frontend expectations
+      const transformedReceiving = {
+        ...populatedReceiving,
+        receivedProducts: populatedReceiving.products, // Map products to receivedProducts for frontend
+        supplier: populatedReceiving.purchaseOrder?.supplier || 'Unknown Supplier',
+        notes: populatedReceiving.notes || '',
+        qcRequired: populatedReceiving.qcRequired !== undefined ? populatedReceiving.qcRequired : true
+      };
+      
       res.json({
         message: 'Product QC status updated successfully',
-        data: invoiceReceiving
+        data: transformedReceiving
       });
     } else {
       res.status(400).json({ message: 'Invalid product index' });
