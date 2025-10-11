@@ -14,10 +14,12 @@ import {
   ClipboardCheck,
   Send,
   User,
-  TrendingUp
+  TrendingUp,
+  Truck
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { qualityControlAPI } from '../../services/qualityControlAPI';
+import { warehouseApprovalAPI } from '../../services/warehouseApprovalAPI';
 import toast from 'react-hot-toast';
 
 interface QCItemDetail {
@@ -122,6 +124,7 @@ const QualityControlDetails: React.FC = () => {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalRemarks, setApprovalRemarks] = useState('');
+  const [sendingToWarehouse, setSendingToWarehouse] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -284,6 +287,33 @@ const QualityControlDetails: React.FC = () => {
            qc && (qc.status === 'pending' || qc.status === 'in_progress');
   };
 
+  const canSendToWarehouse = () => {
+    return hasPermission('warehouse_approval', 'create') && 
+           qc && qc.status === 'completed' &&
+           qc.products.some(p => p.overallStatus === 'passed' || p.overallStatus === 'partial_pass');
+  };
+
+  const sendToWarehouseApproval = async () => {
+    if (!qc) return;
+
+    try {
+      setSendingToWarehouse(true);
+      const response = await warehouseApprovalAPI.createWarehouseApprovalFromQC(qc._id);
+      
+      if (response.success) {
+        toast.success('Successfully sent to warehouse approval');
+        navigate(`/warehouse-approval/${response.data._id}`);
+      } else {
+        toast.error(response.message || 'Failed to send to warehouse approval');
+      }
+    } catch (error: any) {
+      console.error('Error sending to warehouse approval:', error);
+      toast.error(error.message || 'Failed to send to warehouse approval');
+    } finally {
+      setSendingToWarehouse(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -365,6 +395,17 @@ const QualityControlDetails: React.FC = () => {
             >
               <Send className="w-4 h-4 mr-2" />
               {submitting ? 'Submitting...' : 'Submit for Approval'}
+            </button>
+          )}
+          
+          {canSendToWarehouse() && (
+            <button
+              onClick={sendToWarehouseApproval}
+              disabled={sendingToWarehouse}
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              <Truck className="w-4 h-4 mr-2" />
+              {sendingToWarehouse ? 'Sending...' : 'Send to Warehouse Approval'}
             </button>
           )}
           
@@ -516,7 +557,7 @@ const QualityControlDetails: React.FC = () => {
         {activeTab === 'products' && (
           <div className="p-6">
             <div className="space-y-6">
-              {qc.products.map((product, index) => (
+              {qc.products.filter(product => product.receivedQty > 0).map((product, index) => (
                 <div key={index} className="border border-gray-200 rounded-lg p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">

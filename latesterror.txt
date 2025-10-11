@@ -1,119 +1,18 @@
 react-dom.development.js:29895 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
-WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
-    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
-    at renderWithHooks (react-dom.development.js:15486:18)
-    at mountIndeterminateComponent (react-dom.development.js:20103:13)
-    at beginWork (react-dom.development.js:21626:16)
-    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
-    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
-    at invokeGuardedCallback (react-dom.development.js:4277:31)
-    at beginWork$1 (react-dom.development.js:27490:7)
-    at performUnitOfWork (react-dom.development.js:26596:12)
-    at workLoopSync (react-dom.development.js:26505:5)
-WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
-    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
-    at renderWithHooks (react-dom.development.js:15486:18)
-    at mountIndeterminateComponent (react-dom.development.js:20103:13)
-    at beginWork (react-dom.development.js:21626:16)
-    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
-    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
-    at invokeGuardedCallback (react-dom.development.js:4277:31)
-    at beginWork$1 (react-dom.development.js:27490:7)
-    at performUnitOfWork (react-dom.development.js:26596:12)
-    at workLoopSync (react-dom.development.js:26505:5)
-WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
-    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
-    at renderWithHooks (react-dom.development.js:15486:18)
-    at mountIndeterminateComponent (react-dom.development.js:20103:13)
-    at beginWork (react-dom.development.js:21626:16)
-    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
-    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
-    at invokeGuardedCallback (react-dom.development.js:4277:31)
-    at beginWork$1 (react-dom.development.js:27490:7)
-    at performUnitOfWork (react-dom.development.js:26596:12)
-    at workLoopSync (react-dom.development.js:26505:5)
-WarehouseApprovalDetails.tsx:1097  Uncaught ReferenceError: formatDate is not defined
-    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
-    at renderWithHooks (react-dom.development.js:15486:18)
-    at mountIndeterminateComponent (react-dom.development.js:20103:13)
-    at beginWork (react-dom.development.js:21626:16)
-    at HTMLUnknownElement.callCallback2 (react-dom.development.js:4164:14)
-    at Object.invokeGuardedCallbackDev (react-dom.development.js:4213:16)
-    at invokeGuardedCallback (react-dom.development.js:4277:31)
-    at beginWork$1 (react-dom.development.js:27490:7)
-    at performUnitOfWork (react-dom.development.js:26596:12)
-    at workLoopSync (react-dom.development.js:26505:5)
-react-dom.development.js:18704  The above error occurred in the <ProductCheckDisplay> component:
-
-    at ProductCheckDisplay (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:1593:32)
-    at div
-    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
-    at div
-    at div
-    at div
-    at div
-    at WarehouseApprovalDetails (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:36:20)
-    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
-    at Outlet (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4494:26)
-    at div
-    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
-    at main
-    at div
-    at div
-    at Layout (http://localhost:5173/src/components/Layout/Layout.tsx?t=1760172890836:26:41)
-    at ProtectedRoute (http://localhost:5173/src/App.tsx?t=1760172890836:71:27)
-    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
-    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4558:5)
-    at div
-    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4501:15)
-    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:5247:5)
-    at App (http://localhost:5173/src/App.tsx?t=1760172890836:113:68)
-
-Consider adding an error boundary to your tree to customize error handling behavior.
-Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
-logCapturedError @ react-dom.development.js:18704
-react-dom.development.js:18704  The above error occurred in the <ProductCheckDisplay> component:
-
-    at ProductCheckDisplay (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:1593:32)
-    at div
-    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
-    at div
-    at div
-    at div
-    at div
-    at WarehouseApprovalDetails (http://localhost:5173/src/components/Warehouses/WarehouseApprovalDetails.tsx:36:20)
-    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
-    at Outlet (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4494:26)
-    at div
-    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=9ea9f8ed:945:40)
-    at main
-    at div
-    at div
-    at Layout (http://localhost:5173/src/components/Layout/Layout.tsx?t=1760172890836:26:41)
-    at ProtectedRoute (http://localhost:5173/src/App.tsx?t=1760172890836:71:27)
-    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4088:5)
-    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4558:5)
-    at div
-    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:4501:15)
-    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9ea9f8ed:5247:5)
-    at App (http://localhost:5173/src/App.tsx?t=1760172890836:113:68)
-
-Consider adding an error boundary to your tree to customize error handling behavior.
-Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
-logCapturedError @ react-dom.development.js:18704
-react-dom.development.js:26962  Uncaught ReferenceError: formatDate is not defined
-    at ProductCheckDisplay (WarehouseApprovalDetails.tsx:1097:63)
-    at renderWithHooks (react-dom.development.js:15486:18)
-    at mountIndeterminateComponent (react-dom.development.js:20103:13)
-    at beginWork (react-dom.development.js:21626:16)
-    at beginWork$1 (react-dom.development.js:27465:14)
-    at performUnitOfWork (react-dom.development.js:26596:12)
-    at workLoopSync (react-dom.development.js:26505:5)
-    at renderRootSync (react-dom.development.js:26473:7)
-    at recoverFromConcurrentError (react-dom.development.js:25889:20)
-    at performConcurrentWorkOnRoot (react-dom.development.js:25789:22)
-[NEW] Explain Console errors by using Copilot in Edge: click
-         
-         to explain an error. 
-        Learn more
-        Don't show again
+api.ts:28 API POST Request: Object
+api.ts:498 Fetching dashboard statistics...
+api.ts:511 Fetching recent activity...
+api.ts:498 Fetching dashboard statistics...
+api.ts:511 Fetching recent activity...
+api.ts:515 Recent activity response: Object
+api.ts:515 Recent activity response: Object
+api.ts:500 Dashboard stats response: Object
+api.ts:500 Dashboard stats response: Object
+QualityControlList.tsx:127 Fetching QC records with filters: Object
+QualityControlList.tsx:127 Fetching QC records with filters: Object
+QualityControlList.tsx:131 QC API Response: Object
+QualityControlList.tsx:138 First QC record: Object
+QualityControlList.tsx:131 QC API Response: Object
+QualityControlList.tsx:138 First QC record: ObjectassignedTo: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}id: "68ea0d7da689ee01dafe5258"invoiceReceiving: {_id: '68ea0c1b43f0f2640131cd0a', invoiceNumber: 'test', invoiceDate: '2025-10-09T00:00:00.000Z'}purchaseOrder: undefinedqcNumber: "QC000002"[[Prototype]]: Object
+QualityControlDetails.tsx:141 QC Record loaded: ObjectapprovalStatus: "pending"approvals: []assignedTo: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}checklist: []createdAt: "2025-10-11T07:55:41.612Z"createdBy: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}invoiceReceiving: {_id: '68ea0c1b43f0f2640131cd0a', invoiceNumber: 'test', invoiceDate: '2025-10-09T00:00:00.000Z', receivedBy: '68c840bc1875fdbb69fab00f'}overallResult: "pending"priority: "medium"products: (2) [{…}, {…}]qcDocuments: []qcEnvironment: {lightCondition: 'normal'}qcNumber: "QC000002"qcReport: {approvalRequired: false}qcTeam: []qcType: "standard"status: "in_progress"updatedAt: "2025-10-11T15:32:07.032Z"updatedBy: "68c840bc1875fdbb69fab00f"__v: 4_id: "68ea0d7da689ee01dafe5258"[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+QualityControlDetails.tsx:141 QC Record loaded: ObjectapprovalStatus: "pending"approvals: []assignedTo: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}checklist: []createdAt: "2025-10-11T07:55:41.612Z"createdBy: {_id: '68c840bc1875fdbb69fab00f', name: 'System Administrator', email: 'admin@matrixmedys.com'}invoiceReceiving: {_id: '68ea0c1b43f0f2640131cd0a', invoiceNumber: 'test', invoiceDate: '2025-10-09T00:00:00.000Z', receivedBy: '68c840bc1875fdbb69fab00f'}overallResult: "pending"priority: "medium"products: (2) [{…}, {…}]qcDocuments: []qcEnvironment: {lightCondition: 'normal'}qcNumber: "QC000002"qcReport: {approvalRequired: false}qcTeam: []qcType: "standard"status: "in_progress"updatedAt: "2025-10-11T15:32:07.032Z"updatedBy: "68c840bc1875fdbb69fab00f"__v: 4_id: "68ea0d7da689ee01dafe5258"[[Prototype]]: Object

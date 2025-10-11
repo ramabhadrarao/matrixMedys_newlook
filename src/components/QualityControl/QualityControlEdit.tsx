@@ -225,38 +225,42 @@ const QualityControlEdit: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <h3 className="font-semibold text-gray-900 mb-4">Products</h3>
             <div className="space-y-2">
-              {products.map((product, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setSelectedProduct(index);
-                    setSelectedItem(null);
-                  }}
-                  className={`w-full text-left p-3 rounded-lg transition-colors ${
-                    selectedProduct === index
-                      ? 'bg-blue-50 border-blue-200'
-                      : 'hover:bg-gray-50'
-                  } border`}
-                >
-                  <div className="font-medium text-gray-900 text-sm">
-                    {product.productName}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {product.productCode} | Batch: {product.batchNo}
-                  </div>
-                  <div className="flex items-center space-x-2 mt-2">
-                    <span className="text-xs text-green-600">
-                      ✓ {product.passedQty}
-                    </span>
-                    <span className="text-xs text-red-600">
-                      ✗ {product.failedQty}
-                    </span>
-                    <span className="text-xs text-gray-600">
-                      ○ {product.receivedQty - product.passedQty - product.failedQty}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              {products.filter(product => product.receivedQty > 0).map((product, index) => {
+                // Get the original index for state management
+                const originalIndex = products.findIndex(p => p === product);
+                return (
+                  <button
+                    key={originalIndex}
+                    onClick={() => {
+                      setSelectedProduct(originalIndex);
+                      setSelectedItem(null);
+                    }}
+                    className={`w-full text-left p-3 rounded-lg transition-colors ${
+                      selectedProduct === originalIndex
+                        ? 'bg-blue-50 border-blue-200'
+                        : 'hover:bg-gray-50'
+                    } border`}
+                  >
+                    <div className="font-medium text-gray-900 text-sm">
+                      {product.productName}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {product.productCode} | Batch: {product.batchNo}
+                    </div>
+                    <div className="flex items-center space-x-2 mt-2">
+                      <span className="text-xs text-green-600">
+                        ✓ {product.passedQty}
+                      </span>
+                      <span className="text-xs text-red-600">
+                        ✗ {product.failedQty}
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        ○ {product.receivedQty - product.passedQty - product.failedQty}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

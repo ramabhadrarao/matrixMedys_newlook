@@ -7,6 +7,7 @@ import { checkPermission } from '../middleware/permissions.js';
 import {
   getWarehouseApproval,
   getWarehouseApprovals,
+  createWarehouseApproval,
   updateProductWarehouseCheck,
   submitForManagerApproval,
   approveWarehouseApproval,
@@ -133,4 +134,16 @@ router.post('/:id/reject',
   rejectWarehouseApproval
 );
 
+// Create warehouse approval from QC record - MUST be before /:id
+router.post('/from-qc/:qcId', 
+  authenticate, 
+  checkPermission('warehouse_approval', 'create'),
+  [
+    param('qcId').isMongoId(),
+    body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']),
+    body('assignedTo').optional().isMongoId()
+  ],
+  validate,
+  createWarehouseApproval
+);
 export default router;

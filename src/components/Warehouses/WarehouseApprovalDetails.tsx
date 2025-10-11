@@ -27,88 +27,8 @@ import {
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
 import { formatDate } from '../../utils/helpers';
+import { warehouseApprovalAPI, WarehouseApproval, WarehouseApprovalProduct } from '../../services/warehouseApprovalAPI';
 import toast from 'react-hot-toast';
-
-interface ProductCheck {
-  _id: string;
-  productId: string;
-  productName: string;
-  category: string;
-  receivedQty: number;
-  unit: string;
-  batchNumber?: string;
-  expiryDate?: string;
-  status: 'pending' | 'approved' | 'rejected';
-  checkedBy?: {
-    name: string;
-  };
-  checkedAt?: string;
-  remarks?: string;
-  images: Array<{
-    filename: string;
-    originalName: string;
-    uploadedAt: string;
-  }>;
-  physicalCondition: {
-    packaging: 'good' | 'damaged' | 'acceptable';
-    labeling: 'correct' | 'incorrect' | 'missing';
-    appearance: 'normal' | 'abnormal' | 'acceptable';
-  };
-  quantityVerification: {
-    actualQty: number;
-    variance: number;
-    acceptable: boolean;
-  };
-  documentationStatus: {
-    invoiceMatch: boolean;
-    poMatch: boolean;
-    certificatesAvailable: boolean;
-  };
-}
-
-interface WarehouseApproval {
-  _id: string;
-  invoiceReceiving: {
-    _id: string;
-    invoiceNumber: string;
-    receivedDate: string;
-    purchaseOrder: {
-      _id: string;
-      poNumber: string;
-      principal: {
-        name: string;
-        email: string;
-        phone?: string;
-      };
-    };
-    warehouse: {
-      name: string;
-      location: string;
-    };
-    receivedBy: {
-      name: string;
-    };
-  };
-  status: 'pending' | 'submitted' | 'approved' | 'rejected';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  productChecks: ProductCheck[];
-  submittedBy?: {
-    name: string;
-  };
-  approvedBy?: {
-    name: string;
-  };
-  submittedAt?: string;
-  approvedAt?: string;
-  rejectionReason?: string;
-  managerRemarks?: string;
-  totalItems: number;
-  approvedItems: number;
-  rejectedItems: number;
-  pendingItems: number;
-  createdAt: string;
-  updatedAt: string;
-}
 
 const WarehouseApprovalDetails: React.FC = () => {
   const navigate = useNavigate();
@@ -138,141 +58,8 @@ const WarehouseApprovalDetails: React.FC = () => {
   const loadWarehouseApproval = async (approvalId: string) => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await warehouseApprovalAPI.getById(approvalId);
-      // setApproval(response.data);
-      
-      // Mock data for now
-      const mockApproval: WarehouseApproval = {
-        _id: approvalId,
-        invoiceReceiving: {
-          _id: 'ir1',
-          invoiceNumber: 'INV-2024-001',
-          receivedDate: '2024-01-15T10:30:00Z',
-          purchaseOrder: {
-            _id: 'po1',
-            poNumber: 'PO-2024-001',
-            principal: {
-              name: 'MedSupply Corp',
-              email: 'orders@medsupply.com',
-              phone: '+1-555-0123'
-            }
-          },
-          warehouse: {
-            name: 'Main Warehouse',
-            location: 'Building A, Floor 1'
-          },
-          receivedBy: {
-            name: 'John Doe'
-          }
-        },
-        status: 'submitted',
-        priority: 'high',
-        productChecks: [
-          {
-            _id: 'pc1',
-            productId: 'p1',
-            productName: 'Surgical Gloves - Latex Free',
-            category: 'Medical Supplies',
-            receivedQty: 100,
-            unit: 'boxes',
-            batchNumber: 'SG2024001',
-            expiryDate: '2025-12-31T00:00:00Z',
-            status: 'approved',
-            checkedBy: {
-              name: 'Jane Smith'
-            },
-            checkedAt: '2024-01-15T11:00:00Z',
-            remarks: 'All items in good condition, packaging intact',
-            images: [],
-            physicalCondition: {
-              packaging: 'good',
-              labeling: 'correct',
-              appearance: 'normal'
-            },
-            quantityVerification: {
-              actualQty: 100,
-              variance: 0,
-              acceptable: true
-            },
-            documentationStatus: {
-              invoiceMatch: true,
-              poMatch: true,
-              certificatesAvailable: true
-            }
-          },
-          {
-            _id: 'pc2',
-            productId: 'p2',
-            productName: 'Syringes 10ml Disposable',
-            category: 'Medical Devices',
-            receivedQty: 500,
-            unit: 'pieces',
-            batchNumber: 'SY2024002',
-            expiryDate: '2026-06-30T00:00:00Z',
-            status: 'pending',
-            images: [],
-            physicalCondition: {
-              packaging: 'good',
-              labeling: 'correct',
-              appearance: 'normal'
-            },
-            quantityVerification: {
-              actualQty: 495,
-              variance: -5,
-              acceptable: true
-            },
-            documentationStatus: {
-              invoiceMatch: true,
-              poMatch: true,
-              certificatesAvailable: false
-            }
-          },
-          {
-            _id: 'pc3',
-            productId: 'p3',
-            productName: 'Bandages Elastic 4 inch',
-            category: 'Medical Supplies',
-            receivedQty: 200,
-            unit: 'rolls',
-            batchNumber: 'BE2024003',
-            status: 'rejected',
-            checkedBy: {
-              name: 'Bob Wilson'
-            },
-            checkedAt: '2024-01-15T12:30:00Z',
-            remarks: 'Packaging damaged, some items exposed to moisture',
-            images: [],
-            physicalCondition: {
-              packaging: 'damaged',
-              labeling: 'correct',
-              appearance: 'acceptable'
-            },
-            quantityVerification: {
-              actualQty: 200,
-              variance: 0,
-              acceptable: true
-            },
-            documentationStatus: {
-              invoiceMatch: true,
-              poMatch: true,
-              certificatesAvailable: true
-            }
-          }
-        ],
-        submittedBy: {
-          name: 'John Doe'
-        },
-        submittedAt: '2024-01-15T13:00:00Z',
-        totalItems: 3,
-        approvedItems: 1,
-        rejectedItems: 1,
-        pendingItems: 1,
-        createdAt: '2024-01-15T10:30:00Z',
-        updatedAt: '2024-01-15T13:00:00Z'
-      };
-      
-      setApproval(mockApproval);
+      const response = await warehouseApprovalAPI.getWarehouseApproval(approvalId);
+      setApproval(response.data);
     } catch (error) {
       console.error('Error loading warehouse approval:', error);
       toast.error('Failed to load warehouse approval details');
@@ -281,21 +68,33 @@ const WarehouseApprovalDetails: React.FC = () => {
     }
   };
 
-  const updateProductCheck = async (productId: string, updates: Partial<ProductCheck>) => {
+  const updateProductCheck = async (productId: string, updates: Partial<WarehouseApprovalProduct>) => {
     if (!approval) return;
 
     try {
       setSaving(true);
-      // TODO: Replace with actual API call
-      // await warehouseApprovalAPI.updateProductCheck(approval._id, productId, updates);
+      // Find the product index in the products array
+      const productIndex = approval.products.findIndex(p => p.product === productId);
+      if (productIndex === -1) {
+        toast.error('Product not found');
+        return;
+      }
+
+      // Call the API to update the product
+      await warehouseApprovalAPI.updateProductWarehouseCheck(approval._id, productIndex, {
+        warehouseDecision: updates.warehouseDecision || 'approved',
+        warehouseRemarks: updates.warehouseRemarks,
+        approvedQty: updates.approvedQty,
+        storageLocation: updates.storageLocation
+      });
       
       // Update local state
       setApproval(prev => {
         if (!prev) return prev;
         return {
           ...prev,
-          productChecks: prev.productChecks.map(product => 
-            product._id === productId ? { ...product, ...updates } : product
+          products: prev.products.map(product =>
+            product.product === productId ? { ...product, ...updates } : product
           )
         };
       });
@@ -314,19 +113,34 @@ const WarehouseApprovalDetails: React.FC = () => {
     if (!bulkAction || selectedProducts.length === 0 || !approval) return;
 
     try {
-      // TODO: Replace with actual API call
-      // await warehouseApprovalAPI.bulkUpdateProducts(approval._id, selectedProducts, bulkAction);
+      // Update each product
+      for (const productId of selectedProducts) {
+        const productIndex = approval.products.findIndex(p => p.product === productId);
+        if (productIndex !== -1) {
+          await warehouseApprovalAPI.updateProductWarehouseCheck(approval._id, productIndex, {
+            warehouseDecision: bulkAction as 'approved' | 'rejected',
+            warehouseRemarks: `Bulk ${bulkAction} by ${user?.name || 'Current User'}`,
+            approvedQty: bulkAction === 'approved' ? approval.products[productIndex].qcPassedQty : 0,
+            storageLocation: bulkAction === 'approved' ? approval.products[productIndex].storageLocation : undefined
+          });
+        }
+      }
       
       // Update local state
       setApproval(prev => {
         if (!prev) return prev;
         return {
           ...prev,
-          productChecks: prev.productChecks.map(product => 
-            selectedProducts.includes(product._id) 
-              ? { ...product, status: bulkAction as any, checkedBy: { name: user?.name || 'Current User' }, checkedAt: new Date().toISOString() }
-              : product
-          )
+          products: prev.products.map(product => 
+          selectedProducts.includes(product.product) 
+            ? { 
+                ...product, 
+                warehouseDecision: bulkAction as 'approved' | 'rejected',
+                warehouseRemarks: `Bulk ${bulkAction} by ${user?.name || 'Current User'}`,
+                approvedQty: bulkAction === 'approved' ? product.qcPassedQty : 0
+              }
+            : product
+        )
         };
       });
       
@@ -454,7 +268,7 @@ const WarehouseApprovalDetails: React.FC = () => {
   const canSubmit = () => {
     return hasPermission('warehouse_approval', 'submit') && 
            approval && approval.status === 'pending' &&
-           approval.productChecks.every(product => product.status !== 'pending');
+           approval.products.every(product => product.warehouseDecision && product.warehouseDecision !== 'pending');
   };
 
   const canApprove = () => {
@@ -462,11 +276,11 @@ const WarehouseApprovalDetails: React.FC = () => {
            approval && approval.status === 'submitted';
   };
 
-  const filteredProducts = approval?.productChecks.filter(product => {
+  const filteredProducts = approval?.products.filter(product => {
     const matchesSearch = product.productName.toLowerCase().includes(productFilter.toLowerCase()) ||
-                         product.category.toLowerCase().includes(productFilter.toLowerCase()) ||
-                         (product.batchNumber && product.batchNumber.toLowerCase().includes(productFilter.toLowerCase()));
-    const matchesStatus = !statusFilter || product.status === statusFilter;
+                          product.productCode.toLowerCase().includes(productFilter.toLowerCase()) ||
+                          (product.batchNo && product.batchNo.toLowerCase().includes(productFilter.toLowerCase()));
+    const matchesStatus = !statusFilter || product.warehouseDecision === statusFilter;
     return matchesSearch && matchesStatus;
   }) || [];
 
@@ -671,7 +485,7 @@ const WarehouseApprovalDetails: React.FC = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Product Checks ({approval.productChecks.length})
+              Products ({approval.products.length})
             </button>
             
             <button
@@ -758,7 +572,7 @@ const WarehouseApprovalDetails: React.FC = () => {
             <div className="space-y-4">
               {filteredProducts.map((product) => (
                 <motion.div
-                  key={product._id}
+                  key={product.product}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="border border-gray-200 rounded-lg p-6"
@@ -768,12 +582,12 @@ const WarehouseApprovalDetails: React.FC = () => {
                       {canEditProducts() && (
                         <input
                           type="checkbox"
-                          checked={selectedProducts.includes(product._id)}
+                          checked={selectedProducts.includes(product.product)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedProducts(prev => [...prev, product._id]);
+                              setSelectedProducts(prev => [...prev, product.product]);
                             } else {
-                              setSelectedProducts(prev => prev.filter(id => id !== product._id));
+                              setSelectedProducts(prev => prev.filter(id => id !== product.product));
                             }
                           }}
                           className="mt-1 rounded border-gray-300"
@@ -783,42 +597,42 @@ const WarehouseApprovalDetails: React.FC = () => {
                       <div className="flex-1">
                         <h4 className="text-lg font-medium text-gray-900">{product.productName}</h4>
                         <div className="text-sm text-gray-500 mt-1">
-                          Category: {product.category} | Qty: {product.receivedQty} {product.unit}
-                          {product.batchNumber && ` | Batch: ${product.batchNumber}`}
-                          {product.expiryDate && ` | Expires: ${formatDateLocal(product.expiryDate)}`}
+                          Code: {product.productCode} | QC Passed: {product.qcPassedQty} | Warehouse: {product.warehouseQty}
+                          {product.batchNo && ` | Batch: ${product.batchNo}`}
+                          {product.expDate && ` | Expires: ${formatDateLocal(product.expDate)}`}
                         </div>
                       </div>
                     </div>
                     
                     <div className="flex items-center space-x-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        getStatusColor(product.status)
+                        getStatusColor(product.warehouseDecision || 'pending')
                       }`}>
-                        {getStatusIcon(product.status)}
-                        <span className="ml-1 capitalize">{product.status}</span>
+                        {getStatusIcon(product.warehouseDecision || 'pending')}
+                        <span className="ml-1 capitalize">{product.warehouseDecision || 'pending'}</span>
                       </span>
                       
                       {canEditProducts() && (
                         <button
-                          onClick={() => setEditingProduct(editingProduct === product._id ? null : product._id)}
+                          onClick={() => setEditingProduct(editingProduct === product.product ? null : product.product)}
                           className="inline-flex items-center px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                         >
                           <Edit className="w-4 h-4 mr-1" />
-                          {editingProduct === product._id ? 'Cancel' : 'Edit'}
+                          {editingProduct === product.product ? 'Cancel' : 'Edit'}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {editingProduct === product._id ? (
-                    <ProductCheckEditForm
+                  {editingProduct === product.product ? (
+                    <WarehouseProductEditForm
                       product={product}
-                      onSave={(updates) => updateProductCheck(product._id, updates)}
+                      onSave={(updates) => updateProductCheck(product.product, updates)}
                       onCancel={() => setEditingProduct(null)}
                       saving={saving}
                     />
                   ) : (
-                    <ProductCheckDisplay product={product} />
+                    <WarehouseProductDisplay product={product} />
                   )}
                 </motion.div>
               ))}
@@ -984,158 +798,104 @@ const WarehouseApprovalDetails: React.FC = () => {
   );
 };
 
-// Product Check Display Component
-const ProductCheckDisplay: React.FC<{ product: ProductCheck }> = ({ product }) => {
+// Warehouse Product Display Component
+const WarehouseProductDisplay: React.FC<{ product: WarehouseApprovalProduct }> = ({ product }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Physical Condition */}
+      {/* Quantity Information */}
       <div>
-        <h5 className="font-medium text-gray-900 mb-3">Physical Condition</h5>
+           <h5 className="font-medium text-gray-900 mb-3">Quantity Information</h5>
+           <div className="space-y-2">
+             <div className="flex justify-between">
+               <span className="text-sm text-gray-600">QC Passed:</span>
+               <span className="text-sm font-medium text-gray-900">{product.qcPassedQty}</span>
+             </div>
+             <div className="flex justify-between">
+               <span className="text-sm text-gray-600">Warehouse Qty:</span>
+               <span className="text-sm font-medium text-gray-900">{product.warehouseQty}</span>
+             </div>
+             <div className="flex justify-between">
+               <span className="text-sm text-gray-600">Approved:</span>
+               <span className="text-sm font-medium text-gray-900">{product.approvedQty || 0}</span>
+             </div>
+           </div>
+         </div>
+
+      {/* Storage Information */}
+      <div>
+        <h5 className="font-medium text-gray-900 mb-3">Storage Information</h5>
         <div className="space-y-2">
           <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Packaging:</span>
-            <span className={`text-sm font-medium ${
-              product.physicalCondition.packaging === 'good' ? 'text-green-600' :
-              product.physicalCondition.packaging === 'damaged' ? 'text-red-600' : 'text-yellow-600'
-            }`}>
-              {product.physicalCondition.packaging}
-            </span>
+            <span className="text-sm text-gray-600">Location:</span>
+            <span className="text-sm font-medium text-gray-900">{product.storageLocation || 'Not assigned'}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Labeling:</span>
-            <span className={`text-sm font-medium ${
-              product.physicalCondition.labeling === 'correct' ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {product.physicalCondition.labeling}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Appearance:</span>
-            <span className={`text-sm font-medium ${
-              product.physicalCondition.appearance === 'normal' ? 'text-green-600' :
-              product.physicalCondition.appearance === 'abnormal' ? 'text-red-600' : 'text-yellow-600'
-            }`}>
-              {product.physicalCondition.appearance}
-            </span>
-          </div>
+          {product.batchNo && (
+             <div className="flex justify-between">
+               <span className="text-sm text-gray-600">Batch:</span>
+               <span className="text-sm font-medium text-gray-900">{product.batchNo}</span>
+             </div>
+           )}
+           {product.expDate && (
+             <div className="flex justify-between">
+               <span className="text-sm text-gray-600">Expiry:</span>
+               <span className="text-sm font-medium text-gray-900">{formatDateLocal(product.expDate)}</span>
+             </div>
+           )}
         </div>
       </div>
 
-      {/* Quantity Verification */}
+      {/* Decision Information */}
       <div>
-        <h5 className="font-medium text-gray-900 mb-3">Quantity Verification</h5>
+        <h5 className="font-medium text-gray-900 mb-3">Warehouse Decision</h5>
         <div className="space-y-2">
           <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Expected:</span>
-            <span className="text-sm font-medium text-gray-900">{product.receivedQty}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Actual:</span>
-            <span className="text-sm font-medium text-gray-900">{product.quantityVerification.actualQty}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Variance:</span>
+            <span className="text-sm text-gray-600">Status:</span>
             <span className={`text-sm font-medium ${
-              product.quantityVerification.variance === 0 ? 'text-green-600' : 'text-yellow-600'
+              product.warehouseDecision === 'approved' ? 'text-green-600' :
+              product.warehouseDecision === 'rejected' ? 'text-red-600' : 'text-yellow-600'
             }`}>
-              {product.quantityVerification.variance > 0 ? '+' : ''}{product.quantityVerification.variance}
+              {product.warehouseDecision || 'Pending'}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Acceptable:</span>
-            <span className={`text-sm font-medium ${
-              product.quantityVerification.acceptable ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {product.quantityVerification.acceptable ? 'Yes' : 'No'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Documentation Status */}
-      <div>
-        <h5 className="font-medium text-gray-900 mb-3">Documentation</h5>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Invoice Match:</span>
-            <span className={`text-sm font-medium ${
-              product.documentationStatus.invoiceMatch ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {product.documentationStatus.invoiceMatch ? 'Yes' : 'No'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">PO Match:</span>
-            <span className={`text-sm font-medium ${
-              product.documentationStatus.poMatch ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {product.documentationStatus.poMatch ? 'Yes' : 'No'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Certificates:</span>
-            <span className={`text-sm font-medium ${
-              product.documentationStatus.certificatesAvailable ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {product.documentationStatus.certificatesAvailable ? 'Available' : 'Missing'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Remarks and Check Info */}
-      {(product.remarks || product.checkedBy) && (
-        <div className="md:col-span-3">
-          {product.remarks && (
-            <div className="mb-4">
-              <h5 className="font-medium text-gray-900 mb-2">Remarks</h5>
-              <p className="text-sm text-gray-700 bg-gray-50 rounded p-3">{product.remarks}</p>
-            </div>
-          )}
-          
-          {product.checkedBy && (
-            <div className="text-sm text-gray-500">
-              Checked by {product.checkedBy.name} on {product.checkedAt && formatDate(product.checkedAt)}
+          {product.warehouseRemarks && (
+            <div>
+              <span className="text-sm text-gray-600">Remarks:</span>
+              <p className="text-sm text-gray-700 mt-1">{product.warehouseRemarks}</p>
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
 
-// Product Check Edit Form Component
-const ProductCheckEditForm: React.FC<{
-  product: ProductCheck;
-  onSave: (updates: Partial<ProductCheck>) => void;
+// Warehouse Product Edit Form Component
+const WarehouseProductEditForm: React.FC<{
+  product: WarehouseApprovalProduct;
+  onSave: (updates: Partial<WarehouseApprovalProduct>) => void;
   onCancel: () => void;
   saving: boolean;
 }> = ({ product, onSave, onCancel, saving }) => {
   const [formData, setFormData] = useState({
-    status: product.status,
-    physicalCondition: { ...product.physicalCondition },
-    quantityVerification: { ...product.quantityVerification },
-    documentationStatus: { ...product.documentationStatus },
-    remarks: product.remarks || ''
+    warehouseDecision: product.warehouseDecision || 'pending',
+    approvedQty: product.approvedQty || product.qcPassedQty,
+    storageLocation: product.storageLocation?.warehouse || '',
+    warehouseRemarks: product.warehouseRemarks || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...formData,
-      checkedBy: { name: 'Current User' }, // TODO: Get from auth store
-      checkedAt: new Date().toISOString()
-    });
+    onSave(formData);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Status */}
+      {/* Decision */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Check Result</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Warehouse Decision</label>
         <select
-          value={formData.status}
-          onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+          value={formData.warehouseDecision}
+          onChange={(e) => setFormData(prev => ({ ...prev, warehouseDecision: e.target.value as any }))}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           required
         >
@@ -1145,169 +905,51 @@ const ProductCheckEditForm: React.FC<{
         </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Physical Condition */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Approved Quantity */}
         <div>
-          <h5 className="font-medium text-gray-900 mb-3">Physical Condition</h5>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Packaging</label>
-              <select
-                value={formData.physicalCondition.packaging}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  physicalCondition: { ...prev.physicalCondition, packaging: e.target.value as any }
-                }))}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="good">Good</option>
-                <option value="acceptable">Acceptable</option>
-                <option value="damaged">Damaged</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Labeling</label>
-              <select
-                value={formData.physicalCondition.labeling}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  physicalCondition: { ...prev.physicalCondition, labeling: e.target.value as any }
-                }))}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="correct">Correct</option>
-                <option value="incorrect">Incorrect</option>
-                <option value="missing">Missing</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Appearance</label>
-              <select
-                value={formData.physicalCondition.appearance}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  physicalCondition: { ...prev.physicalCondition, appearance: e.target.value as any }
-                }))}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="normal">Normal</option>
-                <option value="acceptable">Acceptable</option>
-                <option value="abnormal">Abnormal</option>
-              </select>
-            </div>
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Approved Quantity</label>
+          <div className="flex items-center space-x-2">
+            <input
+               type="number"
+               value={formData.approvedQty}
+               onChange={(e) => setFormData(prev => ({ ...prev, approvedQty: parseFloat(e.target.value) || 0 }))}
+               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               step="0.01"
+               min="0"
+               max={product.qcPassedQty}
+               disabled={formData.warehouseDecision === 'rejected'}
+             />
+             <span className="text-sm text-gray-500">units</span>
+           </div>
+           <div className="text-xs text-gray-500 mt-1">
+             QC Passed: {product.qcPassedQty} units
+           </div>
         </div>
 
-        {/* Quantity Verification */}
+        {/* Storage Location */}
         <div>
-          <h5 className="font-medium text-gray-900 mb-3">Quantity Verification</h5>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Actual Quantity</label>
-              <input
-                type="number"
-                value={formData.quantityVerification.actualQty}
-                onChange={(e) => {
-                  const actualQty = parseFloat(e.target.value) || 0;
-                  const variance = actualQty - product.receivedQty;
-                  setFormData(prev => ({
-                    ...prev,
-                    quantityVerification: { 
-                      ...prev.quantityVerification, 
-                      actualQty,
-                      variance,
-                      acceptable: Math.abs(variance) <= (product.receivedQty * 0.05) // 5% tolerance
-                    }
-                  }));
-                }}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                step="0.01"
-                min="0"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Variance</label>
-              <input
-                type="number"
-                value={formData.quantityVerification.variance}
-                readOnly
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-gray-50"
-              />
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.quantityVerification.acceptable}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  quantityVerification: { ...prev.quantityVerification, acceptable: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">Acceptable</label>
-            </div>
-          </div>
-        </div>
-
-        {/* Documentation Status */}
-        <div>
-          <h5 className="font-medium text-gray-900 mb-3">Documentation</h5>
-          <div className="space-y-3">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.documentationStatus.invoiceMatch}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  documentationStatus: { ...prev.documentationStatus, invoiceMatch: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">Invoice Match</label>
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.documentationStatus.poMatch}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  documentationStatus: { ...prev.documentationStatus, poMatch: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">PO Match</label>
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.documentationStatus.certificatesAvailable}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  documentationStatus: { ...prev.documentationStatus, certificatesAvailable: e.target.checked }
-                }))}
-                className="rounded border-gray-300 mr-2"
-              />
-              <label className="text-sm text-gray-600">Certificates Available</label>
-            </div>
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Storage Location</label>
+          <input
+            type="text"
+            value={formData.storageLocation}
+            onChange={(e) => setFormData(prev => ({ ...prev, storageLocation: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="e.g., A1-B2-C3"
+            disabled={formData.warehouseDecision === 'rejected'}
+          />
         </div>
       </div>
 
       {/* Remarks */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Warehouse Remarks</label>
         <textarea
-          value={formData.remarks}
-          onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
+          value={formData.warehouseRemarks}
+          onChange={(e) => setFormData(prev => ({ ...prev, warehouseRemarks: e.target.value }))}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Add any additional comments or observations..."
+          placeholder="Add any comments about the warehouse decision..."
         />
       </div>
 

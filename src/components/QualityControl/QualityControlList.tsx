@@ -434,8 +434,10 @@ const QualityControlList: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {qcRecords.map((qc) => {
-                  const completedProducts = qc.products.filter(p => p.overallStatus !== 'pending').length;
-                  const progress = qc.products.length > 0 ? (completedProducts / qc.products.length) * 100 : 0;
+                  // Filter out products with zero received quantity
+                  const validProducts = qc.products.filter(p => p.receivedQty > 0);
+                  const completedProducts = validProducts.filter(p => p.overallStatus !== 'pending').length;
+                  const progress = validProducts.length > 0 ? (completedProducts / validProducts.length) * 100 : 0;
                   
                   return (
                     <tr key={qc._id} className="hover:bg-gray-50">
@@ -486,7 +488,7 @@ const QualityControlList: React.FC = () => {
                       
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {completedProducts} / {qc.products.length} products
+                          {completedProducts} / {validProducts.length} products
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                           <div 
@@ -528,8 +530,10 @@ const QualityControlList: React.FC = () => {
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-4">
             {qcRecords.map((qc) => {
-              const completedProducts = qc.products.filter(p => p.overallStatus !== 'pending').length;
-              const progress = qc.products.length > 0 ? (completedProducts / qc.products.length) * 100 : 0;
+              // Filter out products with zero received quantity
+              const validProducts = qc.products.filter(p => p.receivedQty > 0);
+              const completedProducts = validProducts.filter(p => p.overallStatus !== 'pending').length;
+              const progress = validProducts.length > 0 ? (completedProducts / validProducts.length) * 100 : 0;
               
               return (
                 <div key={qc._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -605,7 +609,7 @@ const QualityControlList: React.FC = () => {
                       <div className="flex justify-between text-sm mb-1">
                         <span className="text-gray-500">Progress:</span>
                         <span className="text-gray-900">
-                          {completedProducts} / {qc.products.length} products
+                          {completedProducts} / {validProducts.length} products
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">

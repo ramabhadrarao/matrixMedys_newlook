@@ -195,6 +195,16 @@ export const warehouseApprovalAPI = {
     }
   },
 
+  // Create warehouse approval from QC record
+  createWarehouseApprovalFromQC: async (qcId: string, data?: { priority?: string; assignedTo?: string }) => {
+    try {
+      const response = await api.post(`/warehouse-approval/from-qc/${qcId}`, data || {});
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
   // Update product warehouse check
   updateProductWarehouseCheck: async (
     warehouseApprovalId: string, 

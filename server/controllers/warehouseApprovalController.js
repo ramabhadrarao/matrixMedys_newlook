@@ -856,9 +856,97 @@ export const getWarehouseApprovalStatistics = async (req, res) => {
   }
 };
 
+// Create warehouse approval from QC record
+export const createWarehouseApproval = async (req, res) => {
+  try {
+    const { qcId } = req.params;
+    const { priority = 'medium', assignedTo } = req.body;
+
+    const qcRecord = await QualityControl.findById(qcId)
+      .populate('invoiceReceiving')
+      .populate('purchaseOrder');
+
+    if (!qcRecord) {
+      return res.status(404).json({ message: 'QC record not found' });
+    }
+
+    if (qcRecord.status !== 'completed') {
+      return res.status(400).json({ message: 'QC record must be completed before sending to warehouse approval' });
+    }
+
+    // Check if warehouse approval already exists
+    const existingWarehouseApproval = await WarehouseApproval.findOne({ qualityControl: qcId });
+    if (existingWarehouseApproval) {
+      return res.status(400).json({ message: 'Warehouse approval already exists for this QC record' });
+    }
+
+    // Get only passed products
+    const passedProducts = qcRecord.products.filter(p => 
+      p.overallStatus === 'passed' || p.overallStatus === 'partial_pass'
+    );
+
+    if (passedProducts.length === 0) {
+      return res.status(400).json({ message: 'No products passed QC to send for warehouse approval' });
+    }
+
+    const warehouseApproval = new WarehouseApproval({
+      qualityControl: qcRecord._id,
+      invoiceReceiving: qcRecord.invoiceReceiving._id,
+      purchaseOrder: qcRecord.purchaseOrder._id,
+      priority,
+      assignedTo: assignedTo || req.user._id,
+      products: passedProducts.map(product => ({
+        product: product.product,
+        productCode: product.productCode,
+        productName: product.productName,
+        batchNo: product.batchNo,
+        mfgDate: product.mfgDate,
+        expDate: product.expDate,
+        qcPassedQty: product.passedQty,
+        warehouseQty: product.passedQty,
+        status: 'pending'
+      })),
+      createdBy: req.user._id
+    });
+
+    await warehouseApproval.save();
+
+    // Update invoice receiving status
+    const invoiceReceiving = await InvoiceReceiving.findById(qcRecord.invoiceReceiving._id);
+    if (invoiceReceiving) {
+      invoiceReceiving.warehouseApproval = warehouseApproval._id;
+      invoiceReceiving.workflowStatus = 'warehouse_pending';
+      await invoiceReceiving.save();
+    }
+
+    await warehouseApproval.populate([
+      { path: 'qualityControl', select: 'qcNumber qcDate overallResult' },
+      { path: 'invoiceReceiving', select: 'invoiceNumber invoiceDate' },
+      { path: 'purchaseOrder', select: 'poNumber poDate' },
+      { path: 'assignedTo', select: 'name email' },
+      { path: 'createdBy', select: 'name email' }
+    ]);
+
+    res.status(201).json({
+      success: true,
+      message: 'QC sent to warehouse approval successfully',
+      data: warehouseApproval
+    });
+
+  } catch (error) {
+    console.error('Create warehouse approval error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to send QC to warehouse approval',
+      error: error.message 
+    });
+  }
+};
+
 export default {
   getWarehouseApproval,
   getWarehouseApprovals,
+  createWarehouseApproval,
   updateProductWarehouseCheck,
   submitForManagerApproval,
   managerApprovalAction,
