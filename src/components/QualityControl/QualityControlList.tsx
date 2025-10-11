@@ -77,7 +77,7 @@ interface QualityControl {
 interface QCFilters {
   search: string;
   status: string;
-  result: string;
+  overallResult: string;
   dateFrom: string;
   dateTo: string;
   page: number;
@@ -113,7 +113,7 @@ const QualityControlList: React.FC = () => {
   const [filters, setFilters] = useState<QCFilters>({
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || '',
-    result: searchParams.get('result') || '',
+    overallResult: searchParams.get('overallResult') || '',
     dateFrom: searchParams.get('dateFrom') || '',
     dateTo: searchParams.get('dateTo') || '',
     page: parseInt(searchParams.get('page') || '1'),
@@ -314,8 +314,8 @@ const QualityControlList: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Result</label>
                 <select
-                  value={filters.result}
-                  onChange={(e) => handleFilterChange('result', e.target.value)}
+                  value={filters.overallResult}
+                  onChange={(e) => handleFilterChange('overallResult', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">All Results</option>
